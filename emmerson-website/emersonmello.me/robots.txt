@@ -1,0 +1,3 @@
+User-agent: *
+
+Sitemap: https://emersonmello.me/sitemap.xml

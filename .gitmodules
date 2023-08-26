@@ -1,0 +1,3 @@
+[submodule "soft/stm32-nrf24l01-lib"]
+	path = soft/stm32-nrf24l01-lib
+	url = https://github.com/elmot/nrf24l01-lib.git
