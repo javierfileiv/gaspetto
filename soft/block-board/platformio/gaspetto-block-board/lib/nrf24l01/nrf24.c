@@ -2,6 +2,9 @@
 
 #include "nrf24.h"
 #include "impl/stm32-f1/zephyr/impl_nrf.h"
+LOG_MODULE_DECLARE(LOG_MODULE_NAME, LOG_LEVEL_DBG);
+// LOG_MODULE_DECLARE(NRF24L_driver, LOG_LEVEL_DBG);
+
 // Read a register
 // input:
 //   reg - number of register to read

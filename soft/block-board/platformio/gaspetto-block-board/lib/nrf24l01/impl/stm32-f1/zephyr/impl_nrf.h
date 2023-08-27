@@ -39,12 +39,26 @@ static inline void nRF24_CSN_H()
 static inline uint8_t nRF24_LL_RW(uint8_t data)
 {
 	// Wait until TX buffer is empty
-	uint8_t result;
-	if (HAL_SPI_TransmitReceive(&hspi1, &data, &result, 1, 2000) != HAL_OK)
-	{
-		Error_Handler();
-	};
-	return result;
+	uint8_t result_buf;
+	uint8_t *result_ptr;
+	struct spi_buf tx_buf, rx_buf;
+
+	tx_buf.buf = &data;
+	tx_buf.len = sizeof(data);
+
+	rx_buf.buf = &result_buf;
+	rx_buf.len = sizeof(result_buf);
+
+	struct spi_buf_set tx_buf_set = {.buffers = &tx_buf, .count = 1};
+	struct spi_buf_set rx_buf_set = {.buffers = &rx_buf, .count = 1};
+
+	if(spi_transceive(_local_nrf24l01.bus_nrf->bus, _local_nrf24l01.bus_nrf->config, &tx_buf_set, &rx_buf_set)) {
+		LOG_WRN("SPI TX failed.")
+		return 1
+	}
+
+	result_ptr = (uint8_t *)rx_buf_set.buffers->buf;
+	return result_ptr[0];
 }
 
 static inline void Delay_ms(uint32_t ms) { HAL_Delay(ms); }

@@ -4,7 +4,10 @@
 #include <stdint.h>
 #include <drivers/gpio.h>
 #include <drivers/spi.h>
+#include <logging/log.h>
 
+#define LOG_MODULE_NAME	NRF24L_driver
+// LOG_MODULE_DECLARE(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 struct nrf24L01_device
 {
 	struct device *dev_gpio_ce;
@@ -13,7 +16,8 @@ struct nrf24L01_device
 	struct device *dev_gpio_csn;
 	gpio_pin_t pin_csn;
 	gpio_flags_t flags_csn;
-	struct device *dev_spi_nrf;
+	struct spi_dt_spec *bus_nrf;
+	const struct spi_config *spi_nrf_config;
 };
 
 // Low level functions (hardware depended)

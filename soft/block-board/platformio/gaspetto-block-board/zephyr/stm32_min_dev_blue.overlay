@@ -1,0 +1,14 @@
+123
+/ {
+	soc {
+		&spi1 {
+			compatible = "st,stm32-spi";
+			/* Configure other SPI device properties as needed.
+				* Find your device's DT binding for details. */
+			spi-max-frequency = <4000000>;
+		};
+	};
+	aliases {
+		bus-nrf24l01 = &spi2;
+	};
+   };
