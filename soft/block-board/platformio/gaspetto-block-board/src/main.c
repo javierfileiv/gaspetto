@@ -142,7 +142,7 @@ K_THREAD_DEFINE(blink0_id, STACKSIZE, blink0, NULL, NULL, NULL, PRIORITY, 0, 0);
 #include <device.h>
 #include <devicetree.h>
 #include <drivers/gpio.h>
-#include "nrf24.h"
+#include <nrf24.h>
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   1000
@@ -162,11 +162,11 @@ K_THREAD_DEFINE(blink0_id, STACKSIZE, blink0, NULL, NULL, NULL, PRIORITY, 0, 0);
 #define FLAGS	0
 #endif
 
-#define SPI2_NODE DT_NODELABEL(spi1)
-#if DT_NODE_HAS_STATUS(SPI2_NODE, okay)
-#else
-#error "Unsupported board: spi1 devicetree alias is not defined"
-#endif
+// #define SPI2_NODE DT_NODELABEL(spi2)
+// #if DT_NODE_HAS_STATUS(SPI2_NODE, okay)
+// #else
+// #error "Unsupported board: spi1 devicetree alias is not defined"
+// #endif
 
 // static const struct gpio_dt_spec wifi_coex_in_spec =
 // 	GPIO_DT_SPEC_GET(DT_NODELABEL(led), gpios);
@@ -181,6 +181,63 @@ K_THREAD_DEFINE(blink0_id, STACKSIZE, blink0, NULL, NULL, NULL, PRIORITY, 0, 0);
 // 	.pin_number = CONFIG_UWB_EXT_SW_GPIO_PIN,
 // };
 
+// static const struct device *const qm33_spi_device =
+// 	DEVICE_DT_GET(DT_BUS(DT_NODELABEL(dw35720)));
+// static const struct spi_config qm33_spi_config =
+// 	SPI_CONFIG_DT(DT_NODELABEL(dw35720), QSPI_OP_FLAGS, 0);
+// #define CONFIG_QM33_SPI_DEV qm33_spi_device
+
+// static struct qspi_instance qm33_qspi_instance = {
+// 	.instance_number = CONFIG_UWB_SPI_INSTANCE,
+// 	.dev = CONFIG_QM33_SPI_DEV,
+// };
+
+// const struct qspi_config qm33_qspi_config = {
+// 	.sck_pin = {
+// 		.port = CONFIG_SPI_UWB_SCK_GPIO_PORT,
+// 		.pin_number = CONFIG_SPI_UWB_SCK_GPIO_PIN_NUMBER,
+// 		.dev = CONFIG_SPI_UWB_SCK_GPIO_DEV,
+// 	},
+// 	.mosi_pin = {
+// 		.port = CONFIG_SPI_UWB_MOSI_GPIO_PORT,
+// 		.pin_number = CONFIG_SPI_UWB_MOSI_GPIO_PIN_NUMBER,
+// 		.dev = CONFIG_SPI_UWB_MOSI_GPIO_DEV,
+// 	},
+// 	.miso_pin = {
+// 		.port = CONFIG_SPI_UWB_MISO_GPIO_PORT,
+// 		.pin_number = CONFIG_SPI_UWB_MISO_GPIO_PIN_NUMBER,
+// 		.dev = CONFIG_SPI_UWB_MISO_GPIO_DEV,
+// 	},
+// 	.ss_pin = {
+// 		.port = CONFIG_SPI_UWB_SS_GPIO_PORT,
+// 		.pin_number = CONFIG_SPI_UWB_SS_GPIO_PIN_NUMBER,
+// 		.dev = CONFIG_SPI_UWB_SS_GPIO_DEV,
+// 	},
+// 	.freq_hz = CONFIG_SPI_UWB_INIT_FREQ,
+
+// 	.irq_priority = CONFIG_SPI_UWB_IRQ_PRIORITY,
+
+// 	.op_flags = QSPI_OP_FLAGS,
+// };
+
+// struct device *dev_gpio_ce;
+// gpio_pin_t pin_ce;
+// gpio_flags_t flags_ce;
+// struct device *dev_gpio_csn;
+// gpio_pin_t pin_csn;
+// gpio_flags_t flags_csn;
+// struct spi_dt_spec *bus_nrf;
+// const struct spi_config *spi_nrf_config;
+// struct spi_config spi_cfg
+// {
+// 	.frequency = 100000,
+// 	.operation = SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_OP_MODE_MASTER,
+// };
+
+// struct nrf24L01_device nrf24l01
+// {
+// 	.
+// };
 
 void main(void)
 {

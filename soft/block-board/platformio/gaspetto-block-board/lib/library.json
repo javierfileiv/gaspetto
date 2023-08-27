@@ -1,5 +1,5 @@
 {
-  "name": "nrf24l01",
+  "name": "libnrf24l01",
   "version": "0.0.1",
   "keywords": "NRF24L01 library",
   "description": "NRF24L01 library",
@@ -9,9 +9,8 @@
   },
   "export": {
     "include": [
-      "nrf24l01/*.c",
       "nrf24l01/*.h"
-      "nrf24l01/impl/stm32-f1/zephyr/*.[c,h]"
+      "nrf24l01/impl/stm32-f1/zephyr/*.h"
     ]
   },
   "frameworks": "*",

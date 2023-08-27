@@ -1,27 +1,12 @@
 #ifndef __NRF24_H
 #define __NRF24_H
 
-#include <stdint.h>
-#include <drivers/gpio.h>
-#include <drivers/spi.h>
-#include <logging/log.h>
+#ifdef __ZEPHYR__
+#include "impl/stm32-f1/zephyr/impl_nrf.h"
+#endif
 
-#define LOG_MODULE_NAME	NRF24L_driver
-// LOG_MODULE_DECLARE(LOG_MODULE_NAME, LOG_LEVEL_DBG);
-struct nrf24L01_device
-{
-	struct device *dev_gpio_ce;
-	gpio_pin_t pin_ce;
-	gpio_flags_t flags_ce;
-	struct device *dev_gpio_csn;
-	gpio_pin_t pin_csn;
-	gpio_flags_t flags_csn;
-	struct spi_dt_spec *bus_nrf;
-	const struct spi_config *spi_nrf_config;
-};
-
-// Low level functions (hardware depended)
-// #include "impl/stm32-f1/support.h"
+#define LOG_MODULE_NAME NRF24L_driver
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 // nRF24L0 instruction definitions
 #define nRF24_CMD_R_REGISTER (uint8_t)0x00	   // Register read
@@ -218,7 +203,8 @@ static const uint8_t nRF24_RX_PW_PIPE[6] = {
     nRF24_REG_RX_PW_P2,
     nRF24_REG_RX_PW_P3,
     nRF24_REG_RX_PW_P4,
-    nRF24_REG_RX_PW_P5};
+    nRF24_REG_RX_PW_P5,
+};
 
 // Addresses of the address registers
 static const uint8_t nRF24_ADDR_REGS[7] = {
@@ -228,10 +214,14 @@ static const uint8_t nRF24_ADDR_REGS[7] = {
     nRF24_REG_RX_ADDR_P3,
     nRF24_REG_RX_ADDR_P4,
     nRF24_REG_RX_ADDR_P5,
-    nRF24_REG_TX_ADDR};
+    nRF24_REG_TX_ADDR,
+};
 
 // Function prototypes
-void nRF24_Init(struct nrf24L01_device *nrf24l01);
+
+int nRF24_Init(const struct nrf24L01_device *nrf24l01);
+/* Struct initialization function. */
+int nRF24_Init_Device(const struct nrf24L01_device *nrf24l01);
 uint8_t nRF24_Check(void);
 
 void nRF24_SetPowerMode(uint8_t mode);
