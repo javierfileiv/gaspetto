@@ -1,0 +1,74 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Cortex Debug",
+			"cwd": "${workspaceFolder}",
+			"executable": "./bin/car.ino.elf",
+			"request": "launch",
+			"type": "cortex-debug",
+			"runToEntryPoint": "main",
+			"args": [],
+			"stopAtEntry": true,
+			"externalConsole": true,
+			"MIMode": "gdb",
+			"miDebuggerPath": "D:/tools/armtools/bin/arm-none-eabi-gdb.exe",
+			"setupCommands": [
+			{
+				"description": "Connect to remote",
+				"text": "target extended-remote COM9"
+			},
+			{
+				"text": "monitor jtag_scan"
+			},
+			{
+				"text": "attach 1"
+			},
+			{
+				"text": "file C:/Users/mgoodner/Source/Repos/1bitsy-examples/examples/1bitsy/fancyblink/fancyblink.elf"
+			},
+			{
+				"text": "load"
+			}
+			]
+	}
+	],
+
+	"configurations": [
+	    {
+		"name": "BMP JTAG Launch",
+		"type": "cppdbg",
+		"request": "launch",
+		"program": "${workspaceRoot}/fancyblink.elf",
+		"stopAtEntry": true,
+		"cwd": "${workspaceRoot}",
+		"environment": [],
+		"externalConsole": true,
+		//"logging": { "trace": true, "traceResponse": true, "engineLogging": true },
+		"windows": {
+		    "MIMode": "gdb",
+		    "miDebuggerPath": "D:/tools/armtools/bin/arm-none-eabi-gdb.exe",
+		    "setupCommands": [
+			{
+			    "description": "Connect to remote",
+			    "text": "target extended-remote COM9"
+			},
+			{
+			    "text": "monitor jtag_scan"
+			},
+			{
+			    "text": "attach 1"
+			},
+			{
+			    "text": "file C:/Users/mgoodner/Source/Repos/1bitsy-examples/examples/1bitsy/fancyblink/fancyblink.elf"
+			},
+			{
+			    "text": "load"
+			}
+		    ]
+		}
+	    }
+}
