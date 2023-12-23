@@ -1,0 +1,6 @@
+{
+    "configuration": "pnum=BLUEPILL_F103CB,upload_method=swdMethod,xserial=generic,usb=CDCgen,xusb=FS,opt=o0std,dbg=none,rtlib=nano",
+    "board": "STMicroelectronics:stm32:GenF1",
+    "sketch": "car.ino",
+    "port": "/dev/ttyACM0"
+}
