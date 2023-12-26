@@ -60,7 +60,6 @@
             "defines": [
                 "VECT_TAB_OFFSET=0x0",
                 "USE_FULL_LL_DRIVER",
-                "NDEBUG",
                 "STM32F1xx",
                 "ARDUINO=10607",
                 "ARDUINO_BLUEPILL_F103CB",

@@ -1,12 +1,19 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 
+#if defined(TIM1) //PB0 and PB1
+TIM_TypeDef *_timer1 = TIM1;
+#else
+#error "Choose another timer for your device"
+#endif
+
+#if defined(TIM2) //PB10 and PB11
+TIM_TypeDef *_timer2_ = TIM2;
+#else
+#error "Choose another timer for your device"
+#endif
 
 const uint8_t LED_PIN = LED_BUILTIN;
-const uint8_t INT1 = PB3;
-const uint8_t INT2 = PA15;
-const uint8_t INT3 = PB5;
-const uint8_t INT4 = PB4;
 
 volatile uint32_t count = 0;
 
@@ -65,28 +72,53 @@ static void vPrintTask(void *pvParameters)
 	}
 }
 //------------------------------------------------------------------------------
+// const uint8_t INT0 = PB4;
+// const uint8_t INT1 = PB5;
+// const uint8_t INT2 = PB3;
+// const uint8_t INT3 = PA15;
+const uint8_t INT0 = PB1;
+const uint8_t INT1 = PB0;
+const uint8_t INT2 = PB11;
+const uint8_t INT3 = PB10;
 void setup()
 {
 	Serial.begin(9600);
-	// wait for Leonardo
-	while (!Serial)
-	{
-	}
 
 	pinMode(pinHall, INPUT);
+	pinMode(INT0, OUTPUT);
 	pinMode(INT1, OUTPUT);
 	pinMode(INT2, OUTPUT);
 	pinMode(INT3, OUTPUT);
-	pinMode(INT4, OUTPUT);
-	digitalWrite(INT1, LOW);
-	digitalWrite(INT2, LOW);
-	digitalWrite(INT3, LOW);
-	digitalWrite(INT4, LOW);
+
+	TIM_TypeDef *Timer1 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(INT0), PinMap_PWM);
+	uint32_t channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT0), PinMap_PWM));
+	HardwareTimer *Timer1_instance = new HardwareTimer(Timer1);
+	Timer1_instance->setPWM(channel, INT0, 1000, 90); // 1 KHertz, 90% dutycycle
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT1), PinMap_PWM));
+	Timer1_instance->setPWM(channel, INT1, 1000, 20); // 1 KHertz, 20% dutycycle
+
+
+	TIM_TypeDef *Timer2 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(INT2), PinMap_PWM);
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT2), PinMap_PWM));
+	HardwareTimer *Timer2_instance = new HardwareTimer(Timer2);
+	Timer2_instance->setPWM(channel, INT2, 5, 10); // 5 Hertz, 10% dutycycle
+
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT3), PinMap_PWM));
+	Timer2_instance->setPWM(channel, INT3, 5, 90); // 5 Hertz, 90% dutycycle
+
+	// digitalWrite(INT0, HIGH);
+	// digitalWrite(INT1, LOW);
+	// digitalWrite(INT2, HIGH);
+	// digitalWrite(INT3, LOW);
 
 
 
+	// analogWrite(INT0,0);
+	// analogWrite(INT1,0);
+	// analogWrite(INT2,0);
+	// analogWrite(INT3,0);
 
-	Serial.begin(9600);
+	// Serial.begin(9600);
 	pinMode(Hall_Sensor_Gnd_Pin_0, OUTPUT);
 	digitalWrite(Hall_Sensor_Gnd_Pin_0, LOW);
 
@@ -123,30 +155,30 @@ void loop()
 	long measure = 0;
 	while (1)
 	{
-		// must insure increment is atomic
-		// in case of context switch for print
-		noInterrupts();
-		count++;
-		interrupts();
-		for (int i = 0; i < 10; i++)
-		{
+		// // must insure increment is atomic
+		// // in case of context switch for print
+		// noInterrupts();
+		// count++;
+		// interrupts();
+		// for (int i = 0; i < 10; i++)
+		// {
 
-			measure += analogRead(pinHall);
-		}
-		measure /= 10;
-		// voltage in mV
-		float outputV = measure * 5000.0 / 1023;
-		Serial.print("Output Voltaje = ");
-		Serial.print(outputV);
-		Serial.print(" mV   ");
-		Serial.print(" \n");
+		// 	measure += analogRead(pinHall);
+		// }
+		// measure /= 10;
+		// // voltage in mV
+		// float outputV = measure * 5000.0 / 1023;
+		// Serial.print("JAVIOutput Voltaje = ");
+		// Serial.print(outputV);
+		// Serial.print(" mV   ");
+		// Serial.print(" \n");
 
-		// flux density
-		float magneticFlux = outputV * 53.33 - 133.3;
-		Serial.print("Magnetic Flux Density = ");
-		Serial.print(magneticFlux);
-		Serial.print(" mT");
-		Serial.print(" \n");
-		delay(2000);
+		// // flux density
+		// float magneticFlux = outputV * 53.33 - 133.3;
+		// Serial.print("Magnetic Flux Density = ");
+		// Serial.print(magneticFlux);
+		// Serial.print(" mT");
+		// Serial.print(" \n");
+		// delay(2000);
 	}
 }

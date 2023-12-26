@@ -5,70 +5,21 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Cortex Debug",
-			"cwd": "${workspaceFolder}",
-			"executable": "./bin/car.ino.elf",
-			"request": "launch",
+			"name": "Arduino Debug (ST-Link)",
 			"type": "cortex-debug",
-			"runToEntryPoint": "main",
-			"args": [],
-			"stopAtEntry": true,
-			"externalConsole": true,
-			"MIMode": "gdb",
-			"miDebuggerPath": "D:/tools/armtools/bin/arm-none-eabi-gdb.exe",
-			"setupCommands": [
-			{
-				"description": "Connect to remote",
-				"text": "target extended-remote COM9"
-			},
-			{
-				"text": "monitor jtag_scan"
-			},
-			{
-				"text": "attach 1"
-			},
-			{
-				"text": "file C:/Users/mgoodner/Source/Repos/1bitsy-examples/examples/1bitsy/fancyblink/fancyblink.elf"
-			},
-			{
-				"text": "load"
-			}
-			]
-	}
-	],
-
-	"configurations": [
-	    {
-		"name": "BMP JTAG Launch",
-		"type": "cppdbg",
-		"request": "launch",
-		"program": "${workspaceRoot}/fancyblink.elf",
-		"stopAtEntry": true,
-		"cwd": "${workspaceRoot}",
-		"environment": [],
-		"externalConsole": true,
-		//"logging": { "trace": true, "traceResponse": true, "engineLogging": true },
-		"windows": {
-		    "MIMode": "gdb",
-		    "miDebuggerPath": "D:/tools/armtools/bin/arm-none-eabi-gdb.exe",
-		    "setupCommands": [
-			{
-			    "description": "Connect to remote",
-			    "text": "target extended-remote COM9"
-			},
-			{
-			    "text": "monitor jtag_scan"
-			},
-			{
-			    "text": "attach 1"
-			},
-			{
-			    "text": "file C:/Users/mgoodner/Source/Repos/1bitsy-examples/examples/1bitsy/fancyblink/fancyblink.elf"
-			},
-			{
-			    "text": "load"
-			}
-		    ]
+			"request": "launch",
+			"servertype": "bmp",
+			"device": "STM32F1",
+			"cwd": "${workspaceFolder}",
+			"executable": "${workspaceFolder}/build/car.ino.elf",
+			"interface": "swd",
+			"svdFile": "",
+			"BMPGDBSerialPort": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+			"runToEntryPoint": "setup",
+			"gdbPath" : "/usr/bin/gdb-multiarch",
+			"overrideLaunchCommands": ["cd ${workspaceRoot}/build","target extended-remote /dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+"monitor swdp_scan","attach 1","file car.ino.elf","load","cd ${workspaceRoot}","set mem inaccessible-by-default off","continue"
+			    ],
 		}
-	    }
+	]
 }
