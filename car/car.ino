@@ -1,14 +1,21 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 
-#if defined(TIM1) //PB0 and PB1
+#define DC_MOTOR_PWM_FREQ	20000 /* 20 Khz PWM frequency. */
+#if defined(TIM1) // PB0 and PB1
 TIM_TypeDef *_timer1 = TIM1;
 #else
 #error "Choose another timer for your device"
 #endif
 
-#if defined(TIM2) //PB10 and PB11
+#if defined(TIM2) // PB10 and PB11
 TIM_TypeDef *_timer2_ = TIM2;
+#else
+#error "Choose another timer for your device"
+#endif
+
+#if defined(TIM3) // PB4 and PB5
+TIM_TypeDef *_timer3_ = TIM3;
 #else
 #error "Choose another timer for your device"
 #endif
@@ -16,9 +23,6 @@ TIM_TypeDef *_timer2_ = TIM2;
 const uint8_t LED_PIN = LED_BUILTIN;
 
 volatile uint32_t count = 0;
-
-const int pinHall = A1;
-#define Hall_Sensor_Gnd_Pin_0 5
 
 // handle for blink task
 TaskHandle_t blink;
@@ -72,55 +76,69 @@ static void vPrintTask(void *pvParameters)
 	}
 }
 //------------------------------------------------------------------------------
-// const uint8_t INT0 = PB4;
-// const uint8_t INT1 = PB5;
-// const uint8_t INT2 = PB3;
-// const uint8_t INT3 = PA15;
-const uint8_t INT0 = PB1;
-const uint8_t INT1 = PB0;
-const uint8_t INT2 = PB11;
-const uint8_t INT3 = PB10;
+#define OPTION
+#ifdef OPTION
+const uint8_t IN_A = PB4;  // green  TIM3_CH1
+const uint8_t IN_B = PB5;  // orange   TIM3_CH2
+const uint8_t IN_C = PB3;  // violet   TIM2_CH2
+const uint8_t IN_D = PA15; // brown    TIM2_CH1_ETR
+#else
+const uint8_t IN_B = PB1; // TIM1_CH3N
+const uint8_t IN_A = PB0; // TIM1_CH2N
+const uint8_t IN_C = PB11; // TIM2_CH4
+const uint8_t IN_D = PB10; // TIM2_CH3
+#endif
+
+#define DUTY_A	0
+#define DUTY_B	0
+#define DUTY_C	50
+#define DUTY_D	0
 void setup()
 {
 	Serial.begin(9600);
 
-	pinMode(pinHall, INPUT);
-	pinMode(INT0, OUTPUT);
-	pinMode(INT1, OUTPUT);
-	pinMode(INT2, OUTPUT);
-	pinMode(INT3, OUTPUT);
-
-	TIM_TypeDef *Timer1 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(INT0), PinMap_PWM);
-	uint32_t channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT0), PinMap_PWM));
-	HardwareTimer *Timer1_instance = new HardwareTimer(Timer1);
-	Timer1_instance->setPWM(channel, INT0, 1000, 90); // 1 KHertz, 90% dutycycle
-	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT1), PinMap_PWM));
-	Timer1_instance->setPWM(channel, INT1, 1000, 20); // 1 KHertz, 20% dutycycle
-
-
-	TIM_TypeDef *Timer2 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(INT2), PinMap_PWM);
-	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT2), PinMap_PWM));
+	pinMode(IN_A, OUTPUT);
+	pinMode(IN_B, OUTPUT);
+	pinMode(IN_C, OUTPUT);
+	pinMode(IN_D, OUTPUT);
+#ifdef OPTION
+	TIM_TypeDef *Timer3 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(IN_A), PinMap_PWM);
+	HardwareTimer *Timer3_instance = new HardwareTimer(Timer3);
+	TIM_TypeDef *Timer2 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(IN_C), PinMap_PWM);
 	HardwareTimer *Timer2_instance = new HardwareTimer(Timer2);
-	Timer2_instance->setPWM(channel, INT2, 5, 10); // 5 Hertz, 10% dutycycle
 
-	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(INT3), PinMap_PWM));
-	Timer2_instance->setPWM(channel, INT3, 5, 90); // 5 Hertz, 90% dutycycle
+	uint32_t channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_A), PinMap_PWM));
+	Timer3_instance->setPWM(channel, IN_A, DC_MOTOR_PWM_FREQ, DUTY_A);
 
-	// digitalWrite(INT0, HIGH);
-	// digitalWrite(INT1, LOW);
-	// digitalWrite(INT2, HIGH);
-	// digitalWrite(INT3, LOW);
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_B), PinMap_PWM));
+	Timer3_instance->setPWM(channel, IN_B, DC_MOTOR_PWM_FREQ, DUTY_B);
 
 
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_C), PinMap_PWM));
+	Timer2_instance->setPWM(channel, IN_C, DC_MOTOR_PWM_FREQ, DUTY_C);
 
-	// analogWrite(INT0,0);
-	// analogWrite(INT1,0);
-	// analogWrite(INT2,0);
-	// analogWrite(INT3,0);
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_D), PinMap_PWM));
+	Timer2_instance->setPWM(channel, IN_D, DC_MOTOR_PWM_FREQ, DUTY_D);
+#else
+	TIM_TypeDef *Timer1 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(IN_B), PinMap_PWM);
+	HardwareTimer *Timer1_instance = new HardwareTimer(Timer1);
 
-	// Serial.begin(9600);
-	pinMode(Hall_Sensor_Gnd_Pin_0, OUTPUT);
-	digitalWrite(Hall_Sensor_Gnd_Pin_0, LOW);
+	uint32_t channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_B), PinMap_PWM));
+	Timer1_instance->setPWM(channel, IN_B, 1000, 90); // 1 KHertz, 90% dutycycle
+
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_A), PinMap_PWM));
+	Timer1_instance->setPWM(channel, IN_A, 1000, 20); // 1 KHertz, 20% dutycycle
+
+
+	TIM_TypeDef *Timer2 = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(IN_C), PinMap_PWM);
+	HardwareTimer *Timer2_instance = new HardwareTimer(Timer2);
+
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_C), PinMap_PWM));
+	Timer2_instance->setPWM(channel, IN_C, 5, 10); // 5 Hertz, 10% dutycycle
+
+	channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(IN_D), PinMap_PWM));
+	Timer2_instance->setPWM(channel, IN_D, 5, 90); // 5 Hertz, 90% dutycycle
+#endif
 
 	// create blink task
 	xTaskCreate(vLEDFlashTask,
@@ -155,30 +173,6 @@ void loop()
 	long measure = 0;
 	while (1)
 	{
-		// // must insure increment is atomic
-		// // in case of context switch for print
-		// noInterrupts();
-		// count++;
-		// interrupts();
-		// for (int i = 0; i < 10; i++)
-		// {
-
-		// 	measure += analogRead(pinHall);
-		// }
-		// measure /= 10;
-		// // voltage in mV
-		// float outputV = measure * 5000.0 / 1023;
-		// Serial.print("JAVIOutput Voltaje = ");
-		// Serial.print(outputV);
-		// Serial.print(" mV   ");
-		// Serial.print(" \n");
-
-		// // flux density
-		// float magneticFlux = outputV * 53.33 - 133.3;
-		// Serial.print("Magnetic Flux Density = ");
-		// Serial.print(magneticFlux);
-		// Serial.print(" mT");
-		// Serial.print(" \n");
-		// delay(2000);
+		delay(2000);
 	}
 }
