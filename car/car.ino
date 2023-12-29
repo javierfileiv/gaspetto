@@ -167,12 +167,48 @@ void setup()
 //------------------------------------------------------------------------------
 // WARNING idle loop has a very small stack (configMINIMAL_STACK_SIZE)
 // loop must never block
+
+//motor 1 est a la izquiera
+
+#define MOTOR_N 2
 void loop()
 {
-	// we measure 10 times and make the mean
-	long measure = 0;
-	while (1)
-	{
-		delay(2000);
-	}
+
+	// Full speed forward
+#if MOTOR_N==1
+	digitalWrite(IN_A, HIGH);
+	digitalWrite(IN_B, LOW);
+#elif MOTOR_N==2
+	digitalWrite(IN_C, HIGH);
+	digitalWrite(IN_D, LOW);
+#endif
+	delay(1000);
+
+
+	// stop
+	digitalWrite(IN_A, LOW);
+	digitalWrite(IN_B, LOW);
+	digitalWrite(IN_C, LOW);
+	digitalWrite(IN_D, LOW);
+
+	delay(5000);
+
+	// Full speed backward
+#if MOTOR_N==1
+	digitalWrite(IN_A, LOW);
+	digitalWrite(IN_B, HIGH);
+#elif MOTOR_N==2
+	digitalWrite(IN_C, LOW);
+	digitalWrite(IN_D, HIGH);
+#endif
+
+	delay(1000);
+
+	// stop
+	digitalWrite(IN_A, LOW);
+	digitalWrite(IN_B, LOW);
+	digitalWrite(IN_C, LOW);
+	digitalWrite(IN_D, LOW);
+
+	delay(5000);
 }
