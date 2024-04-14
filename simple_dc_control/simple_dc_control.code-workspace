@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1"
+		}
+	],
+	"settings": {
+		"cortex-debug.liveWatchRefreshRate": 500,
+		"cortex-debug.gdbPath": "/usr/bin/gdb-multiarch",
+		"cortex-debug.gdbPath.linux": "/usr/bin/gdb-multiarch",
+		"cortex-debug.enableTelemetry": false,
+		"files.associations": {
+			"freertos.h": "c",
+			"functional": "c"
+		},
+		"editor.renderWhitespace": "all",
+		"editor.detectIndentation": false
+	}
+}
