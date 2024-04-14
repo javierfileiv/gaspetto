@@ -19,7 +19,7 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "/home/fixp/sourceCode/gaspetto/car",
+                "/home/fixp/sourceCode/gaspetto/simple_dc_control",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/avr",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32/LL",
@@ -43,7 +43,6 @@
                 "/home/fixp/.arduino15/packages/STMicroelectronics/tools/CMSIS/5.9.0/CMSIS/DSP/PrivateInclude",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/variants/STM32F1xx/F103C8T_F103CB(T-U)",
-                "/home/fixp/Arduino/libraries/STM32duino_FreeRTOS/src",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/libraries/SrcWrapper/src",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/12.2.1-1.2/arm-none-eabi/include/c++/12.2.1",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/12.2.1-1.2/arm-none-eabi/include/c++/12.2.1/arm-none-eabi",

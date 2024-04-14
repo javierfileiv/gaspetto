@@ -1,0 +1,67 @@
+[Settings]
+connect-srst=0
+write-log=1
+print-time=1
+tpwr=0
+connect_srst=0
+[Flash]
+tpwr=0
+full-erase=1
+crp-level=0
+download-address=0x8000000
+postprocess=
+postprocess-failures=0
+auto-download=1
+[Serialize]
+file=
+option=0
+address=:
+match=:
+serial=1:4:0:1
+[Target]
+entrypoint=main
+cmsis-svd=
+source-path=
+[SWO trace]
+mode=0
+bitrate=100000
+clock=48000000
+datasize=8
+enabled=0
+ctf=
+chan0="1 #ebdbb2 0"
+chan1="0 #ebdbb2 1"
+chan2="0 #ebdbb2 2"
+chan3="0 #ebdbb2 3"
+chan4="0 #ebdbb2 4"
+chan5="0 #ebdbb2 5"
+chan6="0 #ebdbb2 6"
+chan7="0 #ebdbb2 7"
+chan8="0 #ebdbb2 8"
+chan9="0 #ebdbb2 9"
+chan10="0 #ebdbb2 10"
+chan11="0 #ebdbb2 11"
+chan12="0 #ebdbb2 12"
+chan13="0 #ebdbb2 13"
+chan14="0 #ebdbb2 14"
+chan15="0 #ebdbb2 15"
+chan16="0 #ebdbb2 16"
+chan17="0 #ebdbb2 17"
+chan18="0 #ebdbb2 18"
+chan19="0 #ebdbb2 19"
+chan20="0 #ebdbb2 20"
+chan21="0 #ebdbb2 21"
+chan22="0 #ebdbb2 22"
+chan23="0 #ebdbb2 23"
+chan24="0 #ebdbb2 24"
+chan25="0 #ebdbb2 25"
+chan26="0 #ebdbb2 26"
+chan27="0 #ebdbb2 27"
+chan28="0 #ebdbb2 28"
+chan29="0 #ebdbb2 29"
+chan30="0 #ebdbb2 30"
+chan31="0 #ebdbb2 31"
+[Serial monitor]
+mode=0
+port=
+baud=0
