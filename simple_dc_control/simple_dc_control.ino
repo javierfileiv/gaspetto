@@ -71,12 +71,16 @@ void m2_speed_irq (void) {
     ++m2_counter;
 }
 
+void stopMotors (void) {
+    m1_timer->setCaptureCompare (channel_M1_FWD, 0, PERCENT_COMPARE_FORMAT);
+    m1_timer->setCaptureCompare (channel_M1_BWD, 0, PERCENT_COMPARE_FORMAT);
+    m2_timer->setCaptureCompare (channel_M2_FWD, 0, PERCENT_COMPARE_FORMAT);
+    m2_timer->setCaptureCompare (channel_M2_BWD, 0, PERCENT_COMPARE_FORMAT);
+    delay (300);
+}
 static void setMotor (enum motor motor, enum direction direction, uint32_t speed) {
     /* wait for 100ms */
     if (motor == MOTOR_1) {
-        m1_timer->setCaptureCompare (channel_M1_FWD, 0, PERCENT_COMPARE_FORMAT);
-        m1_timer->setCaptureCompare (channel_M1_BWD, 0, PERCENT_COMPARE_FORMAT);
-        delay (300);
         switch (direction) {
         case FORDWARD:
             m1_timer->setCaptureCompare (channel_M1_FWD, speed, PERCENT_COMPARE_FORMAT);
@@ -86,9 +90,6 @@ static void setMotor (enum motor motor, enum direction direction, uint32_t speed
             break;
         }
     } else {
-        m2_timer->setCaptureCompare (channel_M2_FWD, 0, PERCENT_COMPARE_FORMAT);
-        m2_timer->setCaptureCompare (channel_M2_BWD, 0, PERCENT_COMPARE_FORMAT);
-        delay (300);
         switch (direction) {
         case FORDWARD:
             m2_timer->setCaptureCompare (channel_M2_FWD, speed, PERCENT_COMPARE_FORMAT);
@@ -112,6 +113,7 @@ static uint32_t centimeters_to_step (float cm) {
 static void MoveForward (int steps, int mspeed) {
     m1_counter = 0; //  reset counter A to zero
     m2_counter = 0; //  reset counter B to zero
+    stopMotors ();
 
     setMotor (MOTOR_1, FORDWARD, mspeed);
     setMotor (MOTOR_2, FORDWARD, mspeed);
@@ -120,14 +122,14 @@ static void MoveForward (int steps, int mspeed) {
     //       while (steps > m1_counter && steps > m2_counter) {
     while (steps > m1_counter || steps > m2_counter)
         ;
-    setMotor (MOTOR_1, FORDWARD, 0);
-    setMotor (MOTOR_2, FORDWARD, 0);
+    stopMotors ();
 }
 
 // Function to Move in Reverse
 static void MoveReverse (int steps, int mspeed) {
     m1_counter = 0; //  reset counter A to zero
     m2_counter = 0; //  reset counter B to zero
+    stopMotors ();
 
     setMotor (MOTOR_1, BACKWARD, mspeed);
     setMotor (MOTOR_2, BACKWARD, mspeed);
@@ -136,8 +138,7 @@ static void MoveReverse (int steps, int mspeed) {
     while (steps > m1_counter && steps > m2_counter)
         ;
 
-    setMotor (MOTOR_1, FORDWARD, 0);
-    setMotor (MOTOR_2, FORDWARD, 0);
+    stopMotors ();
 }
 
 // Function to Spin Right
@@ -145,21 +146,22 @@ static void SpinRight (int steps, int mspeed) {
     m1_counter = 0; //  reset counter A to zero
     m2_counter = 0; //  reset counter B to zero
 
+    stopMotors ();
+
     setMotor (MOTOR_1, FORDWARD, mspeed);
     setMotor (MOTOR_2, BACKWARD, mspeed);
 
     // Go until step value is reached
     while (steps > m1_counter && steps > m2_counter)
         ;
-    // Stop when done
-    setMotor (MOTOR_1, FORDWARD, 0);
-    setMotor (MOTOR_2, FORDWARD, 0);
+    stopMotors ();
 }
 
 // Function to Spin Left
 static void SpinLeft (int steps, int mspeed) {
     m1_counter = 0; //  reset counter A to zero
     m2_counter = 0; //  reset counter B to zero
+    stopMotors ();
 
     // Set Motor A forward
     // Set Motor B reverse
@@ -171,8 +173,7 @@ static void SpinLeft (int steps, int mspeed) {
         ;
 
     // Stop when done
-    setMotor (MOTOR_1, FORDWARD, 0);
-    setMotor (MOTOR_2, FORDWARD, 0);
+    stopMotors ();
 }
 
 void set_interrupt_speed_sensors (void) {
@@ -213,24 +214,20 @@ void setup () {
     set_interrupt_speed_sensors ();
 }
 
+#define STEPS (7)
+#define SPEED (30)
+#define DELAY (2000)
 void loop () {
 
-    // Test Motor Movement  - Experiment with your own sequences here
-    MoveForward (2, 50);
-    //     analogWriteFrequency (25);
-    //     analogWriteResolution (16);
-    //     analogWrite (pin_M2_FWD, 10);
-    //     analogWrite (pin_M1_FWD, 10);
-    delay (10000);
-    MoveReverse (2, 50);
-    delay (10000);
-    MoveForward (2, 50);
-    delay (10000);
-    MoveReverse (2, 50);
-    delay (10000);
-    SpinRight (2, 50);
-    delay (10000);
-    SpinLeft (2, 50);
-    while (1)
-        ;
+    while (1) {
+        // Test Motor Movement  - Experiment with your own sequences here
+        MoveForward (STEPS, SPEED);
+        delay (DELAY);
+        MoveReverse (STEPS, SPEED);
+        delay (DELAY);
+        SpinRight (STEPS, SPEED);
+        delay (DELAY);
+        SpinLeft (STEPS, SPEED);
+        delay (DELAY);
+    }
 }
