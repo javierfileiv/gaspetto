@@ -1,4 +1,0 @@
-{
-    "board": "STMicroelectronics:stm32:GenF4",
-    "configuration": "pnum=BLACKPILL_F411CE,upload_method=dfuMethod,xserial=generic,usb=CDCgen,xusb=FS,opt=ogstd,dbg=enable_all,rtlib=nano"
-}
