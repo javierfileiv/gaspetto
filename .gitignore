@@ -6,3 +6,4 @@ documentation/en.stm32cubeprg-lin-v2-15-0.zip
 car/build
 car_test/build
 simple_dc_control/build
+nrf24++
