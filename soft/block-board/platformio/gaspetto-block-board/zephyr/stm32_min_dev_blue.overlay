@@ -1,5 +1,0 @@
-/ {
-	aliases {
-		bus-nrf24l01 = &spi2;
-	};
-   };
