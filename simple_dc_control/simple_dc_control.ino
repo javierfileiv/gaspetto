@@ -78,10 +78,10 @@ void stopMotors (void) {
     m2_timer->setCaptureCompare (channel_M2_BWD, 0, PERCENT_COMPARE_FORMAT);
     delay (300);
 }
-static void setMotor (enum motor motor, enum direction direction, uint32_t speed) {
+static void setMotor (enum motor motor, enum direction dir, uint32_t speed) {
     /* wait for 100ms */
     if (motor == MOTOR_1) {
-        switch (direction) {
+        switch (dir) {
         case FORDWARD:
             m1_timer->setCaptureCompare (channel_M1_FWD, speed, PERCENT_COMPARE_FORMAT);
             break;
@@ -90,7 +90,7 @@ static void setMotor (enum motor motor, enum direction direction, uint32_t speed
             break;
         }
     } else {
-        switch (direction) {
+        switch (dir) {
         case FORDWARD:
             m2_timer->setCaptureCompare (channel_M2_FWD, speed, PERCENT_COMPARE_FORMAT);
             break;
@@ -200,16 +200,6 @@ void set_interrupt_speed_sensors (void) {
 
 #define INIT_STATE LOW
 void setup () {
-    //     Serial.begin ();
-    //     pinMode (pin_M1_FWD, OUTPUT);
-    //     pinMode (pin_M1_BWD, OUTPUT);
-    //     pinMode (pin_M2_FWD, OUTPUT);
-    //     pinMode (pin_M2_BWD, OUTPUT);
-    //     digitalWrite (pin_M1_FWD, INIT_STATE);
-    //     digitalWrite (pin_M1_BWD, INIT_STATE);
-    //     digitalWrite (pin_M2_FWD, INIT_STATE);
-    //     digitalWrite (pin_M2_BWD, INIT_STATE);
-
     setup_pwm_timer ();
     set_interrupt_speed_sensors ();
 }
