@@ -69,6 +69,13 @@ void readDataBinary(StringStream &s) { readDataBinary(true); }
 
 void readDataHex(StringStream &s) { readDataHex(true); }
 
+void isChipPresent(StringStream &s) {
+  if (radio.isChipConnected())
+    Serial.println(F("NRF ONLINE"));
+  else
+    Serial.println(F("NRF OFFLINE - Verify SPI"));
+}
+
 void reportAutoReceiveMode(StringStream &commandStream) {
   Serial.print(F("ARCE:"));
   switch (receiveMode) {

@@ -27,5 +27,6 @@ const Command command_list[] PROGMEM =
   {"HELP!", help,                "Help!"},
   {"TEST=", setTestMode,         "Set test mode"},
   {"TEST?", reportTestMode,      "Get test mode"},
+  {"HELLO", isChipPresent,      "Get test mode"},
   {"ERROR", nullptr,             "No help :)"}
 };
