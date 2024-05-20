@@ -33,5 +33,5 @@ void help(StringStream& commandStream);
 void setTestMode(StringStream& commandStream);
 void reportTestMode(StringStream& commandStream);
 
-void help(StringStream& commandStream);
+void isChipPresent(StringStream& commandStream);
 #endif //COMMANDS_H
