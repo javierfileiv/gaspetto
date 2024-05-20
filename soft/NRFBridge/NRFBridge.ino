@@ -100,7 +100,6 @@ void loop(void) {
     cmd.toUpperCase();
     command.toUpperCase();
 
-    Serial.println("searching...");
     for (int i = 0;; ++i) {
 
       Command commandStruct = {"", nullptr};

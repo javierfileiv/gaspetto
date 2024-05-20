@@ -165,14 +165,11 @@ void reportTestMode(StringStream &commandStream) {
 
 void setTestMode(StringStream &commandStream) {
   String arg = commandStream.readString();
-  Serial.println(arg);
   testMode = TestMode::Invalid;
   if (arg == F("DISABLED")) {
-    Serial.println(F("TEST:DISABLED"));
     testMode = TestMode::Disabled;
   }
   if (arg == F("COUNTER")) {
-    Serial.println(F("TEST:COUNTER"));
     testMode = TestMode::Counter;
     testCounter = 0;
   }
