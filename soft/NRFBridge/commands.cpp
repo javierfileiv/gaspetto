@@ -15,6 +15,7 @@ void reportTransmitPower(StringStream &commandStream) {
 void setTransmitPower(StringStream &commandStream) {
   uint8_t paLevel = commandStream.parseInt();
   radio.setPALevel(paLevel);
+  Serial.print(F("Set to..."));
   reportTransmitPower(commandStream);
 }
 
@@ -27,6 +28,7 @@ void reportPayloadSize(StringStream &commandStream) {
 void setPayloadSize(StringStream &commandStream) {
   uint8_t payloadSize = commandStream.parseInt();
   radio.setPayloadSize(payloadSize);
+  Serial.print(F("Set to..."));
   reportPayloadSize(commandStream);
 }
 
@@ -62,6 +64,7 @@ void reportChannel(StringStream &commandStream) {
 void setChannel(StringStream &commandStream) {
   uint8_t channel = commandStream.parseInt();
   radio.setChannel(channel);
+  Serial.print(F("Set to..."));
   reportChannel(commandStream);
 }
 
@@ -70,6 +73,8 @@ void readDataBinary(StringStream &s) { readDataBinary(true); }
 void readDataHex(StringStream &s) { readDataHex(true); }
 
 void isChipPresent(StringStream &s) {
+  radio.printPrettyDetails();
+
   if (radio.isChipConnected())
     Serial.println(F("NRF ONLINE"));
   else
@@ -99,6 +104,7 @@ void reportAutoReceiveMode(StringStream &commandStream) {
 void setAutoReceiveMode(StringStream &commandStream) {
   String v = commandStream.readString();
   receiveMode = ReceiveMode::Invalid;
+  Serial.print(F("Set to..."));
   if (v == F("MANUAL"))
     receiveMode = ReceiveMode::Manual;
   if (v == F("BINARY"))

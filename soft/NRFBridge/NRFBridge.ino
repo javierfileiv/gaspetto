@@ -16,27 +16,31 @@
 // picocom /dev/ttyUSB0 --baud 115200 --omap crcrlf --echo
 //
 #define VERSION "0.1.2"
+#define DATA_RATE RF24_1MBPS
+uint8_t address[][6] = {"1Node", "2Node"};
 
 RF24 radio(9, 10); // NRF24L01 used SPI pins + Pin 9 and 10 on the NANO
 
 // configure behaviour of your system here:
-ReceiveMode receiveMode = ReceiveMode::Manual;
+ReceiveMode receiveMode = ReceiveMode::Binary;
 TestMode testMode = TestMode::Disabled;
 rf24_pa_dbm_e defaultPower = RF24_PA_LOW;
-bool openPipesByDefault = false;
-uint8_t defaultAddress[5] = {0, 0, 0, 0, 0};
+bool openPipesByDefault = true;
 
 Timer t;
+float payload = 0.0;
 
 void testIrq() {
   if (testMode != TestMode::Counter)
     return;
-  char buffer[6] = {0};
-  snprintf(buffer, sizeof(buffer), "%04X", testCounter++);
   radio.stopListening();
-  if (!radio.write(buffer, 5))
+  Serial.print(F("Writing "));
+  Serial.println(payload); // print the payload's value
+
+  if (!radio.write(&payload, sizeof(payload)))
     Serial.println("Error writing");
   radio.startListening();
+  payload += 0.01; // increment float payload
 }
 
 String command;
@@ -54,11 +58,14 @@ void setup(void) {
     } // hold program in infinite loop to prevent subsequent errors
   }
   radio.setPALevel(defaultPower);
+  radio.setDataRate(DATA_RATE);
   if (openPipesByDefault) {
-    radio.openReadingPipe(1, defaultAddress);
-    radio.openWritingPipe(defaultAddress);
+    radio.openWritingPipe(address[0]);
+    radio.openReadingPipe(1, address[1]);
   }
-  digitalWrite(LED_BUILTIN, 1);
+  radio.setPayloadSize(4);
+  radio.startListening();
+  radio.printPrettyDetails();
   t.every(1000, testIrq);
 }
 
