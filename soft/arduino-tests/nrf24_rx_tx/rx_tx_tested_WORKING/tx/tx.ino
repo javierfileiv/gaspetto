@@ -26,7 +26,7 @@ bool radioNumber = 1;  // 0 uses address[0] to transmit, 1 uses address[1] to tr
 
 // Used to control whether this node is sending or receiving
 // bool role = _TX;  // true = TX role, false = RX role
-bool role = _RX;  // true = TX role, false = RX role
+bool role = _TX;  // true = TX role, false = RX role
 
 // For this example, we'll be using a payload containing
 // a single float number that will be incremented
@@ -70,7 +70,7 @@ void setup() {
   // because these examples are likely run with nodes in close proximity to
   // each other.
   radio.setPALevel(RF24_PA_LOW);  // RF24_PA_MAX is default.
-  
+
   radio.setDataRate(DATA_RATE);
   // save on transmission time by setting the radio to only transmit the
   // number of bytes we need to transmit a float
