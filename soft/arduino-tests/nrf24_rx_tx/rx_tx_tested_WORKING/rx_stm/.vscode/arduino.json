@@ -1,0 +1,7 @@
+{
+    "configuration": "pnum=BLUEPILL_F103CB,upload_method=bmpMethod,xserial=generic,usb=CDCgen,xusb=FS,opt=o0std,dbg=enable_all,rtlib=nano",
+    "board": "STMicroelectronics:stm32:GenF1",
+    "sketch": "rx.ino",
+    "port": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+    "output": "build/"
+}
