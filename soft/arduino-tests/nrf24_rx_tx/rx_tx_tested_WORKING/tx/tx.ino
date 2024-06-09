@@ -10,7 +10,8 @@
 RF24 radio(CE_PIN, CSN_PIN);
 
 // Let these addresses be used for the pair
-uint8_t address[][6] = { "1Node", "2Node" };
+// const uint8_t address[][6] = {"1Node", "2Node"};
+const uint64_t address[2] = {0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL};
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
 

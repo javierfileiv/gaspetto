@@ -19,7 +19,7 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "/home/fixp/sourceCode/gaspetto/soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx",
+                "/home/fixp/sourceCode/gaspetto/soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx_stm",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/avr",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32/LL",
@@ -61,6 +61,7 @@
             "defines": [
                 "VECT_TAB_OFFSET=0x0",
                 "USE_FULL_LL_DRIVER",
+                "NDEBUG",
                 "STM32F1xx",
                 "ARDUINO=10607",
                 "ARDUINO_BLUEPILL_F103CB",
