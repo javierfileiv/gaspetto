@@ -19,7 +19,7 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "/home/fixp/sourceCode/gaspetto/car_test",
+                "/home/fixp/sourceCode/gaspetto/soft/car_test",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/avr",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32",
                 "/home/fixp/.arduino15/packages/STMicroelectronics/hardware/stm32/2.7.1/cores/arduino/stm32/LL",
