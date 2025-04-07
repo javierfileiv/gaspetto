@@ -1,10 +1,7 @@
 {
 	"folders": [
 		{
-			"path": "car"
-		},
-		{
-			"path": "."
+			"path": "../zephyr-nrf24l01"
 		}
 	]
 }
