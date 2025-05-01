@@ -7,10 +7,10 @@
             "command": "g++",
             "args": [
                 "-g",                 // Generate debugging information
-                "${workspaceFolder}/active_object_encapsulated.cpp",
-		// "${workspaceFolder}/EventQueue.cpp", // Source file
+                "${workspaceFolder}/GaspettoBox.cpp",
+		"${workspaceFolder}/EventQueue.cpp", // Source file
                 "-o",                 // Output flag
-                "${workspaceFolder}/active_object_encapsulated"      // Output binary
+                "${workspaceFolder}/GaspettoBox"      // Output binary
             ],
             "group": {
                 "kind": "build",
