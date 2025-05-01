@@ -5,7 +5,7 @@
             "name": "Debug C++ Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/active_object_encapsulated",
+            "program": "${workspaceFolder}/GaspettoBox",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
