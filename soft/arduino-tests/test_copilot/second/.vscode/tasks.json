@@ -7,6 +7,8 @@
             "command": "g++",
             "args": [
                 "-g",                 // Generate debugging information
+                "${workspaceFolder}/Arduino.cpp",
+                "${workspaceFolder}/GaspettoBox_ino.cpp",
                 "${workspaceFolder}/GaspettoBox.cpp",
 		"${workspaceFolder}/EventQueue.cpp", // Source file
                 "-o",                 // Output flag
