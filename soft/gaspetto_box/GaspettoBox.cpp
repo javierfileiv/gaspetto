@@ -19,7 +19,7 @@ void GaspettoBox::handleEvent(Event event) {
   }
 }
 
-void GaspettoBox::setLowPoerModeReference(std::atomic<bool> &lowPower) {
+void GaspettoBox::setLowPorerModeReference(std::atomic<bool> &lowPower) {
   lowPowerMode.store(lowPower.load());
 }
 void GaspettoBox::process() {
