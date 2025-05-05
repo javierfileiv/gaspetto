@@ -25,5 +25,5 @@ public:
 
   void debounceAndEnqueue(unsigned long currentTime);
 
-  void setLowPoerModeReference(std::atomic<bool> &lowPower);
+  void setLowPorerModeReference(std::atomic<bool> &lowPower);
   };
