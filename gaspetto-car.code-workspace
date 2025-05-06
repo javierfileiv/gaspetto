@@ -1,7 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "../zephyr-nrf24l01"
+			"path": "soft/gaspetto_box"
+		},
+		{
+			"path": "soft/gaspetto_car"
 		}
 	]
 }
