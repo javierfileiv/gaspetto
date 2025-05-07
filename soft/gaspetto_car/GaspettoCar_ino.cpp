@@ -1,23 +1,45 @@
 #include "Arduino.h"
 #include "EventQueue.h"
 #include "GaspettoCar.h"
+#include "IdleState.h"
+#include "ProcessingState.h"
 
-// Pin Definitions
-// const uint8_t adcPins[4] = {PB0, PB1, PB10, PB11}; // ADC Channels
-// const uint8_t groupPins[20] = {PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7, PB12,
-// PB13,
-//                                PB14, PB15, PC13, PC14, PC15, PA8, PA9, PA10,
-//                                PA11, PA12}; // GPIO Pins for GND control
+#include <cstdlib>
+#include <ctime> // Required for std::time
+#include <atomic> // Required for std::atomic
 
-// Global ActiveObject instance
-EventQueue eventQueue; // Shared event queue
-GaspettoCar gaspetto(eventQueue);
+#ifndef ARDUINO
+std::atomic<bool> lowPowerMode;
+#endif
+
+IdleState idleState;
+ProcessingState processingState;
+EventQueue eventQueue;
+GaspettoCar gaspetto(&idleState, &processingState, &eventQueue, StateId::IDLE);
+
+#ifndef ARDUINO
+void enqueue_random_commands(const uint8_t num_events) {
+  srand(std::time(nullptr));
+
+  for (uint8_t i = 0; i < num_events; ++i) {
+    const CommandId command = static_cast<CommandId>(
+        rand() % static_cast<int>(CommandId::MAX_COMMAND_ID));
+    const Event event(EventId::NRF_IRQ,
+                      command); // Random event
+
+    gaspetto.postEvent(event);
+  }
+}
+#endif
 
 void nrf_ISR(void) {
-  // NRF IRQ simulation thread
-  gaspetto.enqueue_random_events(5);
+#ifndef ARDUINO
+  enqueue_random_commands(1);
+#endif
 }
 
-void setup() {}
+void setup() {
+  gaspetto.Init();
+}
 
-void loop() { gaspetto.process(); }
+void loop() { gaspetto.processNextEvent(); }

@@ -1,33 +1,31 @@
 #include "EventQueue.h"
+#include "StateMachine.h"
 
-bool EventQueue::enqueue(EventData event_data) {
+bool EventQueue::enqueue(Event evt) {
   if (count == capacity) {
     // Queue is full
     return false;
   }
-  events[tail] = event_data;
+  events[tail] = evt;
   tail = (tail + 1) % capacity; // Wrap around if necessary
   ++count;
   return true;
 }
 
 // Dequeue an event
-bool EventQueue::dequeue(EventData &event_data) {
+bool EventQueue::dequeue(Event &evt) {
   if (count == 0) {
     // Queue is empty
     return false;
   }
-  event_data = events[head];
+  evt = events[head];
   head = (head + 1) % capacity; // Wrap around if necessary
   --count;
   return true;
 }
 
-// Check if the queue is empty
-bool EventQueue::empty() const { return count == 0; }
+bool EventQueue::IsEmpty() const { return count == 0; }
 
-// Check if the queue is full
-bool EventQueue::full() const { return count == capacity; }
+bool EventQueue::IsFull() const { return count == capacity; }
 
-// Get the current size of the queue
-size_t EventQueue::size() const { return count; }
+size_t EventQueue::GetSize() const { return count; }

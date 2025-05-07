@@ -1,32 +1,31 @@
-#include "ActiveObject.h"
-#include <atomic>
-#include <iostream>
+#pragma once
 
-// Define states
-enum State {
-  IDLE,
-  PROCESSING,
-};
-
-// Active Object class encapsulates the main logic
-class GaspettoCar : public ActiveObject {
-private:
-  State currentState = IDLE;
-  unsigned long lastDebounceTime = 0;
-  const unsigned long debounceDelay = 50; // 50ms debounce
-
-  std::atomic<bool> lowPowerMode; // Reference to low-power mode flag
-
+#include "Arduino.h"
+#include "EventQueue.h"
+#include "IdleState.h"
+#include "ProcessingState.h"
+#include "State.h"
+#include <cstdint>
+#define __ASSERT_USE_STDERR
+#include <assert.h>
+class GaspettoCar {
 public:
-  GaspettoCar(EventQueue &queue);
+  GaspettoCar(State *idle, State *running, EventQueue *queue,
+              StateId initial_state);
 
-  void handleEvent(Event event) override;
+  void transitionTo(StateId newStateId);
+  void enqueue_random_commands(const uint8_t num_events);
+  EventQueue getEventQueue() { return *eventQueue; }
+  void processNextEvent(void);
+  int postEvent(Event evt);
+  void enterLowPowerMode(void);
+  void Init(void);
 
-  void process() override;
+private:
+  void UpdateState(StateId &newStateId);
 
-  void enterLowPowerMode();
-
-  void enqueue_random_events(const uint8_t num_events);
-
-  void setLowPowerModeReference(std::atomic<bool> &lowPower);
+private:
+  EventQueue *eventQueue;
+  State *states[static_cast<int>(StateId::MAX_STATE_ID)];
+  StateId currentStateId;
 };

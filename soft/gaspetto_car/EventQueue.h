@@ -1,36 +1,31 @@
 #pragma once
 
+#include "StateMachine.h"
 #include <cstddef> // For size_t
 
-// Define events
-enum Event { NRF_IRQ };
-enum Command { MOTOR_FORWARD, MOTOR_BACKWARD, MOTOR_RIGHT, MOTOR_LEFT };
-struct EventData {
-  Event event;
-  Command command;
-};
+#define QUEUE_SIZE 10 // Define the size of the queue
 
 class EventQueue {
-private:
-  static const size_t capacity = 10; // Fixed size of the queue
-  EventData events[capacity];            // Preallocated array for events
-  size_t head = 0;                   // Index of the first element
-  size_t tail = 0;                   // Index of the next available slot
-  size_t count = 0;                  // Number of elements in the queue
-
 public:
   // Enqueue an event
-  bool enqueue(EventData event_data);
+  bool enqueue(Event evt);
 
   // Dequeue an event
-  bool dequeue(EventData &event_data);
+  bool dequeue(Event &evt);
 
   // Check if the queue is empty
-  bool empty() const;
+  bool IsEmpty() const;
 
   // Check if the queue is full
-  bool full() const;
+  bool IsFull() const;
 
   // Get the current size of the queue
-  size_t size() const;
+  size_t GetSize() const;
+
+private:
+  const int capacity = QUEUE_SIZE;
+  Event events[QUEUE_SIZE];
+  size_t head = 0;
+  size_t tail = 0;
+  size_t count = 0;
 };
