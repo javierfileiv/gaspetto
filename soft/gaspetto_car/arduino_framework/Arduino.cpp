@@ -1,10 +1,9 @@
-#include "EventQueue.h"
-#include "GaspettoCar.h"
+#include "../GaspettoCar.h"
 #include "GaspettoCar_ino.h"
 #include <atomic>
-#include <chrono>
+#include <iostream>
 #include <thread>
-#include <unistd.h> // For read() on Linux
+#include <unistd.h>
 
 extern "C" {
 #include <termios.h>
@@ -13,24 +12,15 @@ extern "C" {
 extern GaspettoCar gaspetto;
 
 // Global variables
-std::atomic<unsigned long> millisCounter(0); // Simulated millis()
-std::atomic<bool> running(true);             // Flag to stop threads
+std::atomic<unsigned long> millisCounter(0);
+std::atomic<bool> running(true);
+extern std::atomic<bool> lowPowerMode;
 
 // Simulated millis function
 unsigned long millis(void) { return millisCounter.load(); }
 
-// Button press simulation thread
-// static void emu_buttonThread(void) {
-//   while (running) {
-//     std::this_thread::sleep_for(
-//         std::chrono::seconds(2)); // Simulate button press every 2 seconds
-//     std::cout << "Simulating button press...\n";
-//     buttonISR();
-//   }
-// }
-
 // Millis simulation thread
-static void emu_millisThread(void) {
+static void emu_millisThread() {
   while (running) {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(1)); // Increment every millisecond
@@ -38,9 +28,7 @@ static void emu_millisThread(void) {
   }
 }
 
-extern EventQueue eventQueue; // Shared event queue
-
-void keyboardInput(void) {
+static void keyboardInput(void) {
   struct termios oldt, newt;
   tcgetattr(STDIN_FILENO, &oldt);
   newt = oldt;
@@ -49,13 +37,14 @@ void keyboardInput(void) {
 
   char ch;
   bool keyPressed = false;
-  EventData event;
+  Event event;
   while (true) {
     if (read(STDIN_FILENO, &ch, 1) > 0) {
       switch (ch) {
       case 'I':
       case 'i':
-        nrf_ISR(); // Simulate NRF IRQ
+        nrf_ISR();                 // Simulate NRF IRQ
+        lowPowerMode.store(false); /* Wake Up the system. */
         break;
       case 'q':
       case 'Q':
@@ -63,23 +52,33 @@ void keyboardInput(void) {
         break;
       case 'F':
       case 'f':
-        event = {NRF_IRQ, MOTOR_FORWARD};
-        eventQueue.enqueue(event);
+        event = {EventId::NRF_IRQ, CommandId::MOTOR_FORWARD};
+        gaspetto.postEvent(event);
+        lowPowerMode.store(false); // Wake the system
         break;
       case 'b':
       case 'B':
-        event = {NRF_IRQ, MOTOR_BACKWARD};
-        eventQueue.enqueue(event);
+        event = {EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD};
+        gaspetto.postEvent(event);
+        lowPowerMode.store(false); // Wake the system
         break;
       case 'l':
       case 'L':
-        event = {NRF_IRQ, MOTOR_LEFT};
-        eventQueue.enqueue(event);
+        event = {EventId::NRF_IRQ, CommandId::MOTOR_LEFT};
+        gaspetto.postEvent(event);
+        lowPowerMode.store(false); // Wake the system
         break;
       case 'r':
       case 'R':
-        event = {NRF_IRQ, MOTOR_RIGHT};
-        eventQueue.enqueue(event);
+        event = {EventId::NRF_IRQ, CommandId::MOTOR_RIGHT};
+        gaspetto.postEvent(event);
+        lowPowerMode.store(false); // Wake the system
+        break;
+      case 's':
+      case 'S':
+        event = {EventId::NRF_IRQ, CommandId::MOTOR_STOP};
+        gaspetto.postEvent(event);
+        lowPowerMode.store(false); // Wake the system
         break;
       }
     }
@@ -88,6 +87,17 @@ void keyboardInput(void) {
   }
 
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Restore terminal settings
+}
+
+void enterLowPowerMode(void) {
+  std::cout << "Entering low-power mode...\n";
+#ifndef ARDUINO
+  lowPowerMode.store(true);
+  while (lowPowerMode.load()) {
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{100}); // Simulate low-power sleep
+  }
+#endif
 }
 
 int main() {

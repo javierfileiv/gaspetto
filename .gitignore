@@ -9,3 +9,4 @@ soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx_stm/build
 soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx_bluepill
 soft/rx_stm_platformio/
 soft/arduino-tests/test_copilot/second/GaspettoBox
+soft/gaspetto_car/GaspettoCar

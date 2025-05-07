@@ -1,90 +1,84 @@
 #include "GaspettoCar.h"
-#include "EventQueue.h"
-#include <atomic>
-#include <chrono>
 #include <iostream>
-#include <ostream>
-#include <thread>
 
-GaspettoCar::GaspettoCar(EventQueue &queue)
-    : ActiveObject(queue), lowPowerMode(false) {}
+GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue,
+                         StateId initial_state)
+    : eventQueue(queue) {
+#ifndef ARDUINO
+  lowPowerMode = false; // Initialize lowPowerMode to false
+#endif
 
-void GaspettoCar::setLowPowerModeReference(std::atomic<bool> &lowPower) {
-  lowPowerMode.store(lowPower.load());
-}
-void GaspettoCar::handleEvent(Event event) {};
+  /* Initialize event queue. */
+  /* Initialize states. */
+  states[static_cast<int>(StateId::IDLE)] = idle;
+  states[static_cast<int>(StateId::PROCESSING)] = running;
 
-void GaspettoCar::process() {
-  // Process events from the queue
-  EventData event;
-  while (1) {
-    // Perform actions based on the current state
-    switch (currentState) {
-    case IDLE:
-      enterLowPowerMode();
-      break;
-    case PROCESSING:
-      switch (event.command) {
-      case MOTOR_FORWARD:
-        std::cout << "Moving forward...\n";
-        break;
-      case MOTOR_BACKWARD:
-        std::cout << "Moving backward...\n";
-        break;
-      case MOTOR_RIGHT:
-        std::cout << "Turning right...\n";
-        break;
-      case MOTOR_LEFT:
-        std::cout << "Turning left...\n";
-        break;
-      default:
-        std::cout << "Unknown event in PROCESSING state.\n";
-        break;
-      }
-    }
-    if (getEventQueue().empty()) {
-      std::cout << "No more events. Transitioning to IDLE state.\n";
-      currentState = IDLE;
-    } else {
-      getEventQueue().dequeue(event);
+  /* Set up state machine references. */
+  for (int i = 0; i < static_cast<int>(StateId::MAX_STATE_ID); i++) {
+    if (states[i] != nullptr) {
+      states[i]->setMachine(this);
     }
   }
+  currentStateId = initial_state;
 }
-void GaspettoCar::enterLowPowerMode() {
+
+void GaspettoCar::Init(void) {
+  states[static_cast<int>(currentStateId)]->enter();
+}
+
+void GaspettoCar::UpdateState(StateId &newStateId) {
+  State *currentState = states[static_cast<int>(currentStateId)];
+
+  currentState->exit();
+  currentState = states[static_cast<int>(newStateId)];
+  currentState->enter();
+}
+
+void GaspettoCar::enqueue_random_commands(const uint8_t num_events) {
+  std::srand(time(nullptr));
+
+  for (uint8_t i = 0; i < num_events; ++i) {
+    Event event = {EventId::NRF_IRQ,
+                   static_cast<CommandId>(rand() % 4)}; // Random event
+
+    postEvent(event);
+    lowPowerMode = false; // Wake the system
+  }
+}
+
+int GaspettoCar::postEvent(Event evt) {
+  if (eventQueue->IsFull()) {
+    std::cout << "Event queue is full, cannot post event.\n";
+    return -1;
+  }
+  eventQueue->enqueue(evt);
+  return 0;
+}
+
+void GaspettoCar::processNextEvent(void) {
+  if (!eventQueue->IsEmpty()) {
+    Event evt;
+
+    State *currentState = states[static_cast<int>(currentStateId)];
+    eventQueue->dequeue(evt);
+    currentState->processEvent(evt);
+  }
+}
+
+void GaspettoCar::transitionTo(StateId newStateId) {
+  State *currentState = states[static_cast<int>(currentStateId)];
+
+  currentState->exit();
+  currentStateId = newStateId;
+  currentState = states[static_cast<int>(currentStateId)];
+  currentState->enter();
+}
+
+void GaspettoCar::enterLowPowerMode(void) {
   std::cout << "Entering low-power mode...\n";
   lowPowerMode = true;
   while (lowPowerMode) {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(100)); // Simulate low-power sleep
   }
-}
-
-void GaspettoCar::enqueue_random_events(const uint8_t num_events) {
-  currentState = PROCESSING;
-#ifdef ARDUINO
-  if (currentTime - lastDebounceTime > debounceDelay) {
-    lastDebounceTime = currentTime;
-    if (!getEventQueue().full()) {
-      getEventQueue().enqueue(BUTTON_PRESSED);
-      std::cout << "Exiting low-power mode...\n";
-      lowPowerMode = false; // Wake the system
-    } else {
-      std::cout << "Event queue is full! Unable to enqueue event.\n";
-    }
-  }
-#else
-  // Seed the random number generator
-  std::srand(std::time(nullptr));
-  for (uint8_t i = 0; i < num_events; ++i) {
-    EventData event = {NRF_IRQ,
-                       static_cast<Command>(rand() % 4)}; // Random event
-    if (!getEventQueue().full()) {
-      getEventQueue().enqueue(event);
-      std::cout << "Enqueued event: " << event.command << "\n";
-    } else {
-      std::cout << "Event queue is full! Unable to enqueue event.\n";
-    }
-    lowPowerMode = false; // Wake the system
-}
-#endif
 }
