@@ -7,13 +7,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Arduino Debug (ST-Link)",
+      "name": "Arduino Debug BMP",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "bmp",
       "device": "STM32F103",
       "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/rx.ino.elf",
+      "executable": "${workspaceFolder}/build/rx_stm.ino.elf",
       "interface": "swd",
       "BMPGDBSerialPort": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
       "runToEntryPoint": "setup",
@@ -31,19 +31,6 @@
       //         "set mem inaccessible-by-default off",
       //         "continue"
       //       ]
-    },
-    {
-      "name": "Cortex Debug",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/rx.ino.elf",
-      "request": "launch",
-      "type": "cortex-debug",
-      "BMPGDBSerialPort": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
-      "servertype": "bmp",
-      "interface": "swd",
-      "runToEntryPoint": "setup",
-//       "showDevDebugOutput": "both",
-      "postLaunchCommands": ["mon help"],
     }
   ]
 }
