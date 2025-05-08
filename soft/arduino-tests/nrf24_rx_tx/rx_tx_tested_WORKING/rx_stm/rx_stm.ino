@@ -18,16 +18,13 @@ const uint64_t address[2] = {0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL};
 
 // to use different addresses on a pair of radios, we need a variable to
 // uniquely identify which address this radio will use to transmit
-bool radioNumber = 1;  // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+bool radioNumber; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 
-#define _TX true  // ttyUSB0
-#define _RX false // ttyUSB1
 #define DATA_RATE RF24_1MBPS
-// #define DATA_RATE RF24_250KBPS
 
 // Used to control whether this node is sending or receiving
 // bool role = _TX;  // true = TX role, false = RX role
-bool role = _RX; // true = TX role, false = RX role
+bool role = true; // true = TX role, false = RX role
 
 // For this example, we'll be using a payload containing
 // a single float number that will be incremented
@@ -40,10 +37,8 @@ void setup() {
   while (!Serial) {
     // some boards need to wait to ensure access to serial over USB
   }
-
-  String role_str = role ? F("TX") : F("RX");
+  pinMode(PIN_A3, INPUT);
   Serial.print(F("Role:"));
-  Serial.println(role_str);
 
   //   initialize the transceiver on the SPI bus
   if (!radio.begin()) {
@@ -52,11 +47,12 @@ void setup() {
     } // hold in infinite loop
   }
 
-  // print example's introductory prompt
-  Serial.println(F("RF24/examples/GettingStarted"));
-
   // To set the radioNumber via the Serial monitor on startup
-  Serial.println(F("Which radio is this? Enter '0' or '1'. Defaults to '0'"));
+  Serial.println(F(
+      "Which radio is this? Enter '0' for Box or '1' for Car. Defaults to '0'")); // 0 can TX
+                                                                  // but no RX,
+                                                                  // 1 can RX
+                                                                  // but no TX
   while (!Serial.available()) {
     // wait for user input
   }
@@ -84,10 +80,8 @@ void setup() {
   // set the RX address of the TX node into a RX pipe
   radio.openReadingPipe(1, address[!radioNumber]); // using pipe 1
 
-  // additional setup specific to the node's role
-  if (role) {
-    radio.stopListening(); // put radio in TX mode
-  } else {
+  // additional setup specific to the node's RX role
+  if (!role) {
     radio.startListening(); // put radio in RX mode
   }
 
@@ -104,9 +98,10 @@ void loop() {
   if (role) {
     // This device is a TX node
 
-    unsigned long start_timer = micros();                // start the timer
-    bool report = radio.write(&payload, sizeof(float));  // transmit & save the report
-    unsigned long end_timer = micros();                  // end the timer
+    unsigned long start_timer = micros(); // start the timer
+    bool report =
+        radio.write(&payload, sizeof(float)); // transmit & save the report
+    unsigned long end_timer = micros();       // end the timer
 
     if (report) {
       Serial.print(F("Transmission successful! ")); // payload was delivered
