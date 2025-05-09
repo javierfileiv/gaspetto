@@ -11,7 +11,7 @@ RF24 radio(CE_PIN, CSN_PIN);
 
 // Let these addresses be used for the pair
 // const uint8_t address[][6] = {"1Node", "2Node"};
-const uint64_t address[2] = {0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL};
+const uint64_t address = 0xdeadbeef11LL;
 
 // It is very helpful to think of an address as a path instead of as
 // an identifying device destination
@@ -47,20 +47,6 @@ void setup() {
     } // hold in infinite loop
   }
 
-  // To set the radioNumber via the Serial monitor on startup
-  Serial.println(F(
-      "Which radio is this? Enter '0' for Box or '1' for Car. Defaults to '0'")); // 0 can TX
-                                                                  // but no RX,
-                                                                  // 1 can RX
-                                                                  // but no TX
-  while (!Serial.available()) {
-    // wait for user input
-  }
-  char input = Serial.parseInt();
-  radioNumber = input == 1;
-  Serial.print(F("radioNumber = "));
-  Serial.println((int)radioNumber);
-
   // role variable is hardcoded to RX behavior, inform the user of this
   Serial.println(F("*** PRESS 'T' to begin transmitting to the other node"));
 
@@ -75,10 +61,10 @@ void setup() {
   radio.setPayloadSize(sizeof(payload)); // float datatype occupies 4 bytes
 
   // set the TX address of the RX node into the TX pipe
-  radio.openWritingPipe(address[radioNumber]); // always uses pipe 0
+  radio.openWritingPipe(address); // always uses pipe 0
 
   // set the RX address of the TX node into a RX pipe
-  radio.openReadingPipe(1, address[!radioNumber]); // using pipe 1
+  radio.openReadingPipe(1, address); // using pipe 1
 
   // additional setup specific to the node's RX role
   if (!role) {
