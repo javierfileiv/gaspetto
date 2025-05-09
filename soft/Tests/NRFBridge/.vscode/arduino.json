@@ -1,6 +1,6 @@
 {
-    "board": "arduino:avr:nano",
-    "sketch": "NRFBridge.ino",
-    "port": "/dev/ttyUSB0",
-    "configuration": "cpu=atmega328old"
+  "board": "arduino:avr:nano",
+  "sketch": "NRFBridge.ino",
+  "port": "/dev/ttyUSB0",
+  "configuration": "cpu=atmega328old"
 }

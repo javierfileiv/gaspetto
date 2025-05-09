@@ -1,10 +1,9 @@
 #include "utils.h"
-#include "types.h"
 #include "globals.h"
 #include "stringstream.h"
+#include "types.h"
 
-bool readData(uint8_t* data, uint8_t& len, uint8_t& pipe)
-{
+bool readData(uint8_t *data, uint8_t &len, uint8_t &pipe) {
   bool available = radio.available(&pipe);
   if (!available)
     return false;
@@ -14,16 +13,15 @@ bool readData(uint8_t* data, uint8_t& len, uint8_t& pipe)
   return true;
 }
 
-void readDataBinary(bool printEmpty)
-{
+void readDataBinary(bool printEmpty) {
   uint8_t pipe = 0;
   uint8_t len = 0;
   uint8_t data[32] = {0};
 
   bool available = readData(data, len, pipe);
-  if (!available)
-  {
-    if (printEmpty) Serial.println(F("RDBX:-"));
+  if (!available) {
+    if (printEmpty)
+      Serial.println(F("RDBX:-"));
     return;
   }
 
@@ -32,44 +30,40 @@ void readDataBinary(bool printEmpty)
   Serial.println();
 }
 
-void readDataHex(bool printEmpty)
-{
+void readDataHex(bool printEmpty) {
   uint8_t pipe = 0;
   uint8_t len = 0;
   uint8_t data[32] = {0};
 
   bool available = readData(data, len, pipe);
-  if (!available)
-  {
-    if (printEmpty) Serial.println(F("RDHX:-"));
+  if (!available) {
+    if (printEmpty)
+      Serial.println(F("RDHX:-"));
     return;
   }
 
   printf("RDH%d:", pipe);
 
-  for (uint8_t i = 0; i < len; ++i)
-  {
+  for (uint8_t i = 0; i < len; ++i) {
     Serial.print(data[i], 16);
   }
   Serial.println();
 }
 
-uint8_t writeData(StringStream& ss, WriteMode mode)
-{
+uint8_t writeData(StringStream &ss, WriteMode mode) {
   uint8_t data[32];
   uint8_t len = radio.getPayloadSize();
 
   bool dataValid = false;
 
-  switch (mode)
-  {
-    case WriteMode::Bin:
-      dataValid = readRawDataFromStream(ss, data, len);
-      break;
+  switch (mode) {
+  case WriteMode::Bin:
+    dataValid = readRawDataFromStream(ss, data, len);
+    break;
 
-    case WriteMode::Hex:
-      dataValid = readHexDataFromStream(ss, data, len);
-      break;
+  case WriteMode::Hex:
+    dataValid = readHexDataFromStream(ss, data, len);
+    break;
   }
 
   if (!dataValid)
@@ -82,28 +76,30 @@ uint8_t writeData(StringStream& ss, WriteMode mode)
   return len;
 }
 
-bool readRawDataFromStream(StringStream& ss, uint8_t* data, uint8_t& len)
-{
+bool readRawDataFromStream(StringStream &ss, uint8_t *data, uint8_t &len) {
   uint8_t out = 0;
   bool isEscape = false;
 
-  while (ss.available() && (out <= len))
-  {
+  while (ss.available() && (out <= len)) {
     uint8_t b = ss.read();
-    if (b == '\\')
-    {
+    if (b == '\\') {
       isEscape = true;
       continue;
     }
 
-    if (isEscape)
-    {
-      switch (b)
-      {
-        case 'r': b = '\r'; break;
-        case 'n': b = '\n'; break;
-        case 't': b = '\t'; break;
-        default: break;
+    if (isEscape) {
+      switch (b) {
+      case 'r':
+        b = '\r';
+        break;
+      case 'n':
+        b = '\n';
+        break;
+      case 't':
+        b = '\t';
+        break;
+      default:
+        break;
       }
       isEscape = false;
     }
@@ -115,24 +111,21 @@ bool readRawDataFromStream(StringStream& ss, uint8_t* data, uint8_t& len)
   return true;
 }
 
-bool readHexDataFromStream(StringStream& ss, uint8_t* data, uint8_t& len)
-{
+bool readHexDataFromStream(StringStream &ss, uint8_t *data, uint8_t &len) {
   int savedPos = ss.getPositon();
   if (ss.available() & 1)
     return false;
 
-  while (ss.available())
-  {
+  while (ss.available()) {
     if (!isHexadecimalDigit(ss.read()))
       return false;
   }
 
   ss.setPositon(savedPos);
 
-  len = min(ss.available()/2, static_cast<int>(len));
+  len = min(ss.available() / 2, static_cast<int>(len));
 
-  for(int i = 0; i < len; i++)
-  {
+  for (int i = 0; i < len; i++) {
     uint8_t d = hexDigitToInt(ss.read()) << 4;
     d |= hexDigitToInt(ss.read());
     *data++ = d;
@@ -141,16 +134,15 @@ bool readHexDataFromStream(StringStream& ss, uint8_t* data, uint8_t& len)
   return true;
 }
 
-int hexDigitToInt(uint8_t c)
-{
-    if ((c >= '0') and (c <= '9'))
-        return c - '0';
+int hexDigitToInt(uint8_t c) {
+  if ((c >= '0') and (c <= '9'))
+    return c - '0';
 
-    if ((c >= 'A') and (c <= 'F'))
-        return c - 'A' + 10;
+  if ((c >= 'A') and (c <= 'F'))
+    return c - 'A' + 10;
 
-    if ((c >= 'a') and (c <= 'f'))
-        return c - 'a' + 10;
+  if ((c >= 'a') and (c <= 'f'))
+    return c - 'a' + 10;
 
-    return -1;
+  return -1;
 }

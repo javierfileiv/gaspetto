@@ -1,5 +1,5 @@
 #include "EventQueue.h"
-#include "StateMachine.h"
+#include "Event.h"
 
 bool EventQueue::enqueue(Event &evt) {
   if (count == capacity) {

@@ -3,39 +3,38 @@
 
 #include "Arduino.h"
 
-class BuzzerT
-{
+class BuzzerT {
 private:
 public:
-	uint8_t Play;
-	HardwareTimer *TIMER;
-	uint32_t channel;
-	uint8_t buzzer_pin;
-	uint32_t frequency;
+  uint8_t Play;
+  HardwareTimer *TIMER;
+  uint32_t channel;
+  uint8_t buzzer_pin;
+  uint32_t frequency;
 
-	int *image[32][2];
+  int *image[32][2];
 
-	uint8_t Pin;
+  uint8_t Pin;
 
-	unsigned long lastStart;
-	int Freq;
-	int Dura;
+  unsigned long lastStart;
+  int Freq;
+  int Dura;
 
-	int lastFreq;
-	int lastConfig;
-	uint8_t counter;
-	uint8_t lastCounter;
+  int lastFreq;
+  int lastConfig;
+  uint8_t counter;
+  uint8_t lastCounter;
 
-	uint32_t DutyCyc;
-	uint32_t PeriodCyc;
-	uint16_t Prescaler;
-	uint16_t Overflow;
+  uint32_t DutyCyc;
+  uint32_t PeriodCyc;
+  uint16_t Prescaler;
+  uint16_t Overflow;
 
-	BuzzerT(uint8_t Pin);
-	void Melody(int (&image)[32][2]);
-	void ConfigTimer(int Freq);
-	void DisableBuzzer();
-	void EnableBuzzer();
+  BuzzerT(uint8_t Pin);
+  void Melody(int (&image)[32][2]);
+  void ConfigTimer(int Freq);
+  void DisableBuzzer();
+  void EnableBuzzer();
 };
 
 #endif

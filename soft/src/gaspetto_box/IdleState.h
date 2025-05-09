@@ -1,5 +1,5 @@
 #pragma once
-#include "StateMachine.h"
+#include "Event.h"
 #include "State.h"
 
 class IdleState : public State {

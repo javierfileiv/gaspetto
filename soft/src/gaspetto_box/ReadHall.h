@@ -11,7 +11,8 @@
 class ReadHall {
 public:
   ReadHall(uint8_t adcPins[GROUP_SIZE], uint8_t groupPins[TOTAL_SENSORS]);
-  uint8_t* readHallSensors(uint8_t group);
+  uint8_t *readHallSensors(uint8_t group);
+
 private:
   uint8_t adcPins[GROUP_SIZE];
   uint8_t groupPins[TOTAL_SENSORS];

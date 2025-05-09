@@ -25,11 +25,16 @@ void loop() {
   // 25 --- 10 %
   // 20 --- 5 %
   // 15 --- 5 %
-  const uint8_t dutyCycle1 = 10; // Set the desired duty cycle (0-255 for 8-bit resolution)
-  const uint8_t dutyCycle2 = 50; // Set the desired duty cycle (0-255 for 8-bit resolution)
-  analogWrite(pwmPin1, map(dutyCycle1,0,100,0,255)); // Set PWM duty cycle (0-255 for 8-bit resolution)
-  analogWrite(pwmPin2, map(dutyCycle2,0,100,0,255)); // Set PWM duty cycle (0-255 for 8-bit resolution)
-                             // Channel 3 (PB10)
+  const uint8_t dutyCycle1 =
+      10; // Set the desired duty cycle (0-255 for 8-bit resolution)
+  const uint8_t dutyCycle2 =
+      50; // Set the desired duty cycle (0-255 for 8-bit resolution)
+  analogWrite(pwmPin1,
+              map(dutyCycle1, 0, 100, 0,
+                  255)); // Set PWM duty cycle (0-255 for 8-bit resolution)
+  analogWrite(pwmPin2, map(dutyCycle2, 0, 100, 0,
+                           255)); // Set PWM duty cycle (0-255 for 8-bit
+                                  // resolution) Channel 3 (PB10)
   //   for (int dutyCycle = 0; dutyCycle <= 255; dutyCycle+=15) {
   //     analogWrite(pwmPin1, dutyCycle); // Set PWM duty cycle (0-255 for 8-bit
   //     resolution) delay(10);

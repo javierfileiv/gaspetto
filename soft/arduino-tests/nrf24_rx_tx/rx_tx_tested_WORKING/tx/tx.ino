@@ -90,8 +90,8 @@ void setup() {
   }
 
   // For debugging info
-  printf_begin(); // needed only once for printing details
-  radio.printDetails();        // (smaller) function that prints raw register
+  printf_begin();             // needed only once for printing details
+  radio.printDetails();       // (smaller) function that prints raw register
   radio.printPrettyDetails(); // (larger) function that prints human readable
                               // data
 

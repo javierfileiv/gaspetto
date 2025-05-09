@@ -42,15 +42,15 @@ void setup() {
   delay(150);
 
   Serial.print("setup\n");
-  hall_sensor_input[0] = Hall_Sensor_Pin_A0;  // AO sensor to LEFT
-  hall_sensor_input[1] = Hall_Sensor_Pin_A1;  // A1 sensor to DOWN
-  hall_sensor_input[2] = Hall_Sensor_Pin_A2;  // A2 sensor to RIGTH
-  hall_sensor_input[3] = Hall_Sensor_Pin_A3;  // A3 sensor to UP
+  hall_sensor_input[0] = Hall_Sensor_Pin_A0; // AO sensor to LEFT
+  hall_sensor_input[1] = Hall_Sensor_Pin_A1; // A1 sensor to DOWN
+  hall_sensor_input[2] = Hall_Sensor_Pin_A2; // A2 sensor to RIGTH
+  hall_sensor_input[3] = Hall_Sensor_Pin_A3; // A3 sensor to UP
 
-  hall_sensor_gnd[0] = Hall_Sensor_Gnd_Pin_0;  // GND O sensor to LEFT
-  hall_sensor_gnd[1] = Hall_Sensor_Gnd_Pin_1;  // GND 1 sensor to DOWN
-  hall_sensor_gnd[2] = Hall_Sensor_Gnd_Pin_2;  // GND 2 sensor to RIGTH
-  hall_sensor_gnd[3] = Hall_Sensor_Gnd_Pin_3;  // GND 3 sensor to UP
+  hall_sensor_gnd[0] = Hall_Sensor_Gnd_Pin_0; // GND O sensor to LEFT
+  hall_sensor_gnd[1] = Hall_Sensor_Gnd_Pin_1; // GND 1 sensor to DOWN
+  hall_sensor_gnd[2] = Hall_Sensor_Gnd_Pin_2; // GND 2 sensor to RIGTH
+  hall_sensor_gnd[3] = Hall_Sensor_Gnd_Pin_3; // GND 3 sensor to UP
 
   for (int i = 0; i < SENSOR_PER_BLOCK; i++) {
 
@@ -100,30 +100,35 @@ void loop() {
 
 #if !PRINT_CSV
 
-//   Serial.println("///////////////////");
+  //   Serial.println("///////////////////");
   i = 0;
-  if (voltage[0] > HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 && voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
+  if (voltage[0] > HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 &&
+      voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
     Serial.println("LEFT");
   }
 
   i = 0;
-  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] < HALL_THRESHOLD_2 && voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
+  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] < HALL_THRESHOLD_2 &&
+      voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
     Serial.println("UP");
   }
 
   i = 0;
-  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 && voltage[2] > HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
+  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 &&
+      voltage[2] > HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
     Serial.println("RIGTH");
   }
 
   i = 0;
-  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 && voltage[2] < HALL_THRESHOLD_1 && voltage[3] < HALL_THRESHOLD_2) {
+  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 &&
+      voltage[2] < HALL_THRESHOLD_1 && voltage[3] < HALL_THRESHOLD_2) {
     Serial.println("DOWN");
   }
 
   i = 0;
-  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 && voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
-//     Serial.println("NO DETECTION");
+  if (voltage[0] < HALL_THRESHOLD_1 && voltage[1] > HALL_THRESHOLD_2 &&
+      voltage[2] < HALL_THRESHOLD_1 && voltage[3] > HALL_THRESHOLD_2) {
+    //     Serial.println("NO DETECTION");
   }
 
 //   Serial.println("+++++++++++++");

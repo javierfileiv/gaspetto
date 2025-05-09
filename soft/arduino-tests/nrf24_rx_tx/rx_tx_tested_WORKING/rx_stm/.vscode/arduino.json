@@ -1,7 +1,7 @@
 {
-    "configuration": "pnum=BLUEPILL_F103CB,upload_method=bmpMethod,xserial=generic,usb=none,xusb=FS,opt=ogstd,dbg=enable_all,rtlib=nano",
-    "board": "STMicroelectronics:stm32:GenF1",
-    "sketch": "rx_stm.ino",
-    "output": "build",
-    "port": "/dev/ttyACM0"
+  "configuration": "pnum=BLUEPILL_F103CB,upload_method=bmpMethod,xserial=generic,usb=none,xusb=FS,opt=ogstd,dbg=enable_all,rtlib=nano",
+  "board": "STMicroelectronics:stm32:GenF1",
+  "sketch": "rx_stm.ino",
+  "output": "build",
+  "port": "/dev/ttyACM2"
 }

@@ -1,5 +1,6 @@
+#include "Event.h"
 #include "GaspettoCar_ino.h"
-#include "StateMachine.h"
+#include "Serial.h"
 #include <atomic>
 #include <iostream>
 #include <thread>
@@ -12,7 +13,7 @@ extern "C" {
 // Global variables
 std::atomic<unsigned long> millisCounter(0);
 std::atomic<bool> running(true);
-extern std::atomic<bool> lowPowerMode;
+std::atomic<bool> lowPowerMode;
 void (*userFunc_)(void) = nullptr;
 Event event;
 Event evt_copy;
@@ -91,7 +92,7 @@ static void keyboardInput(void) {
 }
 
 void enterLowPowerMode(void) {
-  std::cout << "Entering low-power mode...\n";
+  Serial.println("Entering low-power mode...\n");
 #ifndef ARDUINO
   lowPowerMode.store(true);
   while (lowPowerMode.load()) {
@@ -102,7 +103,7 @@ void enterLowPowerMode(void) {
 }
 
 int main() {
-  std::cout << "Starting simulation...\n";
+  Serial.println("Starting simulation...\n");
   // Start the simulation threads
   std::thread millisSim(emu_millisThread);
   std::thread keyboardSim(keyboardInput);

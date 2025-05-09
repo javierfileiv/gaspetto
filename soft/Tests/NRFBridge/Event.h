@@ -29,8 +29,7 @@
 #define EVENT_EVERY 1
 #define EVENT_OSCILLATE 2
 
-class Event
-{
+class Event {
 
 public:
   Event(void);

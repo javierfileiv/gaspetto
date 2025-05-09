@@ -1,6 +1,6 @@
+#include <RF24.h>
 #include <SPI.h>
 #include <nRF24L01.h>
-#include <RF24.h>
 
 // Pin Definitions for nRF24L01+
 #define CE_PIN PA8
@@ -14,8 +14,10 @@ const byte address[6] = "00001"; // Address for communication
 
 // Pin Definitions for ADC and GPIO
 const uint8_t adcPins[4] = {PB0, PB1, PB10, PB11}; // ADC Channels
-const uint8_t groupPins[20] = {PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7, PB12, PB13,
-                               PB14, PB15, PC13, PC14, PC15, PA8, PA9, PA10, PA11, PA12}; // GPIO Pins for GND control
+const uint8_t groupPins[20] = {
+    PA0,  PA1,  PA2,  PA3,  PA4, PA5, PA6,  PA7,  PB12, PB13, PB14,
+    PB15, PC13, PC14, PC15, PA8, PA9, PA10, PA11, PA12}; // GPIO Pins for GND
+                                                         // control
 
 // Number of groups and sensors per group
 const uint8_t numGroups = 5;
@@ -31,13 +33,14 @@ void setup() {
   // Initialize nRF24L01+
   if (!radio.begin()) {
     Serial.println("nRF24L01+ module not detected. Check connections.");
-    while (1);
+    while (1)
+      ;
   }
-  radio.openWritingPipe(address);       // Set the communication address
-  radio.setPALevel(RF24_PA_LOW);        // Set Power Amplifier level to low
-  radio.setDataRate(RF24_1MBPS);        // Set data rate to 1Mbps
-  radio.setRetries(15, 15);             // Set retries (delay, count)
-  radio.stopListening();                // Set module to transmit mode
+  radio.openWritingPipe(address); // Set the communication address
+  radio.setPALevel(RF24_PA_LOW);  // Set Power Amplifier level to low
+  radio.setDataRate(RF24_1MBPS);  // Set data rate to 1Mbps
+  radio.setRetries(15, 15);       // Set retries (delay, count)
+  radio.stopListening();          // Set module to transmit mode
 
   // Set GPIO pins as OUTPUT and set them HIGH (disable all sensors)
   for (uint8_t i = 0; i < 20; i++) {
@@ -56,7 +59,8 @@ void loop() {
   for (uint8_t group = 0; group < numGroups; group++) {
     // Enable the current group of sensors
     for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-      digitalWrite(groupPins[group * sensorsPerGroup + i], LOW); // Enable sensor
+      digitalWrite(groupPins[group * sensorsPerGroup + i],
+                   LOW); // Enable sensor
     }
 
     // Small delay to allow stabilization
@@ -69,7 +73,8 @@ void loop() {
 
     // Disable the current group of sensors
     for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-      digitalWrite(groupPins[group * sensorsPerGroup + i], HIGH); // Disable sensor
+      digitalWrite(groupPins[group * sensorsPerGroup + i],
+                   HIGH); // Disable sensor
     }
 
     // Transmit the ADC values via nRF24L01+
