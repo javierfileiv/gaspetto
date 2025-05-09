@@ -1,7 +1,13 @@
 #pragma once
 #include <cstdint>
 
-enum class EventId { TIMER_ELAPSED, NRF_IRQ, BUTTON_PRESSED, NONE, MAX_EVENT_ID };
+enum class EventId {
+  TIMER_ELAPSED,
+  NRF_IRQ,
+  BUTTON_PRESSED,
+  NONE,
+  MAX_EVENT_ID
+};
 
 enum class StateId { IDLE, PROCESSING, PAUSED, MAX_STATE_ID };
 

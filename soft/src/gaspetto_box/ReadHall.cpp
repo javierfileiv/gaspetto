@@ -2,7 +2,6 @@
 #include "Arduino.h"
 #include <stdint.h>
 
-
 ReadHall::ReadHall(uint8_t (&adcPins)[GROUP_SIZE],
                    uint8_t (&groupPins)[TOTAL_SENSORS]) {
   for (uint8_t i = 0; i < 4; i++) {

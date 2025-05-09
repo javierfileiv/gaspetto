@@ -5,10 +5,6 @@
 #include "ProcessingState.h"
 #include <atomic>
 
-#ifndef ARDUINO
-std::atomic<bool> lowPowerMode;
-#endif
-
 // Pin Definitions
 // const uint8_t adcPins[4] = {PB0, PB1, PB10, PB11}; // ADC Channels
 // const uint8_t groupPins[20] = {PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7, PB12,
@@ -19,14 +15,25 @@ std::atomic<bool> lowPowerMode;
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;
-GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue, StateId::IDLE);
+GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue,
+                         StateId::IDLE);
 
 // Button press simulation thread
 void ISR(void) {
+#ifndef ARDUINO
   Event evt = getEvent();
   gaspetto_box.debounceAndEnqueue(evt, millis());
+#endif
 }
 
-void setup() {}
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Gaspetto Box Initialized");
+  Serial.println("Starting up...\n");
+  /* Initialize the GaspettoBox state machine. */
+  gaspetto_box.Init();
+  /* Set up ISR for button press simulation. */
+  attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
+}
 
 void loop() { gaspetto_box.processNextEvent(); }

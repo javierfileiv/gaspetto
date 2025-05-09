@@ -18,7 +18,8 @@ const uint64_t address = 0xdeadbeef11LL;
 
 // to use different addresses on a pair of radios, we need a variable to
 // uniquely identify which address this radio will use to transmit
-bool radioNumber; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+bool
+    radioNumber; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
 
 #define DATA_RATE RF24_1MBPS
 

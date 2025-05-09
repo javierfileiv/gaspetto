@@ -4,14 +4,6 @@
 #include "IdleState.h"
 #include "ProcessingState.h"
 
-#include <atomic> /* Required for std::atomic*/
-#include <cstdlib>
-#include <ctime> /* Required for std::time*/
-
-#ifndef ARDUINO
-std::atomic<bool> lowPowerMode;
-#endif
-
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;
@@ -35,11 +27,17 @@ void ISR(void) {
 #ifndef ARDUINO
   Event evt = getEvent();
   gaspetto_car.postEvent(evt);
-#else
-
 #endif
 }
 
-void setup() { gaspetto_car.Init(); }
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Gaspetto Car Initialized");
+  Serial.println("Starting up...\n");
+  /* Initialize the GaspettoCar state machine. */
+  gaspetto_car.Init();
+  /* Set up ISR for button press simulation. */
+  attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
+}
 
 void loop() { gaspetto_car.processNextEvent(); }

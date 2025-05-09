@@ -3,20 +3,18 @@
 #include <cassert>
 #include <iostream>
 
-void IdleState::enter() {
-  car_state_machine->enterLowPowerMode();
-}
+void IdleState::enter() { state_machine->enterLowPowerMode(); }
 
 void IdleState::processEvent(Event event) {
-  std::cout << "Processing event in IdleState...\n";
+  Serial.println("Processing event in IdleState...\n");
   switch (event.getEventId()) {
   case EventId::NRF_IRQ:
-  car_state_machine->transitionTo(StateId::PROCESSING);
-  car_state_machine->postEvent(event);
+    state_machine->transitionTo(StateId::PROCESSING);
+    state_machine->postEvent(event);
     break;
   default:
     /* Stay in low power mode*/
-    car_state_machine->enterLowPowerMode();
+    state_machine->enterLowPowerMode();
     break;
   }
 }

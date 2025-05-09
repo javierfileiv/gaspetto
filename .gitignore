@@ -11,3 +11,4 @@ soft/rx_stm_platformio/
 soft/arduino-tests/test_copilot/second/GaspettoBox
 soft/gaspetto_car/GaspettoCar
 *.lck
+soft/**/main

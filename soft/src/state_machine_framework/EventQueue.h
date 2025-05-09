@@ -1,6 +1,6 @@
 #pragma once
 
-#include "StateMachine.h"
+#include "Event.h"
 #include <cstddef> // For size_t
 
 #define QUEUE_SIZE 10 // Define the size of the queue

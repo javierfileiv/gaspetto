@@ -1,16 +1,26 @@
 #include "ProcessingState.h"
+#include "Event.h"
 #include "GaspettoBox.h"
-#include "StateMachine.h"
 #include <cassert>
 #include <iostream>
 
 void ProcessingState::enter() {
   for (int row = 0; row < 3; ++row) {
-    std::cout << "Processing row " << row << "...\n";
-    std::cout << "Scanning row " << row << "...\n";
+    Serial.print("Scanning row ");
+    Serial.print(row);
+    Serial.println("...\n");
+#ifndef ARDUINO
     std::this_thread::sleep_for(
         std::chrono::duration<int>(1)); // Simulate some processing work
-    std::cout << "Sending row " << row << "...\n";
+#else
+    delay(1000); // Simulate some processing work
+#endif
+    Serial.print("Processing row ");
+    Serial.print(row);
+    Serial.println("...\n");
+    Serial.print("Sending row ");
+    Serial.print(row);
+    Serial.println("...\n");
   }
-  box_state_machine->transitionTo(StateId::IDLE);
+  state_machine->transitionTo(StateId::IDLE);
 }

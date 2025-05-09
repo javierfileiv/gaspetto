@@ -11,8 +11,8 @@ void loop() {
   // we measure 10 times adn make the mean
   long measure = 0;
   for (int i = 0; i < 10; i++) {
-    
-      measure += analogRead(pinHall);
+
+    measure += analogRead(pinHall);
   }
   measure /= 10;
   // voltage in mV

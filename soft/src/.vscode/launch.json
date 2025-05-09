@@ -1,45 +1,45 @@
 {
-    "version": "0.2.0",
-    "configurations": [
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Gaspetto Car Program",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/gaspetto_car/main",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
         {
-            "name": "Debug Gaspetto Car Program",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/gaspetto_car/main",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "Build Gaspetto Car Program"
-        },
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Build Gaspetto Car Program"
+    },
+    {
+      "name": "Debug Gaspetto Box Program",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/gaspetto_box/main",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
         {
-		"name": "Debug Gaspetto Box Program",
-		"type": "cppdbg",
-		"request": "launch",
-		"program": "${workspaceFolder}/gaspetto_box/main",
-		"args": [],
-		"stopAtEntry": false,
-		"cwd": "${workspaceFolder}",
-		"environment": [],
-		"externalConsole": false,
-		"MIMode": "gdb",
-		"setupCommands": [
-		    {
-			"description": "Enable pretty-printing for gdb",
-			"text": "-enable-pretty-printing",
-			"ignoreFailures": true
-		    }
-		],
-		"preLaunchTask": "Build Gaspetto Box Program"
-	    }
-    ]
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Build Gaspetto Box Program"
+    }
+  ]
 }

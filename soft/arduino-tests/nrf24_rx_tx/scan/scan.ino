@@ -1,5 +1,5 @@
-#include <SPI.h>
 #include "RF24.h"
+#include <SPI.h>
 
 #define CE_PIN 9
 #define CSN_PIN 10
@@ -15,7 +15,7 @@ RF24 radio(CE_PIN, CSN_PIN);
   will take a space-delimited string of hexadecimal characters and
   decode then print it out as human readable information.
 */
-uint8_t encoded_details[43] = { 0 };
+uint8_t encoded_details[43] = {0};
 
 // Use this function to print out the encoded_details as a
 // space-delimited string of hexadecimal characters.
@@ -37,7 +37,8 @@ void setup() {
   // initialize the transceiver on the SPI bus
   if (!radio.begin()) {
     Serial.println(F("radio hardware is not responding!!"));
-    while (1) {}  // hold in infinite loop
+    while (1) {
+    } // hold in infinite loop
   }
 
   // print example's introductory prompt
@@ -57,18 +58,23 @@ void setup() {
   Serial.println(F(" characters."));
 
   // encoded_details is NOT human readable.
-  // encodeRadioDetails() is very small when used on its own because it puts debugging information into a byte array
-  // No printf() support needed because it doesn't use an output stream.
+  // encodeRadioDetails() is very small when used on its own because it puts
+  // debugging information into a byte array No printf() support needed because
+  // it doesn't use an output stream.
   radio.encodeRadioDetails(encoded_details);
   Serial.println(F("\nhexadecimal dump of all registers:"));
   dumpRegData();
 
-  Serial.println(F("\n\nCopy the above string of hexadecimal characters (including spaces)."));
-  Serial.print(F("Then paste it into a terminal using the print_details.py located in"));
-  Serial.print(F(" this example's folder. Like so:\npython print_details.py \""));
+  Serial.println(F("\n\nCopy the above string of hexadecimal characters "
+                   "(including spaces)."));
+  Serial.print(
+      F("Then paste it into a terminal using the print_details.py located in"));
+  Serial.print(
+      F(" this example's folder. Like so:\npython print_details.py \""));
   dumpRegData();
-  Serial.println(F("\"\n***You may need to use 'python3' (without quotes) on Linux"));
-}  // setup
+  Serial.println(
+      F("\"\n***You may need to use 'python3' (without quotes) on Linux"));
+} // setup
 
 /* Registers correspnding to index of encoded_details array
   0:     NRF_CONFIG
