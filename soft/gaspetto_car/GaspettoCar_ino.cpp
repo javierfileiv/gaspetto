@@ -4,9 +4,9 @@
 #include "IdleState.h"
 #include "ProcessingState.h"
 
+#include <atomic> /* Required for std::atomic*/
 #include <cstdlib>
-#include <ctime> // Required for std::time
-#include <atomic> // Required for std::atomic
+#include <ctime> /* Required for std::time*/
 
 #ifndef ARDUINO
 std::atomic<bool> lowPowerMode;
@@ -15,7 +15,8 @@ std::atomic<bool> lowPowerMode;
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;
-GaspettoCar gaspetto(&idleState, &processingState, &eventQueue, StateId::IDLE);
+GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue,
+                         StateId::IDLE);
 
 #ifndef ARDUINO
 void enqueue_random_commands(const uint8_t num_events) {
@@ -24,10 +25,8 @@ void enqueue_random_commands(const uint8_t num_events) {
   for (uint8_t i = 0; i < num_events; ++i) {
     const CommandId command = static_cast<CommandId>(
         rand() % static_cast<int>(CommandId::MAX_COMMAND_ID));
-    const Event event(EventId::NRF_IRQ,
-                      command); // Random event
-
-    gaspetto.postEvent(event);
+    const Event event(EventId::NRF_IRQ, command); /* Random event*/
+    gaspetto_car.postEvent(event);
   }
 }
 #endif
@@ -35,11 +34,11 @@ void enqueue_random_commands(const uint8_t num_events) {
 void nrf_ISR(void) {
 #ifndef ARDUINO
   enqueue_random_commands(1);
+#else
+
 #endif
 }
 
-void setup() {
-  gaspetto.Init();
-}
+void setup() { gaspetto_car.Init(); }
 
-void loop() { gaspetto.processNextEvent(); }
+void loop() { gaspetto_car.processNextEvent(); }
