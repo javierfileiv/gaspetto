@@ -8,7 +8,7 @@
 class EventQueue {
 public:
   // Enqueue an event
-  bool enqueue(Event evt);
+  bool enqueue(Event &evt);
 
   // Dequeue an event
   bool dequeue(Event &evt);

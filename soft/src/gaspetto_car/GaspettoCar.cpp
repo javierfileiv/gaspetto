@@ -8,7 +8,6 @@ GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue,
   lowPowerMode = false; // Initialize lowPowerMode to false
 #endif
 
-  /* Initialize event queue. */
   /* Initialize states. */
   states[static_cast<int>(StateId::IDLE)] = idle;
   states[static_cast<int>(StateId::PROCESSING)] = running;
@@ -75,10 +74,12 @@ void GaspettoCar::transitionTo(StateId newStateId) {
 }
 
 void GaspettoCar::enterLowPowerMode(void) {
+#ifndef ARDUINO
   std::cout << "Entering low-power mode...\n";
   lowPowerMode = true;
   while (lowPowerMode) {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(100)); // Simulate low-power sleep
   }
+#endif
 }

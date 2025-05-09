@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-enum class EventId { TIMER_ELAPSED, NRF_IRQ, NONE };
+enum class EventId { TIMER_ELAPSED, NRF_IRQ, BUTTON_PRESSED, NONE, MAX_EVENT_ID };
 
 enum class StateId { IDLE, PROCESSING, PAUSED, MAX_STATE_ID };
 
@@ -11,26 +11,31 @@ enum class CommandId {
   MOTOR_RIGHT,
   MOTOR_LEFT,
   MOTOR_STOP,
+  NONE,
   MAX_COMMAND_ID
 };
 
 const struct {
   CommandId command;
   uint8_t str[20];
-} command_to_string[] = {
+} command_to_string[static_cast<std::size_t>(CommandId::MAX_COMMAND_ID)] = {
     {CommandId::MOTOR_FORWARD, "MOTOR_FORWARD"},
     {CommandId::MOTOR_BACKWARD, "MOTOR_BACKWARD"},
     {CommandId::MOTOR_RIGHT, "MOTOR_RIGHT"},
     {CommandId::MOTOR_LEFT, "MOTOR_LEFT"},
     {CommandId::MOTOR_STOP, "MOTOR_STOP"},
+    {CommandId::NONE, "NONE"},
+
 };
 
 const struct {
   EventId event;
   uint8_t str[20];
-} event_to_string[] = {
+} event_to_string[static_cast<std::size_t>(EventId::MAX_EVENT_ID)] = {
     {EventId::TIMER_ELAPSED, "TIMER_ELAPSED"},
     {EventId::NRF_IRQ, "NRF_IRQ"},
+    {EventId::BUTTON_PRESSED, "BUTTON_PRESSED"},
+    {EventId::NONE, "NONE"},
 };
 
 class Event {

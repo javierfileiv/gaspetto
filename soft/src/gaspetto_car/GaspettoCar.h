@@ -18,8 +18,8 @@ public:
   EventQueue getEventQueue() { return *eventQueue; }
   void processNextEvent(void);
   int postEvent(Event evt);
-  void enterLowPowerMode(void);
   void Init(void);
+  void enterLowPowerMode(void);
 
 private:
   void UpdateState(StateId &newStateId);
