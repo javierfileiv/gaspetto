@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 enum class EventId { TIMER_ELAPSED, NRF_IRQ, NONE };
 
@@ -13,7 +14,26 @@ enum class CommandId {
   MAX_COMMAND_ID
 };
 
-class Event{
+const struct {
+  CommandId command;
+  uint8_t str[20];
+} command_to_string[] = {
+    {CommandId::MOTOR_FORWARD, "MOTOR_FORWARD"},
+    {CommandId::MOTOR_BACKWARD, "MOTOR_BACKWARD"},
+    {CommandId::MOTOR_RIGHT, "MOTOR_RIGHT"},
+    {CommandId::MOTOR_LEFT, "MOTOR_LEFT"},
+    {CommandId::MOTOR_STOP, "MOTOR_STOP"},
+};
+
+const struct {
+  EventId event;
+  uint8_t str[20];
+} event_to_string[] = {
+    {EventId::TIMER_ELAPSED, "TIMER_ELAPSED"},
+    {EventId::NRF_IRQ, "NRF_IRQ"},
+};
+
+class Event {
 public:
   Event() : event(EventId::NONE), command(CommandId::MOTOR_STOP) {}
   Event(EventId eventId, CommandId commandId)
