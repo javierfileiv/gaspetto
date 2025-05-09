@@ -31,9 +31,10 @@ void enqueue_random_commands(const uint8_t num_events) {
 }
 #endif
 
-void nrf_ISR(void) {
+void ISR(void) {
 #ifndef ARDUINO
-  enqueue_random_commands(1);
+  Event evt = getEvent();
+  gaspetto_car.postEvent(evt);
 #else
 
 #endif

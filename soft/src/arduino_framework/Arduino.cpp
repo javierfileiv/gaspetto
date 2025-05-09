@@ -1,5 +1,5 @@
-#include "../GaspettoCar.h"
 #include "GaspettoCar_ino.h"
+#include "StateMachine.h"
 #include <atomic>
 #include <iostream>
 #include <thread>
@@ -8,14 +8,14 @@
 extern "C" {
 #include <termios.h>
 }
-// gloabl variable from ino
-extern GaspettoCar gaspetto;
 
 // Global variables
 std::atomic<unsigned long> millisCounter(0);
 std::atomic<bool> running(true);
 extern std::atomic<bool> lowPowerMode;
-
+void (*userFunc_)(void) = nullptr;
+Event event;
+Event evt_copy;
 // Simulated millis function
 unsigned long millis(void) { return millisCounter.load(); }
 
@@ -28,6 +28,16 @@ static void emu_millisThread() {
   }
 }
 
+void attachInterrupt(uint8_t interruptNum, void (*userFunc)(void),
+                     uint8_t mode) {
+  userFunc_ = userFunc;
+}
+
+Event getEvent(void) {
+  evt_copy = event;
+  return evt_copy;
+}
+
 static void keyboardInput(void) {
   struct termios oldt, newt;
   tcgetattr(STDIN_FILENO, &oldt);
@@ -37,15 +47,10 @@ static void keyboardInput(void) {
 
   char ch;
   bool keyPressed = false;
-  Event event;
   while (true) {
     if (read(STDIN_FILENO, &ch, 1) > 0) {
+      event = {EventId::NONE, CommandId::NONE}; // Reset event
       switch (ch) {
-      case 'I':
-      case 'i':
-        nrf_ISR();                 // Simulate NRF IRQ
-        lowPowerMode.store(false); /* Wake Up the system. */
-        break;
       case 'q':
       case 'Q':
         running = false; // Stop the program
@@ -53,34 +58,30 @@ static void keyboardInput(void) {
       case 'F':
       case 'f':
         event = {EventId::NRF_IRQ, CommandId::MOTOR_FORWARD};
-        gaspetto.postEvent(event);
-        lowPowerMode.store(false); // Wake the system
         break;
       case 'b':
       case 'B':
         event = {EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD};
-        gaspetto.postEvent(event);
-        lowPowerMode.store(false); // Wake the system
         break;
       case 'l':
       case 'L':
         event = {EventId::NRF_IRQ, CommandId::MOTOR_LEFT};
-        gaspetto.postEvent(event);
-        lowPowerMode.store(false); // Wake the system
         break;
       case 'r':
       case 'R':
         event = {EventId::NRF_IRQ, CommandId::MOTOR_RIGHT};
-        gaspetto.postEvent(event);
-        lowPowerMode.store(false); // Wake the system
         break;
       case 's':
       case 'S':
         event = {EventId::NRF_IRQ, CommandId::MOTOR_STOP};
-        gaspetto.postEvent(event);
-        lowPowerMode.store(false); // Wake the system
+        break;
+      case 'p':
+      case 'P':
+        event = {EventId::BUTTON_PRESSED, CommandId::NONE};
         break;
       }
+      ISR();
+      lowPowerMode.store(false);
     }
     std::this_thread::sleep_for(
         std::chrono::milliseconds(250)); // Polling delay

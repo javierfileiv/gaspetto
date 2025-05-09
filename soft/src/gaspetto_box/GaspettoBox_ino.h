@@ -2,4 +2,4 @@
 
 void loop(void);
 void setup(void);
-void nrf_ISR(void);
+void buttonISR(void);

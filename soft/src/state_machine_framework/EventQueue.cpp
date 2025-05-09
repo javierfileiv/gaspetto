@@ -1,7 +1,7 @@
 #include "EventQueue.h"
 #include "StateMachine.h"
 
-bool EventQueue::enqueue(Event evt) {
+bool EventQueue::enqueue(Event &evt) {
   if (count == capacity) {
     // Queue is full
     return false;
