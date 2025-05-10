@@ -2,7 +2,7 @@
 #include "Arduino.h"
 
 TimeredEventQueue::TimeredEventQueue() : headIndex_(-1), freeListHead_(0) {
-  // Initialize the free list
+  /*  Initialize the free list. */
   for (int i = 0; i < MAX_TIMED_EVENT_NODES - 1; ++i) {
     eventNodes_[i].nextIndex = i + 1;
   }
@@ -12,7 +12,7 @@ TimeredEventQueue::TimeredEventQueue() : headIndex_(-1), freeListHead_(0) {
 bool TimeredEventQueue::scheduleEvent(uint32_t timeMs, Event event) {
   int newNodeIndex = allocateNode();
   if (newNodeIndex == -1) {
-    return false; // Queue is full
+    return false; /*  Queue is full. */
   }
 
   eventNodes_[newNodeIndex].triggerTimeMs = timeMs;
@@ -43,14 +43,33 @@ void TimeredEventQueue::processEvents(ActiveObject &ao) {
   uint32_t currentTime = millis();
   while (headIndex_ != -1 &&
          eventNodes_[headIndex_].triggerTimeMs <= currentTime) {
-    ao.enqueue(eventNodes_[headIndex_].event);
+    Serial.print("Processing event: ");
+    Serial.print("Event: ");
+    Serial.print(
+        event_to_string[static_cast<int>(
+                            eventNodes_[headIndex_].event.getEventId())]
+            .str);
+    Serial.print(", ");
+    Serial.print("Command: ");
+    Serial.print(
+        command_to_string[static_cast<int>(
+                              eventNodes_[headIndex_].event.getCommand())]
+            .str);
+    Serial.print(", ");
+    Serial.print("Trigger Time: ");
+    Serial.print(eventNodes_[headIndex_].triggerTimeMs);
+    Serial.print(" ms, ");
+    Serial.print("Current Time: ");
+    Serial.print(currentTime);
+    Serial.println(" ms");
+    ao.postEvent(eventNodes_[headIndex_].event);
     int temp = headIndex_;
     headIndex_ = eventNodes_[headIndex_].nextIndex;
     freeNode(temp);
   }
 }
 
-void TimeredEventQueue::clear() {
+void TimeredEventQueue::clear(void) {
   headIndex_ = -1;
   freeListHead_ = 0;
   for (int i = 0; i < MAX_TIMED_EVENT_NODES - 1; ++i) {
@@ -59,9 +78,9 @@ void TimeredEventQueue::clear() {
   eventNodes_[MAX_TIMED_EVENT_NODES - 1].nextIndex = -1;
 }
 
-int TimeredEventQueue::allocateNode() {
+int TimeredEventQueue::allocateNode(void) {
   if (freeListHead_ == -1) {
-    return -1; // No free nodes
+    return -1; /*  No free nodes. */
   }
   int allocatedIndex = freeListHead_;
   freeListHead_ = eventNodes_[freeListHead_].nextIndex;

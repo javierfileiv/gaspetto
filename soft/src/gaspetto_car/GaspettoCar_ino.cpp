@@ -3,10 +3,13 @@
 #include "GaspettoCar.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
+#include "TimeredEventQueue.h"
 
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;
+TimeredEventQueue timeredEventQueue;
+
 GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue,
                          StateId::IDLE);
 
@@ -38,6 +41,17 @@ void setup() {
   gaspetto_car.Init();
   /* Set up ISR for button press simulation. */
   attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
+  timeredEventQueue.scheduleEventDelayed(
+      1000, Event(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD));
+  timeredEventQueue.scheduleEventDelayed(
+      2000, Event(EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD));
+  timeredEventQueue.scheduleEventDelayed(
+      2000, Event(EventId::NRF_IRQ, CommandId::MOTOR_LEFT));
+  timeredEventQueue.scheduleEventDelayed(
+      10000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
 }
 
-void loop() { gaspetto_car.processNextEvent(); }
+void loop() {
+  gaspetto_car.processNextEvent();
+  timeredEventQueue.processEvents(gaspetto_car);
+}

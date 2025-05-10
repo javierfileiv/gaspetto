@@ -16,9 +16,9 @@ void GaspettoCar::enqueue_random_commands(const uint8_t num_events) {
 
   for (uint8_t i = 0; i < num_events; ++i) {
     Event event = {EventId::NRF_IRQ,
-                   static_cast<CommandId>(rand() % 4)}; // Random event
+                   static_cast<CommandId>(rand() % 4)}; /*  Random event. */
 
     postEvent(event);
-    lowPowerMode = false; // Wake the system
+    lowPowerMode = false; /*  Wake up the system. */
   }
 }

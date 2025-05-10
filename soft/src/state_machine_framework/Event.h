@@ -23,25 +23,29 @@ enum class CommandId {
 
 const struct {
   CommandId command;
-  uint8_t str[20];
+  const uint8_t *str;
 } command_to_string[static_cast<std::size_t>(CommandId::MAX_COMMAND_ID)] = {
-    {CommandId::MOTOR_FORWARD, "MOTOR_FORWARD"},
-    {CommandId::MOTOR_BACKWARD, "MOTOR_BACKWARD"},
-    {CommandId::MOTOR_RIGHT, "MOTOR_RIGHT"},
-    {CommandId::MOTOR_LEFT, "MOTOR_LEFT"},
-    {CommandId::MOTOR_STOP, "MOTOR_STOP"},
-    {CommandId::NONE, "NONE"},
+    {CommandId::MOTOR_FORWARD,
+     reinterpret_cast<const uint8_t *>("MOTOR_FORWARD")},
+    {CommandId::MOTOR_BACKWARD,
+     reinterpret_cast<const uint8_t *>("MOTOR_BACKWARD")},
+    {CommandId::MOTOR_RIGHT, reinterpret_cast<const uint8_t *>("MOTOR_RIGHT")},
+    {CommandId::MOTOR_LEFT, reinterpret_cast<const uint8_t *>("MOTOR_LEFT")},
+    {CommandId::MOTOR_STOP, reinterpret_cast<const uint8_t *>("MOTOR_STOP")},
+    {CommandId::NONE, reinterpret_cast<const uint8_t *>("NONE")},
 
 };
 
 const struct {
   EventId event;
-  uint8_t str[20];
+  const uint8_t *str;
 } event_to_string[static_cast<std::size_t>(EventId::MAX_EVENT_ID)] = {
-    {EventId::TIMER_ELAPSED, "TIMER_ELAPSED"},
-    {EventId::NRF_IRQ, "NRF_IRQ"},
-    {EventId::BUTTON_PRESSED, "BUTTON_PRESSED"},
-    {EventId::NONE, "NONE"},
+    {EventId::TIMER_ELAPSED,
+     reinterpret_cast<const uint8_t *>("TIMER_ELAPSED")},
+    {EventId::NRF_IRQ, reinterpret_cast<const uint8_t *>("NRF_IRQ")},
+    {EventId::BUTTON_PRESSED,
+     reinterpret_cast<const uint8_t *>("BUTTON_PRESSED")},
+    {EventId::NONE, reinterpret_cast<const uint8_t *>("NONE")},
 };
 
 class Event {

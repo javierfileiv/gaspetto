@@ -9,7 +9,8 @@
         "-g",
         "${workspaceFolder}/arduino_framework/Arduino.cpp",
         "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-        // Arduino program
+        "${workspaceFolder}/state_machine_framework/TimeredEventQueue.cpp",
+        /*  Arduino program. */
         "${workspaceFolder}/gaspetto_car/GaspettoCar_ino.cpp",
         "${workspaceFolder}/gaspetto_car/ProcessingState.cpp",
         "${workspaceFolder}/gaspetto_car/IdleState.cpp",
@@ -43,7 +44,7 @@
         "-g",
         "${workspaceFolder}/arduino_framework/Arduino.cpp",
         "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-        // Arduino program
+        /*  Arduino program. */
         "${workspaceFolder}/gaspetto_box/GaspettoBox_ino.cpp",
         "${workspaceFolder}/gaspetto_box/ProcessingState.cpp",
         "${workspaceFolder}/gaspetto_box/IdleState.cpp",
