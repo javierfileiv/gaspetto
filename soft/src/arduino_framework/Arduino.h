@@ -31,6 +31,9 @@ extern SerialEmulator Serial;
 #define digitalPinToInterrupt(pin) (pin)
 #define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
 #define digitalWrite(pin, value)
+#define analogWrite(pin, value)                                                \
+  do {                                                                         \
+  } while (0)
 
 unsigned long millis(void);
 void enterLowPowerMode(void);
