@@ -10,10 +10,6 @@
 #define __ASSERT_USE_STDERR
 #include <assert.h>
 
-// #ifndef ARDUINO
-// extern std::atomic<bool> lowPowerMode;
-// #endif
-
 class GaspettoCar : public ActiveObject {
 public:
   GaspettoCar(State *idle, State *running, EventQueue *queue,

@@ -2,11 +2,12 @@
 #include "Arduino.h"
 #include "EventQueue.h"
 #include "State.h"
-#include "TimeredEventQueue.h"
+#include "TimeredEventQueue.h" // Ensure this header file exists and defines TimeredEventQueue
 #include <cstdint>
 #include <iostream>
 #include <thread>
 
+class TimeredEventQueue;
 class ActiveObject {
 public:
   ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
@@ -63,13 +64,13 @@ public:
     lowPowerMode = true;
     while (lowPowerMode) {
       std::this_thread::sleep_for(
-          std::chrono::milliseconds(100)); // Simulate low-power sleep
+          std::chrono::milliseconds(100)); /*  Simulate low-power sleep. */
     }
 #else
-    // Implement low-power mode for Arduino here
-    // For example, you might use sleep modes or power-saving features
-    // specific to the Arduino platform.
-    delay(100); // Simulate low-power sleep
+    /*  Implement low-power mode for Arduino here. */
+    /*  For example, you might use sleep modes or power-saving features. */
+    /*  specific to the Arduino platform.. */
+    delay(100); /*  Simulate low-power sleep. */
 #endif
   }
 

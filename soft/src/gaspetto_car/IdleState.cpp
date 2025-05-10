@@ -3,7 +3,8 @@
 #include <cassert>
 #include <iostream>
 
-void IdleState::enter() { state_machine->enterLowPowerMode(); }
+void IdleState::enter() { /* state_machine->enterLowPowerMode(); */
+}
 
 void IdleState::processEvent(Event event) {
   Serial.println("Processing event in IdleState...\n");
@@ -14,7 +15,7 @@ void IdleState::processEvent(Event event) {
     break;
   default:
     /* Stay in low power mode*/
-    state_machine->enterLowPowerMode();
+    /* state_machine->enterLowPowerMode(); */
     break;
   }
 }
