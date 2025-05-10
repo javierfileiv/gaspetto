@@ -10,21 +10,21 @@ extern "C" {
 #include <termios.h>
 }
 
-// Global variables
+/*  Global variables. */
 std::atomic<unsigned long> millisCounter(0);
 std::atomic<bool> running(true);
 std::atomic<bool> lowPowerMode;
 void (*userFunc_)(void) = nullptr;
 Event event;
 Event evt_copy;
-// Simulated millis function
+/*  Simulated millis function. */
 unsigned long millis(void) { return millisCounter.load(); }
 
-// Millis simulation thread
+/*  Millis simulation thread. */
 static void emu_millisThread() {
   while (running) {
     std::this_thread::sleep_for(
-        std::chrono::milliseconds(1)); // Increment every millisecond
+        std::chrono::milliseconds(1)); /*  Increment every millisecond. */
     millisCounter.fetch_add(1);
   }
 }
@@ -50,11 +50,11 @@ static void keyboardInput(void) {
   bool keyPressed = false;
   while (true) {
     if (read(STDIN_FILENO, &ch, 1) > 0) {
-      event = {EventId::NONE, CommandId::NONE}; // Reset event
+      event = {EventId::NONE, CommandId::NONE}; /*  Reset event. */
       switch (ch) {
       case 'q':
       case 'Q':
-        running = false; // Stop the program
+        running = false; /*  Stop the program. */
         break;
       case 'F':
       case 'f':
@@ -85,10 +85,10 @@ static void keyboardInput(void) {
       lowPowerMode.store(false);
     }
     std::this_thread::sleep_for(
-        std::chrono::milliseconds(250)); // Polling delay
+        std::chrono::milliseconds(250)); /*  Polling delay. */
   }
 
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Restore terminal settings
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldt); /*  Restore terminal settings. */
 }
 
 void enterLowPowerMode(void) {
@@ -97,26 +97,26 @@ void enterLowPowerMode(void) {
   lowPowerMode.store(true);
   while (lowPowerMode.load()) {
     std::this_thread::sleep_for(
-        std::chrono::milliseconds{100}); // Simulate low-power sleep
+        std::chrono::milliseconds{100}); /*  Simulate low-power sleep. */
   }
 #endif
 }
 
 int main() {
   Serial.println("Starting simulation...\n");
-  // Start the simulation threads
+  /*  Start the simulation threads. */
   std::thread millisSim(emu_millisThread);
   std::thread keyboardSim(keyboardInput);
-  // Setuo the system
+  /*  Setuo the system. */
   setup();
-  // Main loop
+  /*  Main loop. */
   while (running) {
     loop();
     std::this_thread::sleep_for(std::chrono::milliseconds(
-        10)); // Add a small delay to prevent CPU overuse
+        10)); /*  Add a small delay to prevent CPU overuse. */
   }
 
-  // Stop the threads
+  /*  Stop the threads. */
   running = false;
   millisSim.join();
   keyboardSim.join();

@@ -3,23 +3,23 @@
 
 bool EventQueue::enqueue(Event &evt) {
   if (count == capacity) {
-    // Queue is full
+    /*  Queue is full. */
     return false;
   }
   events[tail] = evt;
-  tail = (tail + 1) % capacity; // Wrap around if necessary
+  tail = (tail + 1) % capacity; /*  Wrap around if necessary. */
   ++count;
   return true;
 }
 
-// Dequeue an event
+/*  Dequeue an event. */
 bool EventQueue::dequeue(Event &evt) {
   if (count == 0) {
-    // Queue is empty
+    /*  Queue is empty. */
     return false;
   }
   evt = events[head];
-  head = (head + 1) % capacity; // Wrap around if necessary
+  head = (head + 1) % capacity; /*  Wrap around if necessary. */
   --count;
   return true;
 }

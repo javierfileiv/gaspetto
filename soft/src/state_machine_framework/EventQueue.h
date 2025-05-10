@@ -1,25 +1,25 @@
 #pragma once
 
 #include "Event.h"
-#include <cstddef> // For size_t
+#include <cstddef> /*  For size_t. */
 
-#define QUEUE_SIZE 10 // Define the size of the queue
+#define QUEUE_SIZE 20 /*  Define the size of the queue. */
 
 class EventQueue {
 public:
-  // Enqueue an event
+  /*  Enqueue an event. */
   bool enqueue(Event &evt);
 
-  // Dequeue an event
+  /*  Dequeue an event. */
   bool dequeue(Event &evt);
 
-  // Check if the queue is empty
+  /*  Check if the queue is empty. */
   bool IsEmpty() const;
 
-  // Check if the queue is full
+  /*  Check if the queue is full. */
   bool IsFull() const;
 
-  // Get the current size of the queue
+  /*  Get the current size of the queue. */
   size_t GetSize() const;
 
 private:

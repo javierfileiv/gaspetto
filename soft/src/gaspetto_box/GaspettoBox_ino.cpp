@@ -18,7 +18,7 @@ EventQueue eventQueue;
 GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue,
                          StateId::IDLE);
 
-// Button press simulation thread
+/*  Button press simulation thread. */
 void ISR(void) {
 #ifndef ARDUINO
   Event evt = getEvent();
