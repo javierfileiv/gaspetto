@@ -18,6 +18,6 @@ private:
   uint8_t groupPins[TOTAL_SENSORS];
   const uint8_t numGroups = NUM_GROUPS;
   uint8_t sensorsPerGroup = GROUP_SIZE;
-  // ADC Values array
+  /*  ADC Values array. */
   uint16_t adcValues[GROUP_SIZE] = {0};
 };
