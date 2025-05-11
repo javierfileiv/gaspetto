@@ -1,1 +1,0 @@
-../../arduino-soft/gaspetto_box/GaspettoBox.h

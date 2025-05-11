@@ -1,1 +1,0 @@
-../../arduino-soft/gaspetto_box/ReadHall.cpp
