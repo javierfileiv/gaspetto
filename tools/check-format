@@ -1,0 +1,65 @@
+#!/bin/bash
+
+clang_format=
+style=file
+
+function usage {
+    [[ -n $2 ]] && exec >&2
+    cat <<EOF
+Usage: $1 [options] [dirs or files...]
+
+Apply formating using clang-format.
+
+Options:
+  -p CLANG-FORMAT  use given program to run clang-format
+  -s STYLE         use given style (default: $style)
+  -h               show this help message and exit
+EOF
+    exit $2
+}
+
+function die {
+	echo "$*" >&2
+	exit 1
+}
+
+while getopts fp:s:h option; do
+	case $option in
+		p) clang_format="$OPTARG" ;;
+		s) style="$OPTARG" ;;
+		h) usage $0 ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [[ -z $clang_format ]]; then
+	clang_format=clang-format-14
+	if [[  "$("$clang_format" --version)" != *'version 14.0'* ]]; then
+		die "please use clang-format version 14.0"
+	fi
+fi
+
+[[ $# -eq 0 ]] && set .
+
+files_to_process=()
+
+for path in "$@"
+do
+	if [[ -f "$path" ]]; then
+		files_to_process+=( ${path} )
+	else
+		pats=("${@/%/'/**.[ch]'}" "${@/%/'/**.[ch][ch]'}" "${@/%/'/**.cpp'}")
+		while IFS= read -d '' -r file; do
+			[[ -f "$file" && ! -L "$file" ]] && files_to_process+=( ${file} )
+		done < <(git ls-files -z "${pats[@]}")
+	fi
+done
+
+for file in "${files_to_process[@]}"
+do
+	"$clang_format" -style="$style" -i "$file"
+done
+
+if ! git diff-files --quiet "${files_to_process[@]}"; then
+	die "After formating, there are modified files"
+fi
