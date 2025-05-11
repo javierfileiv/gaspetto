@@ -25,9 +25,8 @@ void ProcessingState::enter()
     pinMode(SPEED_SENSOR_MOTOR_A_PIN, INPUT);
     pinMode(SPEED_SENSOR_MOTOR_B_PIN, INPUT);
 #endif
-    /* Set initial motor state */
+    analogWriteFrequency(35); /* Set PWM frequency to 35Hz. */
     stopMotor();
-    analogWriteFrequency(75); // Set frequency to 75Hz
 }
 
 void ProcessingState::stopMotor(void)
