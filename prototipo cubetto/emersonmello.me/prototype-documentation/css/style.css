@@ -18,21 +18,21 @@
  url(http://primo.io/fonts/nationale.svg#nationale§) format('svg');
  font-weight: normal;
  font-style: normal;
-} 
+}
 
 body {
-	font-family: 'Inconsolata', sans-serif;	
+	font-family: 'Inconsolata', sans-serif;
 	background: #faf5eb;
 }
 
 h1, h2, h3 {
 	font-weight: normal;
-	font-family: 'ginger';	
+	font-family: 'ginger';
 	color: #692d55;
 }
 
-h1 {	
-	padding-bottom: 0.5em;	
+h1 {
+	padding-bottom: 0.5em;
 }
 
 h2 {
@@ -44,7 +44,7 @@ h3 {
 }
 
 a {
-	text-decoration: none;	
+	text-decoration: none;
 	border-bottom: 2px solid #05DC94;
 	color: inherit;
 }
@@ -54,7 +54,7 @@ input[type=checkbox]{
 }
 
 input[type=checkbox] + label{
-    display: block;    
+    display: block;
     padding-left: 40px;
     background-position: 0 0;
     background-repeat: no-repeat;
@@ -74,7 +74,7 @@ label{
 .navs {
 	position: absolute;
 	top: 20px;
-	left: 20px;	
+	left: 20px;
 }
 
 nav {
@@ -86,19 +86,19 @@ nav {
 select {
 	color: #FFF;
 	outline: none;
-	background: url('../images/illustrations/arrow.png') #FFA900 no-repeat 90%/8% ;	
+	background: url('../images/illustrations/arrow.png') #FFA900 no-repeat 90%/8% ;
 	border: none;
 	-webkit-appearance: none;
 	-moz-appearance: none;
 	padding: 1em 4em 1em 1em;
 	border-radius: 0;
 	font-family: inconsolata;
-	font-size: 1em;	
+	font-size: 1em;
 	width: 100%;
 }
 
 option {
-	margin: 0.5em 0;	
+	margin: 0.5em 0;
 }
 
 option:hover {
@@ -108,7 +108,7 @@ option:hover {
 
 #logo {
 	display: block;
-	height: 65px;	
+	height: 65px;
 	margin-bottom: 2.5em;
 	border-bottom: none;
 }
@@ -136,8 +136,8 @@ option:hover {
 }
 
 #container {
-	width: 80%;	
-	max-width: 800px;	
+	width: 80%;
+	max-width: 800px;
 	color: #692d55;
 }
 
@@ -146,11 +146,11 @@ option:hover {
 	margin-bottom: 1em;
 }
 
-#container p {		
-	line-height: 1.4em;	
+#container p {
+	line-height: 1.4em;
 }
 
-#content p {	
+#content p {
 	margin-bottom: 2em;
 	line-height: 1.4em;
 }
@@ -226,7 +226,7 @@ option:hover {
 
  	.navs {
     	width: 100%;
-    }   
+    }
 
     nav {
     	display: block;

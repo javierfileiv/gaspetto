@@ -3,6 +3,7 @@
 #include "GaspettoBox.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
+
 #include <atomic>
 
 // Pin Definitions
@@ -15,25 +16,29 @@
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;
-GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue,
-                         StateId::IDLE);
+GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue, StateId::IDLE);
 
 /*  Button press simulation thread. */
-void ISR(void) {
+void ISR(void)
+{
 #ifndef ARDUINO
-  Event evt = getEvent();
-  gaspetto_box.debounceAndEnqueue(evt, millis());
+    Event evt = getEvent();
+    gaspetto_box.debounceAndEnqueue(evt, millis());
 #endif
 }
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Gaspetto Box Initialized");
-  Serial.println("Starting up...\n");
-  /* Initialize the GaspettoBox state machine. */
-  gaspetto_box.Init();
-  /* Set up ISR for button press simulation. */
-  attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
+void setup()
+{
+    Serial.begin(115200);
+    Serial.println("Gaspetto Box Initialized");
+    Serial.println("Starting up...\n");
+    /* Initialize the GaspettoBox state machine. */
+    gaspetto_box.Init();
+    /* Set up ISR for button press simulation. */
+    attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
 }
 
-void loop() { gaspetto_box.processNextEvent(); }
+void loop()
+{
+    gaspetto_box.processNextEvent();
+}

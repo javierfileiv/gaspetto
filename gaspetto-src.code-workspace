@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "soft/src"
+		},
+		{
+			"path": "soft"
 		}
 	]
 }

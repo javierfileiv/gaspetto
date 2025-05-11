@@ -12,9 +12,9 @@ enum class TestMode : uint8_t { Disabled, Counter, Invalid };
 using CommandFunction = void (*)(StringStream &ss);
 
 struct Command {
-  const char command[6];
-  CommandFunction function;
-  const char help[32];
+    const char command[6];
+    CommandFunction function;
+    const char help[32];
 };
 
 #endif // TYPES_H

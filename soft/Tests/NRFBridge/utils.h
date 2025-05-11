@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include "types.h"
+
 #include <Arduino.h>
 
 class StringStream;

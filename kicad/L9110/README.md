@@ -13,4 +13,3 @@ The lib also contains a 0605 RGB LED that is useful for providing the visual fee
 
 ## L9110 Motor driver
 Cheap SO-8 motor driver that can drive up to 0.8A. Based on the part found in John Spencer's [motorised slider](https://github.com/mage0r/RSA0N11M9A0J_motorised_slider). I've fixed the DRC errors on this chip and I'm redistributing it here under its original [OHL license](http://www.tapr.org/OHL).
-

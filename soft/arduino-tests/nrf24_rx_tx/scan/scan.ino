@@ -1,4 +1,5 @@
 #include "RF24.h"
+
 #include <SPI.h>
 
 #define CE_PIN 9
@@ -15,65 +16,63 @@ RF24 radio(CE_PIN, CSN_PIN);
   will take a space-delimited string of hexadecimal characters and
   decode then print it out as human readable information.
 */
-uint8_t encoded_details[43] = {0};
+uint8_t encoded_details[43] = { 0 };
 
 // Use this function to print out the encoded_details as a
 // space-delimited string of hexadecimal characters.
-void dumpRegData() {
-  for (uint8_t i = 0; i < 43; ++i) {
-    Serial.print(encoded_details[i], HEX);
-    if (i < 42)
-      Serial.print(F(" "));
-  }
+void dumpRegData()
+{
+    for (uint8_t i = 0; i < 43; ++i) {
+        Serial.print(encoded_details[i], HEX);
+        if (i < 42)
+            Serial.print(F(" "));
+    }
 }
 
-void setup() {
+void setup()
+{
+    Serial.begin(115200);
+    while (!Serial) {
+        // some boards need to wait to ensure access to serial over USB
+    }
 
-  Serial.begin(115200);
-  while (!Serial) {
-    // some boards need to wait to ensure access to serial over USB
-  }
+    // initialize the transceiver on the SPI bus
+    if (!radio.begin()) {
+        Serial.println(F("radio hardware is not responding!!"));
+        while (1) {
+        } // hold in infinite loop
+    }
 
-  // initialize the transceiver on the SPI bus
-  if (!radio.begin()) {
-    Serial.println(F("radio hardware is not responding!!"));
-    while (1) {
-    } // hold in infinite loop
-  }
+    // print example's introductory prompt
+    Serial.println(F("RF24/examples/encodedRadioDetails"));
 
-  // print example's introductory prompt
-  Serial.println(F("RF24/examples/encodedRadioDetails"));
+    Serial.println(F("Press any key to show debugging information"));
+    while (!Serial.available()) {
+        // wait for user input
+    }
 
-  Serial.println(F("Press any key to show debugging information"));
-  while (!Serial.available()) {
-    // wait for user input
-  }
+    // For debugging info
+    char *debug_info = new char[870];
+    uint16_t str_len = radio.sprintfPrettyDetails(debug_info);
+    Serial.println(debug_info);
+    Serial.print(F("\nThe above output used "));
+    Serial.print(str_len);
+    Serial.println(F(" characters."));
 
-  // For debugging info
-  char *debug_info = new char[870];
-  uint16_t str_len = radio.sprintfPrettyDetails(debug_info);
-  Serial.println(debug_info);
-  Serial.print(F("\nThe above output used "));
-  Serial.print(str_len);
-  Serial.println(F(" characters."));
+    // encoded_details is NOT human readable.
+    // encodeRadioDetails() is very small when used on its own because it puts
+    // debugging information into a byte array No printf() support needed because
+    // it doesn't use an output stream.
+    radio.encodeRadioDetails(encoded_details);
+    Serial.println(F("\nhexadecimal dump of all registers:"));
+    dumpRegData();
 
-  // encoded_details is NOT human readable.
-  // encodeRadioDetails() is very small when used on its own because it puts
-  // debugging information into a byte array No printf() support needed because
-  // it doesn't use an output stream.
-  radio.encodeRadioDetails(encoded_details);
-  Serial.println(F("\nhexadecimal dump of all registers:"));
-  dumpRegData();
-
-  Serial.println(F("\n\nCopy the above string of hexadecimal characters "
-                   "(including spaces)."));
-  Serial.print(
-      F("Then paste it into a terminal using the print_details.py located in"));
-  Serial.print(
-      F(" this example's folder. Like so:\npython print_details.py \""));
-  dumpRegData();
-  Serial.println(
-      F("\"\n***You may need to use 'python3' (without quotes) on Linux"));
+    Serial.println(F("\n\nCopy the above string of hexadecimal characters "
+                     "(including spaces)."));
+    Serial.print(F("Then paste it into a terminal using the print_details.py located in"));
+    Serial.print(F(" this example's folder. Like so:\npython print_details.py \""));
+    dumpRegData();
+    Serial.println(F("\"\n***You may need to use 'python3' (without quotes) on Linux"));
 } // setup
 
 /* Registers correspnding to index of encoded_details array
@@ -108,6 +107,7 @@ void setup() {
   42:    SPI speed MHz | (isPlusVariant << 4)
 */
 
-void loop() {
-  // Nothing to do here. We did it all at the end of setup()
+void loop()
+{
+    // Nothing to do here. We did it all at the end of setup()
 }

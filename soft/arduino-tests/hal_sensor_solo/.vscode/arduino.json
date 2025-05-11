@@ -1,5 +1,5 @@
 {
-  "board": "arduino:avr:uno",
-  "sketch": "hal_sensor_solo.ino",
-  "port": "/dev/ttyUSB0"
+    "board": "arduino:avr:uno",
+    "sketch": "hal_sensor_solo.ino",
+    "port": "/dev/ttyUSB0"
 }

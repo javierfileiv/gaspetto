@@ -13,86 +13,90 @@ RF24 radio(CE_PIN, CSN_PIN);
 const byte address[6] = "00001"; /*  Address for communication. */
 
 /*  Pin Definitions for ADC and GPIO. */
-const uint8_t adcPins[4] = {PB0, PB1, PB10, PB11}; /*  ADC Channels. */
-const uint8_t groupPins[20] = {
-    PA0,  PA1,  PA2,  PA3,  PA4, PA5, PA6,  PA7,  PB12, PB13, PB14,
-    PB15, PC13, PC14, PC15, PA8, PA9, PA10, PA11, PA12}; /*  GPIO Pins for GND.
-                                                          */
-                                                         /*  control. */
+const uint8_t adcPins[4] = { PB0, PB1, PB10, PB11 }; /*  ADC Channels. */
+const uint8_t groupPins[20] = { PA0,  PA1,  PA2,  PA3,  PA4,  PA5, PA6, PA7,  PB12, PB13,
+                                PB14, PB15, PC13, PC14, PC15, PA8, PA9, PA10, PA11, PA12 }; /*  GPIO
+                                                                                             * Pins
+                                                                                             * for
+                                                                                             * GND.
+                                                                                             */
+/*  control. */
 
 /*  Number of groups and sensors per group. */
 const uint8_t numGroups = 5;
 const uint8_t sensorsPerGroup = 4;
 
 /*  ADC Values array. */
-uint16_t adcValues[4] = {0}; /*  Only store one group's readings. */
+uint16_t adcValues[4] = { 0 }; /*  Only store one group's readings. */
 
-void setup() {
-  /*  Initialize Serial for debugging. */
-  Serial.begin(115200);
+void setup()
+{
+    /*  Initialize Serial for debugging. */
+    Serial.begin(115200);
 
-  /*  Initialize nRF24L01+. */
-  if (!radio.begin()) {
-    Serial.println("nRF24L01+ module not detected. Check connections.");
-    while (1)
-      ;
-  }
-  radio.openWritingPipe(address); /*  Set the communication address. */
-  radio.setPALevel(RF24_PA_LOW);  /*  Set Power Amplifier level to low. */
-  radio.setDataRate(RF24_1MBPS);  /*  Set data rate to 1Mbps. */
-  radio.setRetries(15, 15);       /*  Set retries (delay, count). */
-  radio.stopListening();          /*  Set module to transmit mode. */
+    /*  Initialize nRF24L01+. */
+    if (!radio.begin()) {
+        Serial.println("nRF24L01+ module not detected. Check connections.");
+        while (1)
+            ;
+    }
+    radio.openWritingPipe(address); /*  Set the communication address. */
+    radio.setPALevel(RF24_PA_LOW); /*  Set Power Amplifier level to low. */
+    radio.setDataRate(RF24_1MBPS); /*  Set data rate to 1Mbps. */
+    radio.setRetries(15, 15); /*  Set retries (delay, count). */
+    radio.stopListening(); /*  Set module to transmit mode. */
 
-  /*  Set GPIO pins as OUTPUT and set them HIGH (disable all sensors). */
-  for (uint8_t i = 0; i < 20; i++) {
-    pinMode(groupPins[i], OUTPUT);
-    digitalWrite(groupPins[i], HIGH); /*  Disable sensor. */
-  }
+    /*  Set GPIO pins as OUTPUT and set them HIGH (disable all sensors). */
+    for (uint8_t i = 0; i < 20; i++) {
+        pinMode(groupPins[i], OUTPUT);
+        digitalWrite(groupPins[i], HIGH); /*  Disable sensor. */
+    }
 
-  /*  Set ADC pins as INPUT. */
-  for (uint8_t i = 0; i < 4; i++) {
-    pinMode(adcPins[i], INPUT_ANALOG);
-  }
+    /*  Set ADC pins as INPUT. */
+    for (uint8_t i = 0; i < 4; i++) {
+        pinMode(adcPins[i], INPUT_ANALOG);
+    }
 }
 
-void loop() {
-  /*  Iterate over each group. */
-  for (uint8_t group = 0; group < numGroups; group++) {
-    /*  Enable the current group of sensors. */
-    for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-      digitalWrite(groupPins[group * sensorsPerGroup + i],
-                   LOW); /*  Enable sensor. */
+void loop()
+{
+    /*  Iterate over each group. */
+    for (uint8_t group = 0; group < numGroups; group++) {
+        /*  Enable the current group of sensors. */
+        for (uint8_t i = 0; i < sensorsPerGroup; i++) {
+            digitalWrite(groupPins[group * sensorsPerGroup + i], LOW); /*  Enable
+                                                                          sensor. */
+        }
+
+        /*  Small delay to allow stabilization. */
+        delayMicroseconds(50);
+
+        /*  Read ADC values for the current group. */
+        for (uint8_t i = 0; i < sensorsPerGroup; i++) {
+            adcValues[i] = analogRead(adcPins[i]);
+        }
+
+        /*  Disable the current group of sensors. */
+        for (uint8_t i = 0; i < sensorsPerGroup; i++) {
+            digitalWrite(groupPins[group * sensorsPerGroup + i], HIGH); /*  Disable
+                                                                           sensor. */
+        }
+
+        /*  Transmit the ADC values via nRF24L01+. */
+        if (radio.write(&adcValues, sizeof(adcValues))) {
+            Serial.print("Group ");
+            Serial.print(group);
+            Serial.println(" data sent successfully!");
+        } else {
+            Serial.print("Group ");
+            Serial.print(group);
+            Serial.println(" data transmission failed.");
+        }
+
+        /*  Small delay before switching to the next group. */
+        delay(100); /*  Adjust as needed. */
     }
 
-    /*  Small delay to allow stabilization. */
-    delayMicroseconds(50);
-
-    /*  Read ADC values for the current group. */
-    for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-      adcValues[i] = analogRead(adcPins[i]);
-    }
-
-    /*  Disable the current group of sensors. */
-    for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-      digitalWrite(groupPins[group * sensorsPerGroup + i],
-                   HIGH); /*  Disable sensor. */
-    }
-
-    /*  Transmit the ADC values via nRF24L01+. */
-    if (radio.write(&adcValues, sizeof(adcValues))) {
-      Serial.print("Group ");
-      Serial.print(group);
-      Serial.println(" data sent successfully!");
-    } else {
-      Serial.print("Group ");
-      Serial.print(group);
-      Serial.println(" data transmission failed.");
-    }
-
-    /*  Small delay before switching to the next group. */
-    delay(100); /*  Adjust as needed. */
-  }
-
-  /*  Delay before the next cycle. */
-  delay(1000);
+    /*  Delay before the next cycle. */
+    delay(1000);
 }

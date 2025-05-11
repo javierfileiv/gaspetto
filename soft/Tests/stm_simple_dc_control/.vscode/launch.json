@@ -1,51 +1,54 @@
 {
-  // https://github.com/nRF24/RF24.git
-  // https://github.com/Bonehead5338/NR424L01-FreeRTOS.git
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Arduino Debug (ST-Link)",
-      "type": "cortex-debug",
-      "request": "launch",
-      "servertype": "bmp",
-      "device": "STM32F103",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/simple_dc_control.ino.elf",
-      "interface": "swd",
-      "BMPGDBSerialPort": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
-      "runToEntryPoint": "setup",
-      "gdbPath": "/usr/bin/gdb-multiarch",
-      "showDevDebugOutput": "raw",
-      "targetId": 1
-      //       "postLaunchCommands": [
-      //         "cd ${workspaceRoot}/build",
-      //         "target extended-remote /dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
-      //         "monitor swdp_scan",
-      //         "attach 1",
-      //         "file car_test.ino.elf",
-      //         "load",
-      //         "cd ${workspaceRoot}",
-      //         "set mem inaccessible-by-default off",
-      //         "continue"
-      //       ]
-    },
-    {
-      "name": "Cortex Debug",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/simple_dc_control.ino.elf",
-      "request": "launch",
-      "type": "cortex-debug",
-      "BMPGDBSerialPort": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
-      "servertype": "bmp",
-      "interface": "swd",
-      "runToEntryPoint": "setup",
-      //       "showDevDebugOutput": "both",
-      "postLaunchCommands": [
-        "mon help"
-      ],
-    }
-  ]
+    // https://github.com/nRF24/RF24.git
+    // https://github.com/Bonehead5338/NR424L01-FreeRTOS.git
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Arduino Debug (ST-Link)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "bmp",
+            "device": "STM32F103",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/simple_dc_control.ino.elf",
+            "interface": "swd",
+            "BMPGDBSerialPort":
+                    "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+            "runToEntryPoint": "setup",
+            "gdbPath": "/usr/bin/gdb-multiarch",
+            "showDevDebugOutput": "raw",
+            "targetId": 1
+            //       "postLaunchCommands": [
+            //         "cd ${workspaceRoot}/build",
+            //         "target extended-remote
+            //         /dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+            //         "monitor swdp_scan",
+            //         "attach 1",
+            //         "file car_test.ino.elf",
+            //         "load",
+            //         "cd ${workspaceRoot}",
+            //         "set mem inaccessible-by-default off",
+            //         "continue"
+            //       ]
+        },
+        {
+            "name": "Cortex Debug",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/simple_dc_control.ino.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "BMPGDBSerialPort":
+                    "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00",
+            "servertype": "bmp",
+            "interface": "swd",
+            "runToEntryPoint": "setup",
+            //       "showDevDebugOutput": "both",
+            "postLaunchCommands": [
+                "mon help"
+            ],
+        }
+    ]
 }

@@ -7,5 +7,5 @@ class Event;
 
 class ProcessingState : public State {
 public:
-  void enter() override;
+    void enter() override;
 };

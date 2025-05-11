@@ -1,207 +1,234 @@
 
 #include "commands.h"
+
 #include "globals.h"
 #include "stringstream.h"
 #include "types.h"
 #include "utils.h"
+
 #include <Arduino.h>
 
-void reportTransmitPower(StringStream &commandStream) {
-  uint8_t paLevel = radio.getPALevel();
-  Serial.print("TPOW:");
-  Serial.println(paLevel);
+void reportTransmitPower(StringStream &commandStream)
+{
+    uint8_t paLevel = radio.getPALevel();
+    Serial.print("TPOW:");
+    Serial.println(paLevel);
 }
 
-void setTransmitPower(StringStream &commandStream) {
-  uint8_t paLevel = commandStream.parseInt();
-  radio.setPALevel(paLevel);
-  Serial.print(F("Set to..."));
-  reportTransmitPower(commandStream);
+void setTransmitPower(StringStream &commandStream)
+{
+    uint8_t paLevel = commandStream.parseInt();
+    radio.setPALevel(paLevel);
+    Serial.print(F("Set to..."));
+    reportTransmitPower(commandStream);
 }
 
-void reportPayloadSize(StringStream &commandStream) {
-  uint8_t payloadSize = radio.getPayloadSize();
-  Serial.print("PSIZ:");
-  Serial.println(payloadSize);
+void reportPayloadSize(StringStream &commandStream)
+{
+    uint8_t payloadSize = radio.getPayloadSize();
+    Serial.print("PSIZ:");
+    Serial.println(payloadSize);
 }
 
-void setPayloadSize(StringStream &commandStream) {
-  uint8_t payloadSize = commandStream.parseInt();
-  radio.setPayloadSize(payloadSize);
-  Serial.print(F("Set to..."));
-  reportPayloadSize(commandStream);
+void setPayloadSize(StringStream &commandStream)
+{
+    uint8_t payloadSize = commandStream.parseInt();
+    radio.setPayloadSize(payloadSize);
+    Serial.print(F("Set to..."));
+    reportPayloadSize(commandStream);
 }
 
-void isDataAvailable(StringStream &commandStream) {
-  uint8_t pipe = 0;
-  Serial.print("DATA:");
-  bool available = radio.available(&pipe);
-  char x = available ? pipe + '0' : '-';
-  Serial.println(x);
+void isDataAvailable(StringStream &commandStream)
+{
+    uint8_t pipe = 0;
+    Serial.print("DATA:");
+    bool available = radio.available(&pipe);
+    char x = available ? pipe + '0' : '-';
+    Serial.println(x);
 }
 
-void closePipe(StringStream &commandStream) {
-  uint8_t pipe = commandStream.parseInt();
-  if ((pipe == 0) or (pipe >= 6)) {
-    Serial.println(F("PCLS: Invalid pipe number!"));
-    return;
-  }
+void closePipe(StringStream &commandStream)
+{
+    uint8_t pipe = commandStream.parseInt();
+    if ((pipe == 0) or (pipe >= 6)) {
+        Serial.println(F("PCLS: Invalid pipe number!"));
+        return;
+    }
 
-  radio.closeReadingPipe(pipe);
-  Serial.println(F("PCLS:OK"));
+    radio.closeReadingPipe(pipe);
+    Serial.println(F("PCLS:OK"));
 }
 
-void isCarrierPresent(StringStream &commandStream) {
-  Serial.print(F("CARR:"));
-  Serial.println(radio.testCarrier());
+void isCarrierPresent(StringStream &commandStream)
+{
+    Serial.print(F("CARR:"));
+    Serial.println(radio.testCarrier());
 }
 
-void reportChannel(StringStream &commandStream) {
-  Serial.print(F("CHAN:"));
-  Serial.println(radio.getChannel());
+void reportChannel(StringStream &commandStream)
+{
+    Serial.print(F("CHAN:"));
+    Serial.println(radio.getChannel());
 }
 
-void setChannel(StringStream &commandStream) {
-  uint8_t channel = commandStream.parseInt();
-  radio.setChannel(channel);
-  Serial.print(F("Set to..."));
-  reportChannel(commandStream);
+void setChannel(StringStream &commandStream)
+{
+    uint8_t channel = commandStream.parseInt();
+    radio.setChannel(channel);
+    Serial.print(F("Set to..."));
+    reportChannel(commandStream);
 }
 
-void readDataBinary(StringStream &s) { readDataBinary(true); }
-
-void readDataHex(StringStream &s) { readDataHex(true); }
-
-void isChipPresent(StringStream &s) {
-  radio.printPrettyDetails();
-
-  if (radio.isChipConnected())
-    Serial.println(F("NRF ONLINE"));
-  else
-    Serial.println(F("NRF OFFLINE - Verify SPI"));
+void readDataBinary(StringStream &s)
+{
+    readDataBinary(true);
 }
 
-void reportAutoReceiveMode(StringStream &commandStream) {
-  Serial.print(F("ARCE:"));
-  switch (receiveMode) {
-  case ReceiveMode::Manual:
-    Serial.println(F("MANUAL"));
-    break;
-  case ReceiveMode::Binary:
-    Serial.println(F("BINARY"));
-    break;
-  case ReceiveMode::Hex:
-    Serial.println(F("HEX"));
-    break;
-  case ReceiveMode::Invalid:
-    Serial.println(F("Invalid"));
-    break;
-  default:
-    break;
-  }
+void readDataHex(StringStream &s)
+{
+    readDataHex(true);
 }
 
-void setAutoReceiveMode(StringStream &commandStream) {
-  String v = commandStream.readString();
-  receiveMode = ReceiveMode::Invalid;
-  Serial.print(F("Set to..."));
-  if (v == F("MANUAL"))
-    receiveMode = ReceiveMode::Manual;
-  if (v == F("BINARY"))
-    receiveMode = ReceiveMode::Binary;
-  if (v == F("HEX"))
-    receiveMode = ReceiveMode::Hex;
+void isChipPresent(StringStream &s)
+{
+    radio.printPrettyDetails();
 
-  reportAutoReceiveMode(commandStream);
-
-  if (receiveMode == ReceiveMode::Invalid)
-    receiveMode = ReceiveMode::Manual;
+    if (radio.isChipConnected())
+        Serial.println(F("NRF ONLINE"));
+    else
+        Serial.println(F("NRF OFFLINE - Verify SPI"));
 }
 
-void openPipe(StringStream &commandStream) {
-  uint8_t address[5] = {0};
-  uint8_t pipe = commandStream.parseInt();
-  commandStream.readStringUntil(',');
-  commandStream.readBytes(address, 5);
+void reportAutoReceiveMode(StringStream &commandStream)
+{
+    Serial.print(F("ARCE:"));
+    switch (receiveMode) {
+    case ReceiveMode::Manual:
+        Serial.println(F("MANUAL"));
+        break;
+    case ReceiveMode::Binary:
+        Serial.println(F("BINARY"));
+        break;
+    case ReceiveMode::Hex:
+        Serial.println(F("HEX"));
+        break;
+    case ReceiveMode::Invalid:
+        Serial.println(F("Invalid"));
+        break;
+    default:
+        break;
+    }
+}
 
-  switch (pipe) {
-  case 0:
+void setAutoReceiveMode(StringStream &commandStream)
+{
+    String v = commandStream.readString();
+    receiveMode = ReceiveMode::Invalid;
+    Serial.print(F("Set to..."));
+    if (v == F("MANUAL"))
+        receiveMode = ReceiveMode::Manual;
+    if (v == F("BINARY"))
+        receiveMode = ReceiveMode::Binary;
+    if (v == F("HEX"))
+        receiveMode = ReceiveMode::Hex;
+
+    reportAutoReceiveMode(commandStream);
+
+    if (receiveMode == ReceiveMode::Invalid)
+        receiveMode = ReceiveMode::Manual;
+}
+
+void openPipe(StringStream &commandStream)
+{
+    uint8_t address[5] = { 0 };
+    uint8_t pipe = commandStream.parseInt();
+    commandStream.readStringUntil(',');
+    commandStream.readBytes(address, 5);
+
+    switch (pipe) {
+    case 0:
+        radio.openWritingPipe(address);
+        break;
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        radio.openReadingPipe(pipe, address);
+        break;
+    default:
+        Serial.println(F("POPN: Invalid address!"));
+        break;
+    }
+    printf("POPN:%d\n", (int)pipe);
+}
+
+void writeDataBinary(StringStream &commandStream)
+{
+    uint8_t len = writeData(commandStream, WriteMode::Bin);
+    Serial.print(F("WRTB:"));
+    Serial.println(len);
+}
+
+void writeDataHex(StringStream &commandStream)
+{
+    uint8_t len = writeData(commandStream, WriteMode::Bin);
+    Serial.print(F("WRTH:"));
+    Serial.println(len);
+}
+
+void open(StringStream &commandStream)
+{
+    uint8_t address[5] = { 0 };
+    commandStream.readBytes(address, 5);
     radio.openWritingPipe(address);
-    break;
-  case 1:
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-    radio.openReadingPipe(pipe, address);
-    break;
-  default:
-    Serial.println(F("POPN: Invalid address!"));
-    break;
-  }
-  printf("POPN:%d\n", (int)pipe);
+    radio.openReadingPipe(1, address);
+    Serial.println(F("OPEN:OK"));
 }
 
-void writeDataBinary(StringStream &commandStream) {
-  uint8_t len = writeData(commandStream, WriteMode::Bin);
-  Serial.print(F("WRTB:"));
-  Serial.println(len);
+void reportTestMode(StringStream &commandStream)
+{
+    switch (testMode) {
+    case TestMode::Disabled:
+        Serial.println(F("TEST:Disabled"));
+        break;
+    case TestMode::Counter:
+        Serial.println(F("TEST:Counter"));
+        break;
+    default:
+        Serial.println(F("TEST:Invalid"));
+        break;
+    }
 }
 
-void writeDataHex(StringStream &commandStream) {
-  uint8_t len = writeData(commandStream, WriteMode::Bin);
-  Serial.print(F("WRTH:"));
-  Serial.println(len);
+void setTestMode(StringStream &commandStream)
+{
+    String arg = commandStream.readString();
+    testMode = TestMode::Invalid;
+    if (arg == F("DISABLED")) {
+        testMode = TestMode::Disabled;
+    }
+    if (arg == F("COUNTER")) {
+        testMode = TestMode::Counter;
+        testCounter = 0;
+    }
+
+    reportTestMode(commandStream);
+
+    if (testMode == TestMode::Invalid)
+        testMode = TestMode::Disabled;
 }
 
-void open(StringStream &commandStream) {
-  uint8_t address[5] = {0};
-  commandStream.readBytes(address, 5);
-  radio.openWritingPipe(address);
-  radio.openReadingPipe(1, address);
-  Serial.println(F("OPEN:OK"));
-}
-
-void reportTestMode(StringStream &commandStream) {
-  switch (testMode) {
-  case TestMode::Disabled:
-    Serial.println(F("TEST:Disabled"));
-    break;
-  case TestMode::Counter:
-    Serial.println(F("TEST:Counter"));
-    break;
-  default:
-    Serial.println(F("TEST:Invalid"));
-    break;
-  }
-}
-
-void setTestMode(StringStream &commandStream) {
-  String arg = commandStream.readString();
-  testMode = TestMode::Invalid;
-  if (arg == F("DISABLED")) {
-    testMode = TestMode::Disabled;
-  }
-  if (arg == F("COUNTER")) {
-    testMode = TestMode::Counter;
-    testCounter = 0;
-  }
-
-  reportTestMode(commandStream);
-
-  if (testMode == TestMode::Invalid)
-    testMode = TestMode::Disabled;
-}
-
-void help(StringStream &commandStream) {
-  for (int i = 0;; ++i) {
-    Command commandStruct = {"", nullptr};
-    memcpy_P(&commandStruct, &command_list[i], sizeof(Command));
-    if (!commandStruct.function)
-      break;
-    Serial.print("HELP:");
-    Serial.print(commandStruct.command);
-    Serial.print(" - ");
-    Serial.println(commandStruct.help);
-  }
+void help(StringStream &commandStream)
+{
+    for (int i = 0;; ++i) {
+        Command commandStruct = { "", nullptr };
+        memcpy_P(&commandStruct, &command_list[i], sizeof(Command));
+        if (!commandStruct.function)
+            break;
+        Serial.print("HELP:");
+        Serial.print(commandStruct.command);
+        Serial.print(" - ");
+        Serial.println(commandStruct.help);
+    }
 }
