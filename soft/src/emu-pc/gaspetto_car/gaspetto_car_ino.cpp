@@ -1,1 +1,0 @@
-../../arduino-soft/gaspetto_car/gaspetto_car.ino
