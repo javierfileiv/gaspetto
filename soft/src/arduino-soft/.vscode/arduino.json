@@ -1,0 +1,5 @@
+{
+    "configuration": "pnum=BLACKPILL_F103CB,upload_method=bmpMethod,xserial=generic,usb=none,xusb=FS,opt=osstd,dbg=none,rtlib=nano",
+    "board": "STMicroelectronics:stm32:GenF1",
+    "sketch": "gaspetto_car/gaspetto_car.ino"
+}

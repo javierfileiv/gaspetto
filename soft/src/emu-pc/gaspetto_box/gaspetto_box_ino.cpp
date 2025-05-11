@@ -1,0 +1,1 @@
+../../arduino-soft/gaspetto_box/gaspetto_box.ino
