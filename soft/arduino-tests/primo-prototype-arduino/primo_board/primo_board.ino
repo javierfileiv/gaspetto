@@ -32,54 +32,55 @@ boolean isExecuting = false;
 
 int vals[16];
 
-void setup() {
-  // led init
-  for (int i = 22; i < 38; i++) {
-    pinMode(i, OUTPUT);
-  }
+void setup()
+{
+    // led init
+    for (int i = 22; i < 38; i++) {
+        pinMode(i, OUTPUT);
+    }
 
-  pinMode(buttonPin, INPUT);
+    pinMode(buttonPin, INPUT);
 
-  Serial.begin(9600);
-  Serial1.begin(9600);
+    Serial.begin(9600);
+    Serial1.begin(9600);
 }
 
-void loop() {
+void loop()
+{
+    // turn on LEDs if a block is inserted
+    for (int i = 0; i < 16; i++) {
+        int led = i + 22;
 
-  // turn on LEDs if a block is inserted
-  for (int i = 0; i < 16; i++) {
-    int led = i + 22;
-
-    // fix this
-    if (analogRead(i) < 1010) {
-      digitalWrite(led, HIGH);
-    } else {
-      digitalWrite(led, LOW);
+        // fix this
+        if (analogRead(i) < 1010) {
+            digitalWrite(led, HIGH);
+        } else {
+            digitalWrite(led, LOW);
+        }
     }
-  }
 
-  butVal = digitalRead(buttonPin);
+    butVal = digitalRead(buttonPin);
 
-  // if button press & not executing
-  if (butVal == HIGH && pButVal == LOW && isExecuting == false) {
-    isExecuting = true;
-  }
-
-  if (isExecuting) {
-    readPins();
-
-    for (int i = 0; i < 12; i++) {
-      if (vals[i] < 1010) {
-        route(i);
-      } else {
-        break;
-      }
+    // if button press & not executing
+    if (butVal == HIGH && pButVal == LOW && isExecuting == false) {
+        isExecuting = true;
     }
-  }
 
-  isExecuting = false;
-  pButVal = butVal;
+    if (isExecuting) {
+        readPins();
 
-  // Serial.println(analogRead(0));
-  delay(30);
+        for (int i = 0; i < 12; i++) {
+            if (vals[i] < 1010) {
+                route(i);
+            } else {
+                break;
+            }
+        }
+    }
+
+    isExecuting = false;
+    pButVal = butVal;
+
+    // Serial.println(analogRead(0));
+    delay(30);
 }

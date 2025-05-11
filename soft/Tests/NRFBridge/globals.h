@@ -2,6 +2,7 @@
 #define GLOBALS_H
 
 #include "types.h"
+
 #include <RF24.h>
 #include <nRF24L01.h>
 #include <stdint.h>

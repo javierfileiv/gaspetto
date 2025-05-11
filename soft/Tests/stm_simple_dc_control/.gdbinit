@@ -10,4 +10,3 @@
 # mon connect_rst enable
 # source ~/sourceCode/PyCortexMDebug/scripts/gdb.py
 # svd_load ~/sourceCode/cmsis-svd/data/STMicro/STM32F411.svd
-

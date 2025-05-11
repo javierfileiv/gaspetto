@@ -1,6 +1,7 @@
 #pragma once
 #include "Event.h"
 #include "Serial.h"
+
 #include <atomic>
 #include <thread>
 
@@ -22,18 +23,18 @@ extern SerialEmulator Serial;
 #define LOW 0
 #define HIGH 1
 #define digitalRead(pin) (pin)
-#define pinMode(pin, mode)                                                     \
-  do {                                                                         \
-  } while (0)
-#define attachInterrupt(pin, ISR, mode)                                        \
-  do {                                                                         \
-  } while (0)
+#define pinMode(pin, mode) \
+    do {                   \
+    } while (0)
+#define attachInterrupt(pin, ISR, mode) \
+    do {                                \
+    } while (0)
 #define digitalPinToInterrupt(pin) (pin)
 #define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
 #define digitalWrite(pin, value)
-#define analogWrite(pin, value)                                                \
-  do {                                                                         \
-  } while (0)
+#define analogWrite(pin, value) \
+    do {                        \
+    } while (0)
 
 unsigned long millis(void);
 void enterLowPowerMode(void);

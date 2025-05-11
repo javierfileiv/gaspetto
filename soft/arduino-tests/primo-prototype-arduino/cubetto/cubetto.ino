@@ -34,66 +34,65 @@ const int rightEncoder = A4;
 
 char instruction = 'O';
 
-void setup() {
+void setup()
+{
+    Serial.begin(9600);
 
-  Serial.begin(9600);
+    // initialize left
+    pinMode(leftEnable, OUTPUT);
+    pinMode(leftReverse, OUTPUT);
+    pinMode(leftForward, OUTPUT);
 
-  // initialize left
-  pinMode(leftEnable, OUTPUT);
-  pinMode(leftReverse, OUTPUT);
-  pinMode(leftForward, OUTPUT);
+    // initialize right
+    pinMode(rightEnable, OUTPUT);
+    pinMode(rightForward, OUTPUT);
+    pinMode(rightReverse, OUTPUT);
 
-  // initialize right
-  pinMode(rightEnable, OUTPUT);
-  pinMode(rightForward, OUTPUT);
-  pinMode(rightReverse, OUTPUT);
+    // enable motors
+    digitalWrite(leftEnable, HIGH);
+    digitalWrite(rightEnable, HIGH);
 
-  // enable motors
-  digitalWrite(leftEnable, HIGH);
-  digitalWrite(rightEnable, HIGH);
+    // initialize aligns the wheels
+    initialize();
 
-  // initialize aligns the wheels
-  initialize();
-
-  delay(2000);
+    delay(2000);
 }
 
-void loop() {
+void loop()
+{
+    // read rom the xbee
+    if (Serial.available() > 0) {
+        instruction = Serial.read();
+    }
 
-  // read rom the xbee
-  if (Serial.available() > 0) {
-    instruction = Serial.read();
-  }
+    // decode instruction
+    switch (instruction) {
+    case FORWARD:
+        initialize();
+        digitalWrite(11, HIGH);
+        forward(128, 16);
+        break;
 
-  // decode instruction
-  switch (instruction) {
+    case LEFT:
+        initialize();
+        left(128, 9);
+        break;
 
-  case FORWARD:
-    initialize();
-    digitalWrite(11, HIGH);
-    forward(128, 16);
-    break;
+    case RIGHT:
+        initialize();
+        right(138, 7);
+        break;
 
-  case LEFT:
-    initialize();
-    left(128, 9);
-    break;
+    case INIT:
+        initialize();
+        break;
 
-  case RIGHT:
-    initialize();
-    right(138, 7);
-    break;
+    case STOP:
+        stop();
+        break;
 
-  case INIT:
-    initialize();
-    break;
-
-  case STOP:
-    stop();
-    break;
-
-  default:
-    stop();
-    break;
-  }
+    default:
+        stop();
+        break;
+    }
 }

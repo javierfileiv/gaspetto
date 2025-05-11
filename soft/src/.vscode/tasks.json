@@ -1,74 +1,74 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Build Gaspetto Car Program",
-      "type": "shell",
-      "command": "g++",
-      "args": [
-        "-g",
-        "${workspaceFolder}/arduino_framework/Arduino.cpp",
-        "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-        "${workspaceFolder}/state_machine_framework/TimeredEventQueue.cpp",
-        /*  Arduino program. */
-        "${workspaceFolder}/gaspetto_car/GaspettoCar_ino.cpp",
-        "${workspaceFolder}/gaspetto_car/ProcessingState.cpp",
-        "${workspaceFolder}/gaspetto_car/IdleState.cpp",
-        "${workspaceFolder}/gaspetto_car/GaspettoCar.cpp",
-        "-I",
-        "${workspaceFolder}/arduino_framework",
-        "-I",
-        "${workspaceFolder}/state_machine_framework",
-        "-I",
-        "${workspaceFolder}/gaspetto_car",
-        "-o",
-        "${workspaceFolder}/gaspetto_car/main"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": [
-        "$gcc"
-      ],
-      "detail": "Task to build the C++ program for debugging.",
-      "presentation": {
-        "clear": true
-      }
-    },
-    {
-      "label": "Build Gaspetto Box Program",
-      "type": "shell",
-      "command": "g++",
-      "args": [
-        "-g",
-        "${workspaceFolder}/arduino_framework/Arduino.cpp",
-        "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-        /*  Arduino program. */
-        "${workspaceFolder}/gaspetto_box/GaspettoBox_ino.cpp",
-        "${workspaceFolder}/gaspetto_box/ProcessingState.cpp",
-        "${workspaceFolder}/gaspetto_box/IdleState.cpp",
-        "${workspaceFolder}/gaspetto_box/GaspettoBox.cpp",
-        "-I",
-        "${workspaceFolder}/arduino_framework",
-        "-I",
-        "${workspaceFolder}/state_machine_framework",
-        "-I",
-        "${workspaceFolder}/gaspetto_box",
-        "-o",
-        "${workspaceFolder}/gaspetto_box/main"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": [
-        "$gcc"
-      ],
-      "detail": "Task to build the C++ program for debugging.",
-      "presentation": {
-        "clear": true
-      }
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Gaspetto Car Program",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "${workspaceFolder}/arduino_framework/Arduino.cpp",
+                "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
+                "${workspaceFolder}/state_machine_framework/TimeredEventQueue.cpp",
+                /*  Arduino program. */
+                "${workspaceFolder}/gaspetto_car/GaspettoCar_ino.cpp",
+                "${workspaceFolder}/gaspetto_car/ProcessingState.cpp",
+                "${workspaceFolder}/gaspetto_car/IdleState.cpp",
+                "${workspaceFolder}/gaspetto_car/GaspettoCar.cpp",
+                "-I",
+                "${workspaceFolder}/arduino_framework",
+                "-I",
+                "${workspaceFolder}/state_machine_framework",
+                "-I",
+                "${workspaceFolder}/gaspetto_car",
+                "-o",
+                "${workspaceFolder}/gaspetto_car/main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Task to build the C++ program for debugging.",
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "label": "Build Gaspetto Box Program",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "${workspaceFolder}/arduino_framework/Arduino.cpp",
+                "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
+                /*  Arduino program. */
+                "${workspaceFolder}/gaspetto_box/GaspettoBox_ino.cpp",
+                "${workspaceFolder}/gaspetto_box/ProcessingState.cpp",
+                "${workspaceFolder}/gaspetto_box/IdleState.cpp",
+                "${workspaceFolder}/gaspetto_box/GaspettoBox.cpp",
+                "-I",
+                "${workspaceFolder}/arduino_framework",
+                "-I",
+                "${workspaceFolder}/state_machine_framework",
+                "-I",
+                "${workspaceFolder}/gaspetto_box",
+                "-o",
+                "${workspaceFolder}/gaspetto_box/main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Task to build the C++ program for debugging.",
+            "presentation": {
+                "clear": true
+            }
+        }
+    ]
 }
