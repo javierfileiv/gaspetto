@@ -5,7 +5,6 @@
 #include "EventQueue.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
-#include "State.h"
 
 #ifndef ARDUINO
 #include <cstdint>

@@ -64,9 +64,8 @@ void ProcessingState::moveMotor(float distance, bool forward)
         }
     }
 #else
-    delay(8000);
+    delay(2000);
 #endif
-#else
 #endif
     /* Stop motor */
     stopMotor();
