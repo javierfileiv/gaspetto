@@ -34,6 +34,8 @@ $CXX $CXXFLAGS \
 -I "$PROJECT_ROOT/soft/emu-pc/gaspetto_box" \
 -o "$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
 
+rm "$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
+
 $CXX $CXXFLAGS  \
 "$PROJECT_ROOT/soft/emu-pc/arduino_framework/Arduino.cpp" \
 "$PROJECT_ROOT/soft/emu-pc/state_machine_framework/EventQueue.cpp" \
@@ -46,3 +48,5 @@ $CXX $CXXFLAGS  \
 -I "$PROJECT_ROOT/soft/emu-pc/state_machine_framework" \
 -I "$PROJECT_ROOT/soft/emu-pc/gaspetto_car" \
 -o "$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main"
+
+rm "$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main"
