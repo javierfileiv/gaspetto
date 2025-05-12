@@ -19,8 +19,12 @@ repos:
         name: build-gaspetto-pc
         stages:
           - pre-push
+          - manual
         language: system
         entry: tools/build-gaspetto-pc
+        always_run: true
+        pass_filenames: false
+        verbose: true
         types_or:
           - c
           - c++
