@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# This script builds the GaspettoBox firmware for the emu-pc.
+# It uses the Arduino framework and a state machine framework.
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Detect number of CPU cores and set compiler options
+CXXFLAGS="-O2 -pipe -march=native -flto"
+
+# Use ccache if available
+CXX="g++"
+if command -v ccache >/dev/null 2>&1; then
+    CXX="ccache g++"
+fi
+
+echo "Building GaspettoBox firmware for emu-pc..."
+echo "Project root: $PROJECT_ROOT"
+echo "Script directory: $SCRIPT_DIR"
+echo "Current directory: $(pwd)"
+
+$CXX $CXXFLAGS \
+"$PROJECT_ROOT/soft/emu-pc/arduino_framework/Arduino.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/EventQueue.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/TimeredEventQueue.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/ProcessingState.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/IdleState.cpp" \
+-DLOW_POWER_MODE=1 \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/GaspettoBox.cpp" \
+-I "$PROJECT_ROOT/soft/emu-pc/arduino_framework" \
+-I "$PROJECT_ROOT/soft/emu-pc/state_machine_framework" \
+-I "$PROJECT_ROOT/soft/emu-pc/gaspetto_box" \
+-o "$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
+
+$CXX $CXXFLAGS  \
+"$PROJECT_ROOT/soft/emu-pc/arduino_framework/Arduino.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/EventQueue.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/TimeredEventQueue.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/ProcessingState.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/IdleState.cpp" \
+"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/GaspettoCar.cpp" \
+-I "$PROJECT_ROOT/soft/emu-pc/arduino_framework" \
+-I "$PROJECT_ROOT/soft/emu-pc/state_machine_framework" \
+-I "$PROJECT_ROOT/soft/emu-pc/gaspetto_car" \
+-o "$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main"
