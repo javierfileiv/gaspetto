@@ -13,7 +13,7 @@
 #endif
 
 class TimeredEventQueue;
-class ActiveObject {
+class ActiveObject : public State {
 public:
     ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
             : eventQueue(queue)
@@ -59,13 +59,26 @@ public:
             return -1;
         }
         if (eventQueue) {
+#ifdef DEBUG_GASPETTO
+            Serial.print("postEvent(): ");
+            Serial.print(reinterpret_cast<const char *>(
+                    event_to_string[static_cast<int>(evt.getEventId())].str));
+            Serial.print(", ");
+            Serial.print("Command: ");
+            Serial.print(reinterpret_cast<const char *>(
+                    command_to_string[static_cast<int>(evt.getCommand())].str));
+            Serial.print(", ");
+            Serial.print("Current Time: ");
+            Serial.print(millis());
+            Serial.println(" ms");
+#endif
             eventQueue->enqueue(evt);
             return 0;
         }
         return -1;
     }
 
-    virtual void processNextEvent(void)
+    void processNextEvent(void)
     {
         if (eventQueue && !eventQueue->IsEmpty()) {
             Event evt;
@@ -79,6 +92,19 @@ public:
     virtual void processEvent(Event evt)
     {
         State *currentState = states[static_cast<int>(currentStateId)];
+#ifdef DEBUG_GASPETTO
+        Serial.print("processEvent: ");
+        Serial.print(reinterpret_cast<const char *>(
+                event_to_string[static_cast<int>(evt.getEventId())].str));
+        Serial.print(", ");
+        Serial.print("Command: ");
+        Serial.print(reinterpret_cast<const char *>(
+                command_to_string[static_cast<int>(evt.getCommand())].str));
+        Serial.print(", ");
+        Serial.print("Current Time: ");
+        Serial.print(millis());
+        Serial.println(" ms");
+#endif
         currentState->processEvent(evt);
     }
 
