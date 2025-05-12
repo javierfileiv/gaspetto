@@ -18,7 +18,7 @@ repos:
       - id: build-gaspetto-pc
         name: build-gaspetto-pc
         stages:
-          - push
+          - pre-push
         language: system
         entry: tools/build-gaspetto-pc
         types_or:
@@ -51,7 +51,3 @@ repos:
     hooks:
     - id: cmake-format
     - id: cmake-lint
-  - repo: git@gitlab.com:qorvo/tech/uwb/ci/scripts/python-packages/check-commit-messages.git
-    rev: v4.4
-    hooks:
-    - id: check-commit-messages
