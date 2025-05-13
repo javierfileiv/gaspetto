@@ -17,6 +17,7 @@ enum class CommandId {
     MOTOR_RIGHT,
     MOTOR_LEFT,
     MOTOR_STOP,
+    INIT,
     NONE,
     MAX_COMMAND_ID
 };
