@@ -9,51 +9,78 @@
 #include <iostream>
 #endif
 
-void ProcessingState::enter()
+#define DUTY_CYCLE 15
+
+void ProcessingState::InitMotorPins(void)
 {
     /* Initialize motor control pins */
-    pinMode(MOTOR_PWM_PIN_A, OUTPUT);
-    pinMode(MOTOR_PWM_PIN_B, OUTPUT);
-    pinMode(MOTOR_DIR_PIN_A, OUTPUT);
-    pinMode(MOTOR_DIR_PIN_B, OUTPUT);
-    digitalWrite(MOTOR_DIR_PIN_A, LOW);
-    digitalWrite(MOTOR_DIR_PIN_B, LOW);
-    digitalWrite(MOTOR_DIR_PIN_A, LOW);
-    digitalWrite(MOTOR_DIR_PIN_B, LOW);
-#ifdef SPEED_SENSOR_ON
+    pinMode(MOTOR_1_PIN_A, OUTPUT);
+    pinMode(MOTOR_1_PIN_B, OUTPUT);
+    pinMode(MOTOR_2_PIN_A, OUTPUT);
+    pinMode(MOTOR_2_PIN_B, OUTPUT);
+}
+
+void ProcessingState::InitSpeedSensor(void)
+{
     /* Initialize speed sensor pins */
     pinMode(SPEED_SENSOR_MOTOR_A_PIN, INPUT);
     pinMode(SPEED_SENSOR_MOTOR_B_PIN, INPUT);
-#endif
+}
+
+void ProcessingState::Init(void)
+{
+    /* Initialize motor control pins */
+    InitMotorPins();
     analogWriteFrequency(35); /* Set PWM frequency to 35Hz. */
-    stopMotor();
+#ifdef SPEED_SENSOR_ON
+    /* Initialize speed sensor pins */
+    InitSpeedSensor();
+#endif
+}
+
+void ProcessingState::enter()
+{
+    if (!initialized) {
+        /* Initialize motor control pins */
+        InitMotorPins();
+        analogWriteFrequency(35); /* Set PWM frequency to 35Hz. */
+        /* Initialize speed sensor pins */
+        InitSpeedSensor();
+        initialized = true;
+    }
 }
 
 void ProcessingState::stopMotor(void)
 {
+    Serial.print("Stopping motor...\n");
     /* Stop motor */
-    analogWrite(MOTOR_PWM_PIN_A, 0);
-    analogWrite(MOTOR_PWM_PIN_B, 0);
-    digitalWrite(MOTOR_DIR_PIN_A, LOW);
-    digitalWrite(MOTOR_DIR_PIN_B, LOW);
+    analogWrite(MOTOR_1_PIN_A, 0);
+    analogWrite(MOTOR_1_PIN_B, 0);
+    analogWrite(MOTOR_2_PIN_A, 0);
+    analogWrite(MOTOR_2_PIN_B, 0);
 }
 /* Function to move the motor a specific distance */
 void ProcessingState::moveMotor(float distance, bool forward)
 {
+#ifdef ARDUINO
+#ifdef SPEED_SENSOR_ON
     float pulsesRequired = distance / DISTANCE_PER_PULSE;
     int pulseCount = 0;
+#endif
+#endif
 
     /* Set motor direction */
     if (forward) {
-        digitalWrite(MOTOR_DIR_PIN_A, HIGH);
-        digitalWrite(MOTOR_DIR_PIN_B, HIGH);
+        analogWrite(MOTOR_1_PIN_A, mapDutyCycle(DUTY_CYCLE));
+        analogWrite(MOTOR_1_PIN_B, 0);
+        analogWrite(MOTOR_2_PIN_A, mapDutyCycle(DUTY_CYCLE));
+        analogWrite(MOTOR_2_PIN_B, 0);
     } else {
-        digitalWrite(MOTOR_DIR_PIN_A, LOW);
-        digitalWrite(MOTOR_DIR_PIN_B, LOW);
+        analogWrite(MOTOR_1_PIN_A, 0);
+        analogWrite(MOTOR_1_PIN_B, mapDutyCycle(DUTY_CYCLE));
+        analogWrite(MOTOR_2_PIN_A, 0);
+        analogWrite(MOTOR_2_PIN_B, mapDutyCycle(DUTY_CYCLE));
     }
-    /* Start motor with PWM */
-    analogWrite(MOTOR_PWM_PIN_A, mapDutyCycle(50)); /* 50% duty cycle */
-    analogWrite(MOTOR_PWM_PIN_B, mapDutyCycle(50));
 #ifdef ARDUINO
 #ifdef SPEED_SENSOR_ON
     /* Wait for the required number of pulses */
@@ -64,16 +91,20 @@ void ProcessingState::moveMotor(float distance, bool forward)
         }
     }
 #else
-    delay(2000);
+//     delay(2000);
 #endif
 #endif
-    /* Stop motor */
-    stopMotor();
+    //     /* Stop motor */
+    //     stopMotor();
 }
 
 void ProcessingState::processEvent(Event evt)
 {
     switch (evt.getCommand()) {
+    case CommandId::INIT:
+        /* Initialize the state */
+        Init();
+        break;
     case CommandId::MOTOR_FORWARD:
         /* Moving forward */
         Serial.println("Moving forward...\n");

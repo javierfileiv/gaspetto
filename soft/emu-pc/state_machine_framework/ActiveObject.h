@@ -13,7 +13,7 @@
 #endif
 
 class TimeredEventQueue;
-class ActiveObject : public State {
+class ActiveObject {
 public:
     ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
             : eventQueue(queue)
@@ -21,7 +21,7 @@ public:
     {
     }
 
-    virtual void InitMachine(StateId state_id, State *state)
+    void InitMachine(StateId state_id, State *state)
     {
         /* Initialize state. */
         states[static_cast<int>(state_id)] = state;
@@ -32,17 +32,17 @@ public:
             }
         }
     }
-    virtual void SetInitialState(StateId state)
+    void SetInitialState(StateId state)
     {
         currentStateId = state;
     }
 
-    virtual void Init(void)
+    void Init(void)
     {
         states[static_cast<int>(currentStateId)]->enter();
     }
 
-    virtual void transitionTo(StateId newStateId)
+    void transitionTo(StateId newStateId)
     {
         State *currentState = states[static_cast<int>(currentStateId)];
 
@@ -52,7 +52,7 @@ public:
         currentState->enter();
     }
 
-    virtual int postEvent(Event evt)
+    int postEvent(Event evt)
     {
         if (eventQueue->IsFull()) {
             Serial.println("Event queue is full, cannot post event.\n");
@@ -89,7 +89,7 @@ public:
         }
     }
 
-    virtual void processEvent(Event evt)
+    void processEvent(Event evt)
     {
         State *currentState = states[static_cast<int>(currentStateId)];
 #ifdef DEBUG_GASPETTO
@@ -108,7 +108,7 @@ public:
         currentState->processEvent(evt);
     }
 
-    virtual void enterLowPowerMode(void)
+    void enterLowPowerMode(void)
     {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
