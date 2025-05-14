@@ -5,7 +5,7 @@
    viewBox="0 0 300.00001 299.99999"
    version="1.1"
    id="svg94"
-   sodipodi:docname="gaspetto-box-BodyPad2.svg"
+   sodipodi:docname="gaspetto-box.svg"
    inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -24,9 +24,9 @@
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="0.8688829"
-     inkscape:cx="553.00893"
-     inkscape:cy="590.98873"
+     inkscape:zoom="1.3316073"
+     inkscape:cx="485.50349"
+     inkscape:cy="402.89655"
      inkscape:window-width="2511"
      inkscape:window-height="1371"
      inkscape:window-x="1920"
@@ -41,40 +41,40 @@
      style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.698451;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0001"
-     d="m 33.635512,18.566642 v 30 h 31.5 v -30 h -31.5"
+     d="M 33.643963,18.575093 V 50.058191 H 65.127061 V 18.575093 H 33.643963"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0002"
-     d="m 80.135512,18.566642 v 30 h 31.499998 v -30 H 80.135512"
+     d="M 80.143963,18.575093 V 50.058191 H 111.62706 V 18.575093 H 80.143963"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0003"
-     d="m 126.63551,18.566642 v 30 h 31.5 v -30 h -31.5"
+     d="m 126.64396,18.575093 v 31.483098 h 31.4831 V 18.575093 h -31.4831"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0004"
-     d="m 173.13551,18.566642 v 30 h 31.5 v -30 h -31.5"
+     d="m 173.14396,18.575093 v 31.483098 h 31.4831 V 18.575093 h -31.4831"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0005"
-     d="m 219.63551,18.566642 v 30 h 31.5 v -30 h -31.5"
+     d="m 219.64396,18.575093 v 31.483098 h 31.4831 V 18.575093 h -31.4831"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0006"
-     d="m 266.13551,18.566642 v 30 h 31.5 v -30 h -31.5"
+     d="m 266.14396,18.575093 v 31.483098 h 31.4831 V 18.575093 h -31.4831"
      stroke="#000000"
      stroke-width="0.7 px"
-     style="fill:none;fill-opacity:0.75823897;fill-rule:evenodd;stroke-width:0.7;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ffffff;stroke-opacity:1" />
+     style="fill:none;fill-opacity:0.758239;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.716902;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
   <path
      id="Sketch_w0007"
      d="m 33.635512,58.566642 v 31.5 h 31.5 v -31.5 h -31.5"
