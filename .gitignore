@@ -14,3 +14,4 @@ soft/gaspetto_car/GaspettoCar
 soft/**/main
 soft/src/arduino-soft/build_car
 soft/Tests/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx_stm/build
+pulseview-NIGHTLY-x86_64-debug.AppImage
