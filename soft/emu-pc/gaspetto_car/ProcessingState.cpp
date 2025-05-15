@@ -9,33 +9,22 @@
 #include <iostream>
 #endif
 
-#define DUTY_CYCLE 15
+#define DUTY_CYCLE 30
 
 void ProcessingState::InitMotorPins(void)
 {
     /* Initialize motor control pins */
-    pinMode(MOTOR_1_PIN_A, OUTPUT);
-    pinMode(MOTOR_1_PIN_B, OUTPUT);
-    pinMode(MOTOR_2_PIN_A, OUTPUT);
-    pinMode(MOTOR_2_PIN_B, OUTPUT);
+    pinMode(MOTOR_RIGHT_PIN_A, OUTPUT);
+    pinMode(MOTOR_RIGHT_PIN_B, OUTPUT);
+    pinMode(MOTOR_LEFT_PIN_A, OUTPUT);
+    pinMode(MOTOR_LEFT_PIN_B, OUTPUT);
 }
 
 void ProcessingState::InitSpeedSensor(void)
 {
     /* Initialize speed sensor pins */
-    pinMode(SPEED_SENSOR_MOTOR_A_PIN, INPUT);
-    pinMode(SPEED_SENSOR_MOTOR_B_PIN, INPUT);
-}
-
-void ProcessingState::Init(void)
-{
-    /* Initialize motor control pins */
-    InitMotorPins();
-    analogWriteFrequency(35); /* Set PWM frequency to 35Hz. */
-#ifdef SPEED_SENSOR_ON
-    /* Initialize speed sensor pins */
-    InitSpeedSensor();
-#endif
+    pinMode(SPEED_SENSOR_LEFT_PIN, INPUT);
+    pinMode(SPEED_SENSOR_RIGHT_PIN, INPUT);
 }
 
 void ProcessingState::enter()
@@ -54,10 +43,10 @@ void ProcessingState::stopMotor(void)
 {
     Serial.print("Stopping motor...\n");
     /* Stop motor */
-    analogWrite(MOTOR_1_PIN_A, 0);
-    analogWrite(MOTOR_1_PIN_B, 0);
-    analogWrite(MOTOR_2_PIN_A, 0);
-    analogWrite(MOTOR_2_PIN_B, 0);
+    analogWrite(MOTOR_RIGHT_PIN_A, 0);
+    analogWrite(MOTOR_RIGHT_PIN_B, 0);
+    analogWrite(MOTOR_LEFT_PIN_A, 0);
+    analogWrite(MOTOR_LEFT_PIN_B, 0);
 }
 /* Function to move the motor a specific distance */
 void ProcessingState::moveMotor(float distance, bool forward)
@@ -71,49 +60,41 @@ void ProcessingState::moveMotor(float distance, bool forward)
 
     /* Set motor direction */
     if (forward) {
-        analogWrite(MOTOR_1_PIN_A, mapDutyCycle(DUTY_CYCLE));
-        analogWrite(MOTOR_1_PIN_B, 0);
-        analogWrite(MOTOR_2_PIN_A, mapDutyCycle(DUTY_CYCLE));
-        analogWrite(MOTOR_2_PIN_B, 0);
+#ifndef NOT_RIGHT_MOTOR
+        analogWrite(MOTOR_RIGHT_PIN_A, mapDutyCycle(DUTY_CYCLE));
+        analogWrite(MOTOR_RIGHT_PIN_B, 0);
+#endif
+#ifndef NOT_LEFT_MOTOR
+        analogWrite(MOTOR_LEFT_PIN_A, mapDutyCycle(DUTY_CYCLE));
+        analogWrite(MOTOR_LEFT_PIN_B, 0);
+#endif
     } else {
-        analogWrite(MOTOR_1_PIN_A, 0);
-        analogWrite(MOTOR_1_PIN_B, mapDutyCycle(DUTY_CYCLE));
-        analogWrite(MOTOR_2_PIN_A, 0);
-        analogWrite(MOTOR_2_PIN_B, mapDutyCycle(DUTY_CYCLE));
-    }
-#ifdef ARDUINO
-#ifdef SPEED_SENSOR_ON
-    /* Wait for the required number of pulses */
-    while (pulseCount < pulsesRequired) {
-        if (digitalRead(SPEED_SENSOR_PIN) == HIGH) {
-            pulseCount++;
-            delay(3); /* Debounce delay */
-        }
-    }
-#else
-//     delay(2000);
+#ifndef NOT_RIGHT_MOTOR
+        analogWrite(MOTOR_RIGHT_PIN_A, 0);
+        analogWrite(MOTOR_RIGHT_PIN_B, mapDutyCycle(DUTY_CYCLE));
 #endif
+#ifndef NOT_LEFT_MOTOR
+        analogWrite(MOTOR_LEFT_PIN_A, 0);
+        analogWrite(MOTOR_LEFT_PIN_B, mapDutyCycle(DUTY_CYCLE));
 #endif
-    //     /* Stop motor */
-    //     stopMotor();
+    }
+#ifndef ARDUINO
+    delay(1000);
+#endif
 }
 
 void ProcessingState::processEvent(Event evt)
 {
     switch (evt.getCommand()) {
-    case CommandId::INIT:
-        /* Initialize the state */
-        Init();
-        break;
     case CommandId::MOTOR_FORWARD:
         /* Moving forward */
         Serial.println("Moving forward...\n");
-        moveMotor(TARGET_DISTANCE, FORWARD);
+        moveMotor(5, FORWARD);
         break;
     case CommandId::MOTOR_BACKWARD:
         /* Moving backward */
         Serial.println("Moving backward...\n");
-        moveMotor(TARGET_DISTANCE, BACKWARD);
+        moveMotor(5, BACKWARD);
         break;
     case CommandId::MOTOR_RIGHT:
         /* Turning right */
