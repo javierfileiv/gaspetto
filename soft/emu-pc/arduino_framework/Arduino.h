@@ -8,6 +8,8 @@
 extern std::atomic<bool> lowPowerMode;
 extern SerialEmulator Serial;
 
+#define PA0 0
+#define PA1 1
 #define PB0 0
 #define PB1 1
 #define PB10 10

@@ -26,14 +26,13 @@ private:
     void Init(void);
 
 public:
-    /* Constants for motor control */
-    const int MOTOR_1_PIN_A = PB1; /* Example PWM pin for motor A */
-    const int MOTOR_1_PIN_B = PB0; /* Direction pin for motor A */
-    const int MOTOR_2_PIN_A = PB11; /* Example PWM pin for motor B */
-    const int MOTOR_2_PIN_B = PB10; /* Direction pin for motor B */
-    const int SPEED_SENSOR_MOTOR_A_PIN = 4; /* Pin for speed/distance sensor */
-    const int SPEED_SENSOR_MOTOR_B_PIN = 4; /* Pin for speed/distance sensor */
-    const float DISTANCE_PER_PULSE = 0.5; /* Distance in cm per sensor pulse */
-    const float TARGET_DISTANCE = 5.0; /* Target distance in cm */
+    /* Constants for motor control. */
+    const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
+    const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
+    const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
+    const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
+    const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
+    const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
+    /* Variables for motor control. */
     bool initialized = false;
 };
