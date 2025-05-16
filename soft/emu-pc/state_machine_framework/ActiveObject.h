@@ -78,7 +78,7 @@ public:
         return -1;
     }
 
-    void processNextEvent(void)
+    virtual void processNextEvent(void)
     {
         if (eventQueue && !eventQueue->IsEmpty()) {
             Event evt;
@@ -108,7 +108,7 @@ public:
         currentState->processEvent(evt);
     }
 
-    void enterLowPowerMode(void)
+    virtual void enterLowPowerMode(void)
     {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
