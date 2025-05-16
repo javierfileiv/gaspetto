@@ -29,4 +29,35 @@ public:
     GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state);
 
     void enqueue_random_commands(const uint8_t num_events);
+    void stopMotor(void);
+    void Init(void);
+    /* Set motor directions. */
+    void SetMotor(bool forward_motor_left, uint8_t motor_left_speed, bool forward_motor_right,
+                  uint8_t motor_right_speed);
+    void processNextEvent(void) override;
+    void enterLowPowerMode(void) override;
+
+private:
+    /* Function to map duty cycle percentage to PWM value */
+    static int mapDutyCycle(int dutyCycle)
+    {
+        return map(dutyCycle, 0, 100, 0, 255);
+    }
+    void InitMotorPins(void);
+    void InitSpeedSensor(void);
+    uint32_t CentimetersToStep(float cm);
+
+public:
+    /* Constants for motor control. */
+    const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
+    const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
+    const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
+    const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
+    const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
+    const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
+    const float stepcount = 20.00; /* 20 Slots in disk. */
+    const float wheeldiameter = 67.0; /* Wheel diameter in millimeters. */
+    /* Calculate wheel circumference in cm. */
+    const float circumference = (wheeldiameter * 3.14) / 10;
+    const float cm_step = circumference / stepcount; /* CM per Step. */
 };
