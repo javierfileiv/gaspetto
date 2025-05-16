@@ -30,8 +30,8 @@ public:
 private:
     uint32_t lastProcessTime_;
     TimedEventNode eventNodes_[MAX_TIMED_EVENT_NODES];
-    uint8_t headIndex_; /*  Index of the first event in the sorted list (-1 if empty). */
-    uint8_t freeListHead_; /*  Index of the first free node in the array (-1 if full). */
+    int8_t headIndex_; /*  Index of the first event in the sorted list (-1 if empty). */
+    int8_t freeListHead_; /*  Index of the first free node in the array (-1 if full). */
     uint8_t allocateNode(void);
     void freeNode(uint8_t index);
 };
