@@ -28,14 +28,16 @@ class GaspettoCar : public ActiveObject {
 public:
     GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state);
 
-    void enqueue_random_commands(const uint8_t num_events);
-    void stopMotor(void);
     void Init(void);
     /* Set motor directions. */
-    void SetMotor(bool forward_motor_left, uint8_t motor_left_speed, bool forward_motor_right,
-                  uint8_t motor_right_speed);
+    void SetMotor(bool forward_motor_left, uint8_t motor_left_speed, uint8_t distance_cm_left,
+                  bool forward_motor_right, uint8_t motor_right_speed, uint8_t distance_cm_right);
     void processNextEvent(void) override;
     void enterLowPowerMode(void) override;
+    void stopMotorRight(void);
+    void stopMotorLeft(void);
+    void ResetCounterMotorRight(void);
+    void ResetCounterMotorLeft(void);
 
 private:
     /* Function to map duty cycle percentage to PWM value */
@@ -43,9 +45,15 @@ private:
     {
         return map(dutyCycle, 0, 100, 0, 255);
     }
+    uint32_t CentimetersToCount(float cm)
+    {
+        float f_result = cm / cm_step; /* Calculate result as a float. */
+        return (uint32_t)f_result;
+    }
     void InitMotorPins(void);
     void InitSpeedSensor(void);
     uint32_t CentimetersToStep(float cm);
+    bool isTargetReached(void);
 
 public:
     /* Constants for motor control. */
@@ -60,4 +68,8 @@ public:
     /* Calculate wheel circumference in cm. */
     const float circumference = (wheeldiameter * 3.14) / 10;
     const float cm_step = circumference / stepcount; /* CM per Step. */
+
+    /* Variables for motor control. */
+    long target_pulses_right;
+    long target_pulses_left;
 };

@@ -14,10 +14,10 @@ def before_build(source, target, env):
             sys.exit(1)
 
         print("Copying compile_commands.json...")
-        result = env.Execute("cp compile_commands.json ~/clang_compile/compile_commands.json")
-        if result != 0:
-            print("Failed to copy compilation database")
-            sys.exit(1)
+        # result = env.Execute("cp compile_commands.json ~/clang_compile/compile_commands.json")
+        # if result != 0:
+        #     print("Failed to copy compilation database")
+        #     sys.exit(1)
 
         print("== Pre-build script finished ==")
 
