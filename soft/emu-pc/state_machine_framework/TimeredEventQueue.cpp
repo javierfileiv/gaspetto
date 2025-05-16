@@ -44,7 +44,7 @@ bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
     } else {
         int current = headIndex_;
         while (eventNodes_[current].nextIndex != -1 &&
-               eventNodes_[eventNodes_[current].nextIndex].triggerTimeMs <= timeMs) {
+               eventNodes_[current].triggerTimeMs <= timeMs) {
             current = eventNodes_[current].nextIndex;
         }
         eventNodes_[newNodeIndex].nextIndex = eventNodes_[current].nextIndex;
