@@ -34,14 +34,14 @@ void loop()
     analogWrite(pwmPin2, map(dutyCycle2, 0, 100, 0,
                              255)); // Set PWM duty cycle (0-255 for 8-bit
                                     // resolution) Channel 3 (PB10)
-    //   for (int dutyCycle = 0; dutyCycle <= 255; dutyCycle+=15) {
-    //     analogWrite(pwmPin1, dutyCycle); // Set PWM duty cycle (0-255 for 8-bit
-    //     resolution) delay(10);
-    //   }
-    //   for (int dutyCycle = 255; dutyCycle >= 0; dutyCycle-=15) {
-    //     analogWrite(pwmPin1, dutyCycle);
-    //     delay(10);
-    //   }
+                                    //   for (int dutyCycle = 0; dutyCycle <= 255; dutyCycle+=15) {
+                                    //     analogWrite(pwmPin1, dutyCycle); // Set PWM duty cycle
+                                    //     (0-255 for 8-bit resolution) delay(10);
+                                    //   }
+                                    //   for (int dutyCycle = 255; dutyCycle >= 0; dutyCycle-=15) {
+                                    //     analogWrite(pwmPin1, dutyCycle);
+                                    //     delay(10);
+                                    //   }
 
     //   // Channel 4 (PB11) - Let's make it out of phase for visualization
     //   for (int dutyCycle = 255; dutyCycle >= 0; dutyCycle--) {
