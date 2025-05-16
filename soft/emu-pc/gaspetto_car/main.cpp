@@ -49,11 +49,9 @@ void setup()
     timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD));
     timeredEventQueue.scheduleEventDelayed(4000,
                                            Event(EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD));
-    timeredEventQueue.scheduleEventDelayed(10000,
-                                           Event(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD));
-    timeredEventQueue.scheduleEventDelayed(15000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
-    timeredEventQueue.scheduleEventDelayed(15800,
-                                           Event(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD));
+    timeredEventQueue.scheduleEventDelayed(10000, Event(EventId::NRF_IRQ, CommandId::MOTOR_RIGHT));
+    timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
+    timeredEventQueue.scheduleEventDelayed(2000, Event(EventId::NRF_IRQ, CommandId::MOTOR_LEFT));
     timeredEventQueue.scheduleEventDelayed(17000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
 #endif
 }

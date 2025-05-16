@@ -3,45 +3,37 @@
 #include "ActiveObject.h"
 #include "State.h"
 
+#include <cstdint>
+
 static bool turning = false;
-/* Variables for motor control. */
-long target_pulses_1;
-long target_pulses_2;
-static long initial_motor1_pulses;
-static long initial_motor2_pulses;
+
 /* IRQ pulse counters. */
-static volatile long motor1_pulse_count;
-static volatile long motor2_pulse_count;
+static volatile long motor_right_pulse_count;
+static volatile long motor_left_pulse_count;
 
-static inline long fast_abs(long x)
+bool GaspettoCar::isTargetReached(void)
 {
-    return (x < 0) ? -x : x;
-}
+    if (currentStateId != StateId::PROCESSING)
+        return true;
+    if (motor_right_pulse_count >= target_pulses_right)
+        stopMotorRight();
+    if (motor_left_pulse_count >= target_pulses_left)
+        stopMotorLeft();
 
-static bool isTargetReached(void)
-{
-    long current_pulses_motor1 = fast_abs(motor1_pulse_count - initial_motor1_pulses);
-    long current_pulses_motor2 = fast_abs(motor2_pulse_count - initial_motor2_pulses);
-
-    return current_pulses_motor1 >= target_pulses_1 && current_pulses_motor2 >= target_pulses_2;
+    return motor_right_pulse_count >= target_pulses_right &&
+           motor_left_pulse_count >= target_pulses_left;
 }
 
 void left_motor_speed_irq(void)
 {
     /* Increment left motor pulse count */
-    motor1_pulse_count++;
+    motor_right_pulse_count++;
 }
 
 void right_motor_speed_irq(void)
 {
     /* Increment right motor pulse count */
-    motor2_pulse_count++;
-}
-
-uint32_t GaspettoCar::CentimetersToStep(float cm)
-{
-    float f_result = cm / cm_step; /* Calculate result as a float. */
-    return (uint32_t)f_result;
+    motor_left_pulse_count++;
 }
 
 GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state)
@@ -79,10 +71,25 @@ void GaspettoCar::Init(void)
     InitSpeedSensor();
 }
 
-void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
-                           bool forward_motor_right, uint8_t motor_right_speed)
+void GaspettoCar::ResetCounterMotorRight(void)
 {
-    stopMotor();
+    motor_right_pulse_count = 0;
+    target_pulses_right = 0;
+}
+void GaspettoCar::ResetCounterMotorLeft(void)
+{
+    motor_left_pulse_count = 0;
+    target_pulses_left = 0;
+}
+
+void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
+                           uint8_t distance_cm_left, bool forward_motor_right,
+                           uint8_t motor_right_speed, uint8_t distance_cm_right)
+{
+    ResetCounterMotorRight();
+    ResetCounterMotorLeft();
+    target_pulses_left = CentimetersToCount(distance_cm_left);
+    target_pulses_right = CentimetersToCount(distance_cm_right);
     /* Set motor directions */
     if (forward_motor_left) {
         analogWrite(MOTOR_LEFT_PIN_A, mapDutyCycle(motor_left_speed));
@@ -103,43 +110,32 @@ void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
 #endif
 }
 
-void GaspettoCar::stopMotor(void)
+void GaspettoCar::stopMotorRight(void)
 {
-    Serial.print("Stopping motor...\n");
-    /* Stop motor */
+    Serial.print("Stopping motor RIGHT...\n");
     analogWrite(MOTOR_RIGHT_PIN_A, 0);
     analogWrite(MOTOR_RIGHT_PIN_B, 0);
-    analogWrite(MOTOR_LEFT_PIN_A, 0);
-    analogWrite(MOTOR_LEFT_PIN_B, 0);
+    ResetCounterMotorRight();
 }
 
-void GaspettoCar::enqueue_random_commands(const uint8_t num_events)
+void GaspettoCar::stopMotorLeft(void)
 {
-    std::srand(time(nullptr));
-
-    for (uint8_t i = 0; i < num_events; ++i) {
-        Event event = { EventId::NRF_IRQ, static_cast<CommandId>(rand() % 4) }; /*  Random
-                                                                                   event. */
-
-        postEvent(event);
-#ifdef LOW_POWER_MODE
-        lowPowerMode = false; /*  Wake up the system. */
-#endif
-    }
+    Serial.print("Stopping motor LEFT...\n");
+    analogWrite(MOTOR_LEFT_PIN_A, 0);
+    analogWrite(MOTOR_LEFT_PIN_B, 0);
+    ResetCounterMotorLeft();
 }
 
 void GaspettoCar::processNextEvent(void)
 {
     if (isTargetReached()) {
-        Serial.println("Target reached.\n");
-        return;
-    }
-    if (eventQueue && !eventQueue->IsEmpty()) {
-        Event evt;
+        if (eventQueue && !eventQueue->IsEmpty()) {
+            Event evt;
 
-        State *currentState = states[static_cast<int>(currentStateId)];
-        eventQueue->dequeue(evt);
-        currentState->processEvent(evt);
+            State *currentState = states[static_cast<int>(currentStateId)];
+            eventQueue->dequeue(evt);
+            currentState->processEvent(evt);
+        }
     }
 }
 

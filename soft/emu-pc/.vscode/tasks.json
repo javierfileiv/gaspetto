@@ -22,7 +22,8 @@
                 "-I",
                 "${workspaceFolder}/gaspetto_car",
                 "-o",
-                "${workspaceFolder}/gaspetto_car/main"
+                "${workspaceFolder}/gaspetto_car/main",
+		"-DDEBUG_GASPETTO=1"
             ],
             "group": {
                 "kind": "build",
@@ -57,7 +58,7 @@
                 "${workspaceFolder}/gaspetto_box",
                 "-o",
                 "${workspaceFolder}/gaspetto_box/main",
-		"-DLOW_POWER_MODE=1"
+		"-DLOW_POWER_MODE=1 -DDEBUG_GASPETTO=1"
             ],
             "group": {
                 "kind": "build",
