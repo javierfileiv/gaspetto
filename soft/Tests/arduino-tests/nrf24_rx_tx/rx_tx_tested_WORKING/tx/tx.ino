@@ -119,13 +119,12 @@ void loop()
 
         // to make this example readable in the serial monitor
         delay(1000); // slow transmissions down by 1 second
-
     } else {
         // This device is a RX node
 
         uint8_t pipe;
         if (radio.available(&pipe)) { // is there a payload? get the pipe number
-                                      // that recieved it
+            // that recieved it
             uint8_t bytes = radio.getPayloadSize(); // get the size of the payload
             radio.read(&payload, bytes); // fetch payload from FIFO
             Serial.print(F("Received "));
@@ -147,7 +146,6 @@ void loop()
             role = _TX;
             Serial.println(F("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK"));
             radio.stopListening();
-
         } else if (c == 'R' && role) {
             // Become the RX node
 
