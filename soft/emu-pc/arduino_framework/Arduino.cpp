@@ -1,5 +1,5 @@
-#include "Event.h"
 #include "GaspettoCar_ino.h"
+#include "MotorEvent.h"
 #include "Serial.h"
 
 #include <atomic>
@@ -16,8 +16,8 @@ std::atomic<unsigned long> millisCounter(0);
 std::atomic<bool> running(true);
 std::atomic<bool> lowPowerMode;
 void (*userFunc_)(void) = nullptr;
-Event event;
-Event evt_copy;
+MotorEvent event;
+MotorEvent evt_copy;
 /*  Simulated millis function. */
 unsigned long millis(void)
 {
@@ -62,7 +62,7 @@ static void keyboardInput(void)
     bool keyPressed = false;
     while (true) {
         if (read(STDIN_FILENO, &ch, 1) > 0) {
-            event = { EventId::NONE, CommandId::NONE }; /*  Reset event. */
+            event = MotorEvent(EventId::NONE, CommandId::NONE); /*  Reset event. */
             switch (ch) {
             case 'q':
             case 'Q':
@@ -70,27 +70,27 @@ static void keyboardInput(void)
                 break;
             case 'F':
             case 'f':
-                event = { EventId::NRF_IRQ, CommandId::MOTOR_FORWARD };
+                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD);
                 break;
             case 'b':
             case 'B':
-                event = { EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD };
+                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD);
                 break;
             case 'l':
             case 'L':
-                event = { EventId::NRF_IRQ, CommandId::MOTOR_LEFT };
+                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_LEFT);
                 break;
             case 'r':
             case 'R':
-                event = { EventId::NRF_IRQ, CommandId::MOTOR_RIGHT };
+                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_RIGHT);
                 break;
             case 's':
             case 'S':
-                event = { EventId::NRF_IRQ, CommandId::MOTOR_STOP };
+                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_STOP);
                 break;
             case 'p':
             case 'P':
-                event = { EventId::BUTTON_PRESSED, CommandId::NONE };
+                event = MotorEvent(EventId::BUTTON_PRESSED, CommandId::NONE);
                 break;
             }
             ISR();

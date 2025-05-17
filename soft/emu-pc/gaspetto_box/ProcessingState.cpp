@@ -1,7 +1,7 @@
 #include "ProcessingState.h"
 
-#include "Event.h"
 #include "GaspettoBox.h"
+#include "State.h"
 
 #include <cassert>
 #include <iostream>
@@ -37,5 +37,5 @@ void ProcessingState::enter()
         delay(1000); /*  Simulate some processing work. */
 #endif
     }
-    state_machine->transitionTo(StateId::IDLE);
+    active_object->transitionTo(StateId::IDLE);
 }

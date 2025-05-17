@@ -16,17 +16,15 @@ TimeredEventQueue::TimeredEventQueue()
 
 bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
 {
-    uint8_t newNodeIndex = allocateNode();
+    int8_t newNodeIndex = allocateNode();
     if (newNodeIndex == -1)
         return false; /*  Queue is full. */
 #ifdef DEBUG_GASPETTO
     Serial.print("scheduleEvent(): ");
-    Serial.print(reinterpret_cast<const char *>(
-            event_to_string[static_cast<int>(evt.getEventId())].str));
+    Serial.print(eventIdToString(evt.getEventId()));
     Serial.print(", ");
     Serial.print("Command: ");
-    Serial.print(reinterpret_cast<const char *>(
-            command_to_string[static_cast<int>(evt.getCommand())].str));
+    Serial.print(commandIdToString(evt.getCommand()));
     Serial.print(", ");
     Serial.print("Trigger Time: ");
     Serial.print(timeMs);
@@ -84,7 +82,7 @@ void TimeredEventQueue::processEvents(ActiveObject &ao)
     lastProcessTime_ = currentTime;
 }
 
-void TimeredEventQueue::clear(void)
+void TimeredEventQueue::clear()
 {
     headIndex_ = -1;
     freeListHead_ = 0;
@@ -93,9 +91,9 @@ void TimeredEventQueue::clear(void)
     eventNodes_[MAX_TIMED_EVENT_NODES - 1].nextIndex = -1;
 }
 
-uint8_t TimeredEventQueue::allocateNode(void)
+int8_t TimeredEventQueue::allocateNode()
 {
-    uint8_t allocatedIndex = freeListHead_;
+    int8_t allocatedIndex = freeListHead_;
 
     if (allocatedIndex == -1)
         return -1; /*  No free nodes. */

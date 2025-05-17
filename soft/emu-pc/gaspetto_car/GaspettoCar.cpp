@@ -1,145 +1,86 @@
 #include "GaspettoCar.h"
 
 #include "ActiveObject.h"
+#include "Arduino.h"
+#include "MotorController.h"
 #include "State.h"
 
 #include <cstdint>
 
-static bool turning = false;
-
-/* IRQ pulse counters. */
-static volatile long motor_right_pulse_count;
-static volatile long motor_left_pulse_count;
-
-bool GaspettoCar::isTargetReached(void)
-{
-    if (currentStateId != StateId::PROCESSING)
-        return true;
-    if (motor_right_pulse_count >= target_pulses_right)
-        stopMotorRight();
-    if (motor_left_pulse_count >= target_pulses_left)
-        stopMotorLeft();
-
-    return motor_right_pulse_count >= target_pulses_right &&
-           motor_left_pulse_count >= target_pulses_left;
-}
-
-void left_motor_speed_irq(void)
-{
-    /* Increment left motor pulse count */
-    motor_right_pulse_count++;
-}
-
-void right_motor_speed_irq(void)
-{
-    /* Increment right motor pulse count */
-    motor_left_pulse_count++;
-}
-
-GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state)
+GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state,
+                         MotorController *motorController, RadioController *radioController)
         : ActiveObject(queue, nullptr)
+        , motorController(motorController)
+        , radioController(radioController)
 {
     InitMachine(StateId::IDLE, idle);
     InitMachine(StateId::PROCESSING, running);
     SetInitialState(initial_state);
 }
 
-void GaspettoCar::InitMotorPins(void)
+void GaspettoCar::Init()
 {
-    /* Initialize motor control pins */
-    pinMode(MOTOR_RIGHT_PIN_A, OUTPUT);
-    pinMode(MOTOR_RIGHT_PIN_B, OUTPUT);
-    pinMode(MOTOR_LEFT_PIN_A, OUTPUT);
-    pinMode(MOTOR_LEFT_PIN_B, OUTPUT);
-}
-
-void GaspettoCar::InitSpeedSensor(void)
-{
-    /* Initialize speed sensor pins */
-    pinMode(SPEED_SENSOR_LEFT_PIN, INPUT);
-    pinMode(SPEED_SENSOR_RIGHT_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(SPEED_SENSOR_LEFT_PIN), left_motor_speed_irq, RISING);
-    attachInterrupt(digitalPinToInterrupt(SPEED_SENSOR_RIGHT_PIN), right_motor_speed_irq, RISING);
-}
-
-void GaspettoCar::Init(void)
-{
-    /* Initialize motor control pins */
-    InitMotorPins();
-    analogWriteFrequency(35); /* Set PWM frequency to 35Hz. */
-    /* Initialize speed sensor pins */
-    InitSpeedSensor();
-}
-
-void GaspettoCar::ResetCounterMotorRight(void)
-{
-    motor_right_pulse_count = 0;
-    target_pulses_right = 0;
-}
-void GaspettoCar::ResetCounterMotorLeft(void)
-{
-    motor_left_pulse_count = 0;
-    target_pulses_left = 0;
+    ActiveObject::Init();
+    if (motorController) {
+        motorController->InitMotorPins();
+        motorController->InitSpeedSensor();
+    }
 }
 
 void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
                            uint8_t distance_cm_left, bool forward_motor_right,
                            uint8_t motor_right_speed, uint8_t distance_cm_right)
 {
-    ResetCounterMotorRight();
-    ResetCounterMotorLeft();
-    target_pulses_left = CentimetersToCount(distance_cm_left);
-    target_pulses_right = CentimetersToCount(distance_cm_right);
-    /* Set motor directions */
-    if (forward_motor_left) {
-        analogWrite(MOTOR_LEFT_PIN_A, mapDutyCycle(motor_left_speed));
-        analogWrite(MOTOR_LEFT_PIN_B, 0);
-    } else {
-        analogWrite(MOTOR_LEFT_PIN_A, 0);
-        analogWrite(MOTOR_LEFT_PIN_B, mapDutyCycle(motor_left_speed));
+    if (motorController) {
+        motorController->SetMotor(forward_motor_left, motor_left_speed, distance_cm_left,
+                                  forward_motor_right, motor_right_speed, distance_cm_right);
     }
-    if (forward_motor_right) {
-        analogWrite(MOTOR_RIGHT_PIN_A, mapDutyCycle(motor_right_speed));
-        analogWrite(MOTOR_RIGHT_PIN_B, 0);
-    } else {
-        analogWrite(MOTOR_RIGHT_PIN_A, 0);
-        analogWrite(MOTOR_RIGHT_PIN_B, mapDutyCycle(motor_right_speed));
+}
+
+void GaspettoCar::stopMotorRight()
+{
+    if (motorController) {
+        motorController->stopMotorRight();
     }
-#ifndef ARDUINO
-    delay(1000);
-#endif
 }
 
-void GaspettoCar::stopMotorRight(void)
+void GaspettoCar::stopMotorLeft()
 {
-    Serial.print("Stopping motor RIGHT...\n");
-    analogWrite(MOTOR_RIGHT_PIN_A, 0);
-    analogWrite(MOTOR_RIGHT_PIN_B, 0);
-    ResetCounterMotorRight();
+    if (motorController) {
+        motorController->stopMotorLeft();
+    }
 }
 
-void GaspettoCar::stopMotorLeft(void)
+bool GaspettoCar::isTargetReached()
 {
-    Serial.print("Stopping motor LEFT...\n");
-    analogWrite(MOTOR_LEFT_PIN_A, 0);
-    analogWrite(MOTOR_LEFT_PIN_B, 0);
-    ResetCounterMotorLeft();
+    if (!motorController)
+        return true;
+    return motorController->isTargetReached(currentStateId);
 }
 
-void GaspettoCar::processNextEvent(void)
+int GaspettoCar::postEvent(Event evt)
+{
+    if (eventQueue) {
+        eventQueue->enqueue(evt);
+        return 0;
+    }
+    return -1;
+}
+
+void GaspettoCar::processNextEvent()
 {
     if (isTargetReached()) {
         if (eventQueue && !eventQueue->IsEmpty()) {
             Event evt;
 
-            State *currentState = states[static_cast<int>(currentStateId)];
+            State *currentState = states[static_cast<uint8_t>(currentStateId)];
             eventQueue->dequeue(evt);
             currentState->processEvent(evt);
         }
     }
 }
 
-void GaspettoCar::enterLowPowerMode(void)
+void GaspettoCar::enterLowPowerMode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO

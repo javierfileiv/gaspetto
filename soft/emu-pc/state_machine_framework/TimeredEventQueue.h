@@ -25,7 +25,47 @@ public:
                                                                      time. */
     bool scheduleEventDelayed(uint32_t delayMs, Event event); /*  Schedule based on delay. */
     void processEvents(ActiveObject &ao);
-    void clear(void); /*  Reset the queue. */
+    void clear(); /*  Reset the queue. */
+
+    static const char *eventIdToString(EventId id)
+    {
+        switch (id) {
+        case EventId::NONE:
+            return "NONE";
+        case EventId::TIMER_ELAPSED:
+            return "TIMER_ELAPSED";
+        case EventId::NRF_IRQ:
+            return "NRF_IRQ";
+        case EventId::BUTTON_PRESSED:
+            return "BUTTON_PRESSED";
+        case EventId::MAX_EVENT_ID:
+            return "MAX_EVENT_ID";
+        default:
+            return "UNKNOWN_EVENT_ID";
+        }
+    }
+
+    static const char *commandIdToString(CommandId id)
+    {
+        switch (id) {
+        case CommandId::NONE:
+            return "NONE";
+        case CommandId::MOTOR_FORWARD:
+            return "MOTOR_FORWARD";
+        case CommandId::MOTOR_BACKWARD:
+            return "MOTOR_BACKWARD";
+        case CommandId::MOTOR_RIGHT:
+            return "MOTOR_RIGHT";
+        case CommandId::MOTOR_LEFT:
+            return "MOTOR_LEFT";
+        case CommandId::MOTOR_STOP:
+            return "MOTOR_STOP";
+        case CommandId::MAX_COMMAND_ID:
+            return "MAX_COMMAND_ID";
+        default:
+            return "UNKNOWN_COMMAND_ID";
+        }
+    }
 
 private:
     uint32_t lastProcessTime_;
@@ -34,7 +74,7 @@ private:
                           empty). */
     int8_t freeListHead_; /*  Index of the first free node in the array (-1 if
                              full). */
-    uint8_t allocateNode(void);
+    int8_t allocateNode();
     void freeNode(uint8_t index);
 };
 

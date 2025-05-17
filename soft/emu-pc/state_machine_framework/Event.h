@@ -7,74 +7,85 @@
 #include "Arduino.h"
 #endif
 
-enum class EventId { TIMER_ELAPSED, NRF_IRQ, BUTTON_PRESSED, NONE, MAX_EVENT_ID };
-
-enum class StateId { IDLE, PROCESSING, PAUSED, MAX_STATE_ID };
-
-enum class CommandId {
+enum class EventId : uint8_t { NONE, TIMER_ELAPSED, NRF_IRQ, BUTTON_PRESSED, MAX_EVENT_ID };
+enum class CommandId : uint8_t {
+    NONE,
     MOTOR_FORWARD,
     MOTOR_BACKWARD,
     MOTOR_RIGHT,
     MOTOR_LEFT,
     MOTOR_STOP,
-    NONE,
     MAX_COMMAND_ID
 };
 
-const struct {
-    CommandId command;
-    const uint8_t *str;
-} command_to_string[static_cast<std::size_t>(CommandId::MAX_COMMAND_ID)] = {
-    { CommandId::MOTOR_FORWARD, reinterpret_cast<const uint8_t *>("MOTOR_FORWARD") },
-    { CommandId::MOTOR_BACKWARD, reinterpret_cast<const uint8_t *>("MOTOR_BACKWARD") },
-    { CommandId::MOTOR_RIGHT, reinterpret_cast<const uint8_t *>("MOTOR_RIGHT") },
-    { CommandId::MOTOR_LEFT, reinterpret_cast<const uint8_t *>("MOTOR_LEFT") },
-    { CommandId::MOTOR_STOP, reinterpret_cast<const uint8_t *>("MOTOR_STOP") },
-    { CommandId::NONE, reinterpret_cast<const uint8_t *>("NONE") },
+// Stringify helpers for EventId and CommandId
+static inline const char *eventIdToString(EventId id)
+{
+    switch (id) {
+    case EventId::NONE:
+        return "NONE";
+    case EventId::TIMER_ELAPSED:
+        return "TIMER_ELAPSED";
+    case EventId::NRF_IRQ:
+        return "NRF_IRQ";
+    case EventId::BUTTON_PRESSED:
+        return "BUTTON_PRESSED";
+    case EventId::MAX_EVENT_ID:
+        return "MAX_EVENT_ID";
+    default:
+        return "UNKNOWN_EVENT_ID";
+    }
+}
 
-};
-
-const struct {
-    EventId event;
-    const uint8_t *str;
-} event_to_string[static_cast<std::size_t>(EventId::MAX_EVENT_ID)] = {
-    { EventId::TIMER_ELAPSED, reinterpret_cast<const uint8_t *>("TIMER_ELAPSED") },
-    { EventId::NRF_IRQ, reinterpret_cast<const uint8_t *>("NRF_IRQ") },
-    { EventId::BUTTON_PRESSED, reinterpret_cast<const uint8_t *>("BUTTON_PRESSED") },
-    { EventId::NONE, reinterpret_cast<const uint8_t *>("NONE") },
-};
+static inline const char *commandIdToString(CommandId id)
+{
+    switch (id) {
+    case CommandId::NONE:
+        return "NONE";
+    case CommandId::MOTOR_FORWARD:
+        return "MOTOR_FORWARD";
+    case CommandId::MOTOR_BACKWARD:
+        return "MOTOR_BACKWARD";
+    case CommandId::MOTOR_RIGHT:
+        return "MOTOR_RIGHT";
+    case CommandId::MOTOR_LEFT:
+        return "MOTOR_LEFT";
+    case CommandId::MOTOR_STOP:
+        return "MOTOR_STOP";
+    case CommandId::MAX_COMMAND_ID:
+        return "MAX_COMMAND_ID";
+    default:
+        return "UNKNOWN_COMMAND_ID";
+    }
+}
 
 class Event {
 public:
-    Event()
-            : event(EventId::NONE)
-            , command(CommandId::MOTOR_STOP)
+    Event(EventId eventId = EventId::NONE, CommandId command = CommandId::NONE)
+            : eventId(eventId)
+            , command(command)
     {
     }
-    Event(EventId eventId, CommandId commandId)
-            : event(eventId)
-            , command(commandId)
-    {
-    }
-    void setEventId(EventId eventId)
-    {
-        event = eventId;
-    }
-    void setCommand(CommandId commandId)
-    {
-        command = commandId;
-    }
+    virtual ~Event() = default;
     EventId getEventId() const
     {
-        return event;
+        return eventId;
     }
     CommandId getCommand() const
     {
         return command;
     }
+    void setEventId(EventId id)
+    {
+        eventId = id;
+    }
+    void setCommand(CommandId cmd)
+    {
+        command = cmd;
+    }
 
-private:
-    EventId event;
+protected:
+    EventId eventId;
     CommandId command;
 };
 

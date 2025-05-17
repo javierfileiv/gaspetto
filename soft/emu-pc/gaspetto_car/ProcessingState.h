@@ -10,5 +10,5 @@ class Event;
 
 class ProcessingState : public State {
 public:
-    void processEvent(Event evt) override;
+    void processEvent(Event &evt) override;
 };
