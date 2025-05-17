@@ -1,0 +1,9 @@
+add_library(motor_controller STATIC)
+target_sources(motor_controller PRIVATE MotorController.cpp MotorController.h)
+target_link_libraries(motor_controller PRIVATE arduino_framework state_machine_framework)
+
+add_executable(gaspetto_car main.cpp ProcessingState.cpp IdleState.cpp GaspettoCar.cpp)
+
+target_include_directories(gaspetto_car PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(gaspetto_car arduino_framework state_machine_framework motor_controller)
+target_compile_definitions(gaspetto_car PRIVATE DEBUG_GASPETTO=1)

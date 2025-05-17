@@ -24,9 +24,9 @@ public:
     void InitMachine(StateId state_id, State *state)
     {
         /* Initialize state. */
-        states[static_cast<int>(state_id)] = state;
+        states[static_cast<uint8_t>(state_id)] = state;
         /* Set up state machine references. */
-        for (int i = 0; i < static_cast<int>(StateId::MAX_STATE_ID); i++) {
+        for (int i = 0; i < static_cast<uint8_t>(StateId::MAX_STATE_ID); i++) {
             if (states[i] != nullptr) {
                 states[i]->setMachine(this);
             }
@@ -37,7 +37,7 @@ public:
         currentStateId = state;
     }
 
-    void Init(void)
+    void Init()
     {
         states[static_cast<int>(currentStateId)]->enter();
     }
@@ -48,90 +48,46 @@ public:
 
         currentState->exit();
         currentStateId = newStateId;
-        currentState = states[static_cast<int>(currentStateId)];
+        currentState = states[static_cast<uint8_t>(currentStateId)];
         currentState->enter();
     }
 
-    int postEvent(Event evt)
+    State *getCurrentState()
     {
-        if (eventQueue->IsFull()) {
-            Serial.println("Event queue is full, cannot post event.\n");
-            return -1;
-        }
-        if (eventQueue) {
-#ifdef DEBUG_GASPETTO
-            Serial.print("postEvent(): ");
-            Serial.print(reinterpret_cast<const char *>(
-                    event_to_string[static_cast<int>(evt.getEventId())].str));
-            Serial.print(", ");
-            Serial.print("Command: ");
-            Serial.print(reinterpret_cast<const char *>(
-                    command_to_string[static_cast<int>(evt.getCommand())].str));
-            Serial.print(", ");
-            Serial.print("Current Time: ");
-            Serial.print(millis());
-            Serial.println(" ms");
-#endif
-            eventQueue->enqueue(evt);
-            return 0;
-        }
-        return -1;
+        return states[static_cast<uint8_t>(currentStateId)];
     }
 
-    virtual void processNextEvent(void)
+    virtual int postEvent(Event evt)
     {
-        if (eventQueue && !eventQueue->IsEmpty()) {
-            Event evt;
-
-            State *currentState = states[static_cast<int>(currentStateId)];
-            eventQueue->dequeue(evt);
-            currentState->processEvent(evt);
-        }
+        Serial.print(F("Default postEvent() empty implementation called.\n"));
+        return 0;
+        ;
     }
 
-    void processEvent(Event evt)
+    virtual void processNextEvent()
     {
-        State *currentState = states[static_cast<int>(currentStateId)];
-#ifdef DEBUG_GASPETTO
-        Serial.print("processEvent: ");
-        Serial.print(reinterpret_cast<const char *>(
-                event_to_string[static_cast<int>(evt.getEventId())].str));
-        Serial.print(", ");
-        Serial.print("Command: ");
-        Serial.print(reinterpret_cast<const char *>(
-                command_to_string[static_cast<int>(evt.getCommand())].str));
-        Serial.print(", ");
-        Serial.print("Current Time: ");
-        Serial.print(millis());
-        Serial.println(" ms");
-#endif
-        currentState->processEvent(evt);
+        Serial.print(F("Default processNextEvent() empty implementation called.\n"));
+    };
+
+    virtual void enterLowPowerMode()
+    {
+        Serial.print(F("Default enterLowPowerMode() empty implementation called.\n"));
+    };
+
+    EventQueue *getEventQueue()
+    {
+        return eventQueue;
     }
 
-    virtual void enterLowPowerMode(void)
+    TimeredEventQueue *getTimeredEventQueue()
     {
-#ifdef LOW_POWER_MODE
-#ifndef ARDUINO
-        Serial.println("Entering low-power mode...\n");
-        lowPowerMode = true;
-        while (lowPowerMode) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); /*  Simulate
-                                                                            low-power
-                                                                            sleep. */
-        }
-#else
-        /*  Implement low-power mode for Arduino here. */
-        /*  For example, you might use sleep modes or power-saving features. */
-        /*  specific to the Arduino platform.. */
-        delay(100); /*  Simulate low-power sleep. */
-#endif
-#endif
+        return timeredEventQueue;
     }
 
 protected:
     EventQueue *eventQueue;
     TimeredEventQueue *timeredEventQueue;
-    State *states[static_cast<int>(StateId::MAX_STATE_ID)];
+    State *states[static_cast<uint8_t>(StateId::MAX_STATE_ID)];
     StateId currentStateId;
 };
 

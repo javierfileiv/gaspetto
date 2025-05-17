@@ -5,10 +5,10 @@
             "name": "Debug Gaspetto Car Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/gaspetto_car/main",
+            "program": "${workspaceFolder}/build-car-debug/gaspetto_car/gaspetto_car",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build-car-debug/gaspetto_car",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -19,16 +19,16 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "Build Gaspetto Car Program"
+            "preLaunchTask": "CMake Build Gaspetto Car Debug"
         },
         {
             "name": "Debug Gaspetto Box Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/gaspetto_box/main",
+            "program": "${workspaceFolder}/build-box-debug/gaspetto_box/gaspetto_box",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build-box-debug/gaspetto_box",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -39,7 +39,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "Build Gaspetto Box Program"
+            "preLaunchTask": "CMake Build Gaspetto Box Debug"
         }
     ]
 }

@@ -2,75 +2,101 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build Gaspetto Car Program",
+            "label": "CMake Configure",
             "type": "shell",
-            "command": "g++",
+            "command": "cmake",
             "args": [
-                "-g",
-                "${workspaceFolder}/arduino_framework/Arduino.cpp",
-                "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-                "${workspaceFolder}/state_machine_framework/TimeredEventQueue.cpp",
-                /*  Arduino program. */
-                "${workspaceFolder}/gaspetto_car/main.cpp",
-                "${workspaceFolder}/gaspetto_car/ProcessingState.cpp",
-                "${workspaceFolder}/gaspetto_car/IdleState.cpp",
-                "${workspaceFolder}/gaspetto_car/GaspettoCar.cpp",
-                "-I",
-                "${workspaceFolder}/arduino_framework",
-                "-I",
-                "${workspaceFolder}/state_machine_framework",
-                "-I",
-                "${workspaceFolder}/gaspetto_car",
-                "-o",
-                "${workspaceFolder}/gaspetto_car/main",
-		"-DDEBUG_GASPETTO=1"
+                "-S", "${workspaceFolder}",
+                "-B", "${workspaceFolder}/build"
             ],
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": false
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "detail": "Task to build the C++ program for debugging.",
             "presentation": {
                 "clear": true
-            }
+            },
+            "problemMatcher": []
         },
         {
-            "label": "Build Gaspetto Box Program",
+            "label": "CMake Debug Configure Car",
             "type": "shell",
-            "command": "g++",
+            "command": "cmake",
             "args": [
-                "-g",
-                "${workspaceFolder}/arduino_framework/Arduino.cpp",
-                "${workspaceFolder}/state_machine_framework/EventQueue.cpp",
-                /*  Arduino program. */
-                "${workspaceFolder}/gaspetto_box/main.cpp",
-                "${workspaceFolder}/gaspetto_box/ProcessingState.cpp",
-                "${workspaceFolder}/gaspetto_box/IdleState.cpp",
-                "${workspaceFolder}/gaspetto_box/GaspettoBox.cpp",
-                "-I",
-                "${workspaceFolder}/arduino_framework",
-                "-I",
-                "${workspaceFolder}/state_machine_framework",
-                "-I",
-                "${workspaceFolder}/gaspetto_box",
-                "-o",
-                "${workspaceFolder}/gaspetto_box/main",
-		"-DLOW_POWER_MODE=1 -DDEBUG_GASPETTO=1"
+                "-S", "${workspaceFolder}",
+                "-B", "${workspaceFolder}/build-car-debug",
+                "-DCMAKE_BUILD_TYPE=Debug"
             ],
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Debug Configure Box",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S", "${workspaceFolder}",
+                "-B", "${workspaceFolder}/build-box-debug",
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build Gaspetto Car",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build", "--target", "gaspetto_car"
+            ],
+            "dependsOn": ["CMake Configure"],
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": false
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "detail": "Task to build the C++ program for debugging.",
             "presentation": {
                 "clear": true
-            }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build Gaspetto Box",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build", "--target", "gaspetto_box"
+            ],
+            "dependsOn": ["CMake Configure"],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build Gaspetto Car Debug",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build-car-debug", "--target", "gaspetto_car"
+            ],
+            "dependsOn": ["CMake Debug Configure Car"],
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "clear": true },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build Gaspetto Box Debug",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build-box-debug", "--target", "gaspetto_box"
+            ],
+            "dependsOn": ["CMake Debug Configure Box"],
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "clear": true },
+            "problemMatcher": []
         }
     ]
 }

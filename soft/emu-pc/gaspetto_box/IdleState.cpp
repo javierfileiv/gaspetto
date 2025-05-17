@@ -7,19 +7,19 @@
 
 void IdleState::enter()
 {
-    state_machine->enterLowPowerMode();
+    active_object->enterLowPowerMode();
 }
 
-void IdleState::processEvent(Event event)
+void IdleState::processEvent(Event &evt)
 {
     Serial.println("Processing event in IdleState...\n");
-    switch (event.getEventId()) {
+    switch (evt.getEventId()) {
     case EventId::BUTTON_PRESSED:
-        state_machine->transitionTo(StateId::PROCESSING);
+        active_object->transitionTo(StateId::PROCESSING);
         break;
     default:
         /* Stay in low power mode*/
-        state_machine->enterLowPowerMode();
+        // state_machine->enterLowPowerMode();
         break;
     }
 }

@@ -2,6 +2,8 @@
 
 #include "GaspettoCar.h"
 
+#include <cstdint>
+
 #ifndef ARDUINO
 #include <cassert>
 #include <iostream>
@@ -9,20 +11,13 @@
 
 void IdleState::enter()
 {
-    state_machine->enterLowPowerMode();
+    active_object->enterLowPowerMode();
 }
 
-void IdleState::processEvent(Event event)
+void IdleState::processEvent(Event &evt)
 {
     Serial.println("Processing event in IdleState...\n");
-    switch (event.getEventId()) {
-    case EventId::NRF_IRQ:
-        state_machine->transitionTo(StateId::PROCESSING);
-        state_machine->processEvent(event);
-        break;
-    default:
-        /* Stay in low power mode. */
-        state_machine->enterLowPowerMode();
-        break;
-    }
+    active_object->transitionTo(StateId::PROCESSING);
+    State *currentState = active_object->getCurrentState();
+    currentState->processEvent(evt);
 }

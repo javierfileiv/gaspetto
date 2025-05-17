@@ -3,8 +3,10 @@
 #include "ActiveObject.h"
 #include "Arduino.h"
 #include "EventQueue.h"
-#include "IdleState.h"
+#include "MotorController.h"
 #include "ProcessingState.h"
+#include "RadioController.h"
+#include "State.h"
 
 #ifndef ARDUINO
 #include <cstdint>
@@ -24,52 +26,38 @@
         }                                      \
     } while (0)
 #endif
+
 class GaspettoCar : public ActiveObject {
 public:
-    GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state);
+    GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state,
+                MotorController *motorController = nullptr,
+                RadioController *radioController = nullptr);
 
-    void Init(void);
+    void Init();
     /* Set motor directions. */
     void SetMotor(bool forward_motor_left, uint8_t motor_left_speed, uint8_t distance_cm_left,
                   bool forward_motor_right, uint8_t motor_right_speed, uint8_t distance_cm_right);
-    void processNextEvent(void) override;
-    void enterLowPowerMode(void) override;
-    void stopMotorRight(void);
-    void stopMotorLeft(void);
-    void ResetCounterMotorRight(void);
-    void ResetCounterMotorLeft(void);
+    int postEvent(Event evt) override;
+    void processNextEvent() override;
+    void enterLowPowerMode() override;
+    void stopMotorRight();
+    void stopMotorLeft();
+    void ResetCounterMotorRight();
+    void ResetCounterMotorLeft();
+    MotorController *getMotorController() const
+    {
+        return motorController;
+    }
+    RadioController *getRadioController() const
+    {
+        return radioController;
+    }
 
 private:
-    /* Function to map duty cycle percentage to PWM value */
-    static int mapDutyCycle(int dutyCycle)
-    {
-        return map(dutyCycle, 0, 100, 0, 255);
-    }
-    uint32_t CentimetersToCount(float cm)
-    {
-        float f_result = cm / cm_step; /* Calculate result as a float. */
-        return (uint32_t)f_result;
-    }
-    void InitMotorPins(void);
-    void InitSpeedSensor(void);
+    MotorController *motorController;
+    RadioController *radioController;
+    void InitMotorPins();
+    void InitSpeedSensor();
     uint32_t CentimetersToStep(float cm);
-    bool isTargetReached(void);
-
-public:
-    /* Constants for motor control. */
-    const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
-    const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
-    const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
-    const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
-    const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
-    const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
-    const float stepcount = 20.00; /* 20 Slots in disk. */
-    const float wheeldiameter = 67.0; /* Wheel diameter in millimeters. */
-    /* Calculate wheel circumference in cm. */
-    const float circumference = (wheeldiameter * 3.14) / 10;
-    const float cm_step = circumference / stepcount; /* CM per Step. */
-
-    /* Variables for motor control. */
-    long target_pulses_right;
-    long target_pulses_left;
+    bool isTargetReached();
 };
