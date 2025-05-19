@@ -1,56 +1,59 @@
 #!/bin/bash
 
-# This script builds the GaspettoBox firmware for the emu-pc.
-# It uses the Arduino framework and a state machine framework.
+# This script builds the GaspettoBox and GaspettoCar firmware for the emu-pc.
+# It now uses the CMake build system and cleans up after itself.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
+BUILD_DIR="$EMU_PC_DIR/build"
 
-# Detect number of CPU cores and set compiler options
-CXXFLAGS="-O2 -pipe -march=native -flto"
+echo "Building Gaspetto firmware for emu-pc..."
+echo "Project root: $PROJECT_ROOT"
+echo "EMU PC directory: $EMU_PC_DIR"
 
-# Use ccache if available
-CXX="g++"
-if command -v ccache >/dev/null 2>&1; then
-    CXX="ccache g++"
+# Create build directory if it doesn't exist
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# Detect number of CPU cores
+NUM_CORES=$(nproc)
+echo "Using $NUM_CORES cores for compilation"
+
+# Configure with CMake
+echo "Configuring project with CMake..."
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      ..
+
+# Build each target separately
+echo "Building GaspettoBox..."
+cmake --build . --parallel $NUM_CORES --target gaspetto_box
+
+if [ $? -ne 0 ]; then
+    echo "GaspettoBox build failed!" >&2
+    echo "Cleaning up build directory..."
+    cd "$EMU_PC_DIR"
+    rm -rf "$BUILD_DIR"
+    exit 1
 fi
 
-echo "Building GaspettoBox firmware for emu-pc..."
-echo "Project root: $PROJECT_ROOT"
-echo "Script directory: $SCRIPT_DIR"
-echo "Current directory: $(pwd)"
+echo "Building GaspettoCar..."
+cmake --build . --parallel $NUM_CORES --target gaspetto_car
 
-echo "Building GaspettoBox firmware for emu-pc..."
-$CXX $CXXFLAGS \
-"$PROJECT_ROOT/soft/emu-pc/arduino_framework/Arduino.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/EventQueue.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/TimeredEventQueue.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/ProcessingState.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/IdleState.cpp" \
--DLOW_POWER_MODE=1 \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_box/GaspettoBox.cpp" \
--I "$PROJECT_ROOT/soft/emu-pc/arduino_framework" \
--I "$PROJECT_ROOT/soft/emu-pc/state_machine_framework" \
--I "$PROJECT_ROOT/soft/emu-pc/gaspetto_box" \
--o "$PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
-echo "Build complete. Output file: $PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
-echo "Removing output file..."
-rm $PROJECT_ROOT/soft/emu-pc/gaspetto_box/main
+if [ $? -ne 0 ]; then
+    echo "GaspettoCar build failed!" >&2
+    echo "Cleaning up build directory..."
+    rm -rf "$BUILD_DIR"
+    exit 1
+fi
 
-echo "Building GaspettoCar firmware for emu-pc..."
-$CXX $CXXFLAGS  \
-"$PROJECT_ROOT/soft/emu-pc/arduino_framework/Arduino.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/EventQueue.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/state_machine_framework/TimeredEventQueue.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/ProcessingState.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/IdleState.cpp" \
-"$PROJECT_ROOT/soft/emu-pc/gaspetto_car/GaspettoCar.cpp" \
--I "$PROJECT_ROOT/soft/emu-pc/arduino_framework" \
--I "$PROJECT_ROOT/soft/emu-pc/state_machine_framework" \
--I "$PROJECT_ROOT/soft/emu-pc/gaspetto_car" \
--o "$PROJECT_ROOT/soft/emu-pc/gaspetto_car/main"
-echo "Build complete. Output file: $PROJECT_ROOT/soft/emu-pc/gaspetto_box/main"
-echo "Removing output file..."
-rm $PROJECT_ROOT/soft/emu-pc/gaspetto_car/main
+echo "All targets built successfully."
+
+# Clean up everything
+echo "Removing all build outputs and directories..."
+cd "$EMU_PC_DIR"
+rm -rf "$BUILD_DIR"
+
+echo "Build verification complete. All outputs cleaned."
