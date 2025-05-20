@@ -1,7 +1,6 @@
 #include "MotorController.h"
 
 #include "Arduino.h"
-#include "GaspettoCar.h"
 #include "State.h"
 
 MotorController::MotorController()
@@ -96,13 +95,11 @@ void MotorController::stopMotorLeft() const
     analogWrite(MOTOR_LEFT_PIN_B, 0);
 }
 
-bool MotorController::isTargetReached(StateId currentStateId)
+bool MotorController::isTargetReached()
 {
     bool right_reached = motor_right_pulse_count >= target_pulses_right;
     bool left_reached = motor_left_pulse_count >= target_pulses_left;
 
-    if (currentStateId != StateId::PROCESSING)
-        return true;
     if (right_reached)
         stopMotorRight();
     if (left_reached)

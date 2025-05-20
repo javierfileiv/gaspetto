@@ -34,10 +34,11 @@ public:
             return "NONE";
         case EventId::TIMER_ELAPSED:
             return "TIMER_ELAPSED";
-        case EventId::NRF_IRQ:
-            return "NRF_IRQ";
+        case EventId::ACTION:
+            return "ACTION";
         case EventId::BUTTON_PRESSED:
             return "BUTTON_PRESSED";
+
         case EventId::MAX_EVENT_ID:
             return "MAX_EVENT_ID";
         default:

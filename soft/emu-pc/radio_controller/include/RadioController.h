@@ -10,14 +10,18 @@ enum class RadioEventId : uint8_t { RADIO_RX, RADIO_TX };
 
 class RadioController {
 public:
-    RadioController(EventQueue *gaspettoQueue);
-    void process_radio();
-    void send_action(uint8_t action);
+    RadioController(EventQueue *gaspettoQueue, const uint8_t writing_addr[5],
+                    const uint8_t reading_addr[5]);
+    void Init();
+    void ProcessRadio();
+    void SendEvent(Event evt);
     EventQueue *getRadioQueue();
 
 private:
+    uint8_t writing_addr[5];
+    uint8_t reading_addr[5];
     EventQueue radioQueue;
-    EventQueue *gaspettoCarQueue;
+    EventQueue *gaspettoQueue;
 };
 
 #endif // RADIO_CONTROLLER_H

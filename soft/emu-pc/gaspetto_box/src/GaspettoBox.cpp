@@ -21,7 +21,7 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         if (!eventQueue->full()) {
             eventQueue->enqueue(evt);
             Serial.println("Exiting low-power mode...\n");
-            lowPowerMode = false; /*  Wake the system. */
+            lowPowerMode = false; /*  Wake the system up. */
         } else {
             Serial.println("Event queue is full! Unable to enqueue event.\n");
         }

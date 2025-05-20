@@ -6,6 +6,7 @@
 #include "ProcessingState.h"
 #include "RadioController.h"
 #include "TimeredEventQueue.h"
+#include "radio_controller/defs.h"
 
 #include <cstdint>
 
@@ -17,13 +18,14 @@ const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
 const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
 const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
 
+EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
-EventQueue eventQueue;
 TimeredEventQueue timeredEventQueue;
 MotorController &motorController = MotorController::getInstance();
-GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, StateId::IDLE,
-                         &motorController);
+RadioController radioControllerCar(&eventQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
+GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, &motorController,
+                         &radioControllerCar);
 
 #ifndef ARDUINO
 void enqueue_random_commands(const uint8_t num_events)
@@ -33,7 +35,7 @@ void enqueue_random_commands(const uint8_t num_events)
     for (uint8_t i = 0; i < num_events; ++i) {
         const CommandId command =
                 static_cast<CommandId>(rand() % static_cast<uint8_t>(CommandId::MAX_COMMAND_ID));
-        const Event event(EventId::NRF_IRQ, command); /* Random event*/
+        const Event event(EventId::ACTION, command); /* Random event*/
         gaspetto_car.postEvent(event);
     }
 }
@@ -41,7 +43,7 @@ void enqueue_random_commands(const uint8_t num_events)
 
 void ISR(void)
 {
-#ifndef ARDUINO
+#if !defined(ARDUINO) && defined(NRF_IRQ) && defined(USE_RADIO_CONTROLLER)
     Event evt = getEvent();
     gaspetto_car.postEvent(evt);
 #endif
@@ -53,27 +55,28 @@ void setup()
     Serial.println("Gaspetto Car Initialized");
     Serial.println("Starting up...\n");
     /* Initialize the GaspettoCar state machine. */
-    gaspetto_car.Init();
+    gaspetto_car.Init(StateId::IDLE);
     /* Initialize the motor controller. */
     motorController.setPins(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
                             MOTOR_RIGHT_PIN_B, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN);
+#ifdef USE_RADIO_CONTROLLER
 #ifdef NRF_IRQ
     /* Set up ISR for NRF IRQ. */
     attachInterrupt(digitalPinToInterrupt(NRF_IRQ_PIN), ISR, RISING);
+#endif /* NRF_IRQ */
 #else
-    timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD));
-    timeredEventQueue.scheduleEventDelayed(4000,
-                                           Event(EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD));
-    timeredEventQueue.scheduleEventDelayed(10000, Event(EventId::NRF_IRQ, CommandId::MOTOR_RIGHT));
-    timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
-    timeredEventQueue.scheduleEventDelayed(2000, Event(EventId::NRF_IRQ, CommandId::MOTOR_LEFT));
-    timeredEventQueue.scheduleEventDelayed(17000, Event(EventId::NRF_IRQ, CommandId::MOTOR_STOP));
-#endif
+    timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::ACTION, CommandId::MOTOR_FORWARD));
+    timeredEventQueue.scheduleEventDelayed(4000, Event(EventId::ACTION, CommandId::MOTOR_BACKWARD));
+    timeredEventQueue.scheduleEventDelayed(10000, Event(EventId::ACTION, CommandId::MOTOR_RIGHT));
+    timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+    timeredEventQueue.scheduleEventDelayed(2000, Event(EventId::ACTION, CommandId::MOTOR_LEFT));
+    timeredEventQueue.scheduleEventDelayed(17000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+#endif /* USE_RADIO_CONTROLLER */
 }
 
 void loop()
 {
-    //     radioController.process_radio();
+    radioControllerCar.ProcessRadio();
     gaspetto_car.processNextEvent();
     timeredEventQueue.processEvents(gaspetto_car);
 }
