@@ -3,11 +3,12 @@
 #include "ActiveObject.h"
 #include "Arduino.h"
 #include "MotorController.h"
+#include "RadioController.h"
 #include "State.h"
 
 #include <cstdint>
 
-GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state,
+GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue,
                          MotorController *motorController, RadioController *radioController)
         : ActiveObject(queue, nullptr)
         , motorController(motorController)
@@ -15,16 +16,18 @@ GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue, StateId
 {
     InitMachine(StateId::IDLE, idle);
     InitMachine(StateId::PROCESSING, running);
-    SetInitialState(initial_state);
 }
 
-void GaspettoCar::Init()
+void GaspettoCar::Init(StateId initial_state)
 {
-    ActiveObject::Init();
     if (motorController) {
         motorController->InitMotorPins();
         motorController->InitSpeedSensor();
     }
+    if (radioController)
+        radioController->Init();
+    SetInitialState(initial_state);
+    ActiveObject::Init();
 }
 
 void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
@@ -53,9 +56,9 @@ void GaspettoCar::stopMotorLeft()
 
 bool GaspettoCar::isTargetReached()
 {
-    if (!motorController)
+    if (!motorController || currentStateId == StateId::IDLE)
         return true;
-    return motorController->isTargetReached(currentStateId);
+    return motorController->isTargetReached();
 }
 
 int GaspettoCar::postEvent(Event evt)

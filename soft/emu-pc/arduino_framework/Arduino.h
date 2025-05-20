@@ -15,6 +15,8 @@ extern SerialEmulator Serial;
 #define PB1 1
 #define PB10 10
 #define PB11 11
+#define PB_15 15
+#define PIN_A4 4
 #define RISING 0
 #define FALLING 1
 #define LOW 0
@@ -41,7 +43,9 @@ extern SerialEmulator Serial;
 #define analogWriteFrequency(freq) \
     do {                           \
     } while (0)
-
+#define printf_begin() \
+    do {               \
+    } while (0)
 unsigned long millis(void);
 void enterLowPowerMode(void);
 Event getEvent(void);

@@ -22,7 +22,7 @@ public:
                   bool forward_motor_right, uint8_t motor_right_speed, uint8_t distance_cm_right);
     void stopMotorRight() const;
     void stopMotorLeft() const;
-    bool isTargetReached(StateId currentStateId);
+    bool isTargetReached(void);
     void setPins(int lA, int lB, int rA, int rB, int sL, int sR);
 
 private:

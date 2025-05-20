@@ -3,9 +3,7 @@
 #include "ActiveObject.h"
 #include "Arduino.h"
 #include "EventQueue.h"
-#include "MotorController.h"
 #include "ProcessingState.h"
-#include "RadioController.h"
 #include "State.h"
 
 #ifndef ARDUINO
@@ -27,13 +25,16 @@
     } while (0)
 #endif
 
+class MotorController;
+class RadioController;
+
 class GaspettoCar : public ActiveObject {
 public:
-    GaspettoCar(State *idle, State *running, EventQueue *queue, StateId initial_state,
+    GaspettoCar(State *idle, State *running, EventQueue *queue,
                 MotorController *motorController = nullptr,
                 RadioController *radioController = nullptr);
 
-    void Init();
+    void Init(StateId initial_state);
     /* Set motor directions. */
     void SetMotor(bool forward_motor_left, uint8_t motor_left_speed, uint8_t distance_cm_left,
                   bool forward_motor_right, uint8_t motor_right_speed, uint8_t distance_cm_right);

@@ -7,7 +7,14 @@
 #include "Arduino.h"
 #endif
 
-enum class EventId : uint8_t { NONE, TIMER_ELAPSED, NRF_IRQ, BUTTON_PRESSED, MAX_EVENT_ID };
+enum class EventId : uint8_t {
+    NONE,
+    TIMER_ELAPSED,
+    ACTION,
+    BUTTON_PRESSED,
+    RADIO_TX,
+    MAX_EVENT_ID
+};
 enum class CommandId : uint8_t {
     NONE,
     MOTOR_FORWARD,
@@ -26,7 +33,7 @@ static inline const char *eventIdToString(EventId id)
         return "NONE";
     case EventId::TIMER_ELAPSED:
         return "TIMER_ELAPSED";
-    case EventId::NRF_IRQ:
+    case EventId::ACTION:
         return "NRF_IRQ";
     case EventId::BUTTON_PRESSED:
         return "BUTTON_PRESSED";
@@ -59,6 +66,11 @@ static inline const char *commandIdToString(CommandId id)
     }
 }
 
+struct __attribute__((packed)) EventPacket {
+    uint8_t eventId;
+    uint8_t commandId;
+};
+
 class Event {
 public:
     Event(EventId eventId = EventId::NONE, CommandId command = CommandId::NONE)
@@ -82,6 +94,20 @@ public:
     void setCommand(CommandId cmd)
     {
         command = cmd;
+    }
+    void toPacket(EventPacket &packet) const
+    {
+        packet.eventId = static_cast<uint8_t>(eventId);
+        packet.commandId = static_cast<uint8_t>(command);
+    }
+    static Event fromPacket(const EventPacket &packet)
+    {
+        return Event(static_cast<EventId>(packet.eventId),
+                     static_cast<CommandId>(packet.commandId));
+    }
+    static constexpr std::size_t packetSize()
+    {
+        return sizeof(EventPacket);
     }
 
 protected:

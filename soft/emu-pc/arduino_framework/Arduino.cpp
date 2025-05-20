@@ -18,6 +18,8 @@ std::atomic<bool> lowPowerMode;
 void (*userFunc_)(void) = nullptr;
 MotorEvent event;
 MotorEvent evt_copy;
+EventPacket pkt;
+
 /*  Simulated millis function. */
 unsigned long millis(void)
 {
@@ -64,34 +66,67 @@ static void keyboardInput(void)
         if (read(STDIN_FILENO, &ch, 1) > 0) {
             event = MotorEvent(EventId::NONE, CommandId::NONE); /*  Reset event. */
             switch (ch) {
+#ifdef USE_RADIO_CONTROLLER
+            case 'E':
+            case 'e':
+                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
+                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
+                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
+                break;
+            case 'D':
+            case 'd':
+                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
+                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_BACKWARD);
+                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
+                break;
+            case 'S':
+            case 's':
+                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
+                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_LEFT);
+                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
+                break;
+            case 'F':
+            case 'f':
+                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
+                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_RIGHT);
+                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
+                break;
+            case 'C':
+            case 'c':
+                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
+                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
+                break;
+#else
             case 'q':
             case 'Q':
                 running = false; /*  Stop the program. */
                 break;
             case 'F':
             case 'f':
-                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_FORWARD);
+                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_FORWARD);
                 break;
             case 'b':
             case 'B':
-                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_BACKWARD);
+                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_BACKWARD);
                 break;
             case 'l':
             case 'L':
-                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_LEFT);
+                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_LEFT);
                 break;
             case 'r':
             case 'R':
-                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_RIGHT);
+                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_RIGHT);
                 break;
             case 's':
             case 'S':
-                event = MotorEvent(EventId::NRF_IRQ, CommandId::MOTOR_STOP);
+                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_STOP);
                 break;
             case 'p':
             case 'P':
                 event = MotorEvent(EventId::BUTTON_PRESSED, CommandId::NONE);
                 break;
+#endif
             }
             ISR();
             lowPowerMode.store(false);

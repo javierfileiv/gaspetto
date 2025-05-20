@@ -7,7 +7,7 @@
 #include <cstdint>
 #endif
 
-#define QUEUE_SIZE 20 /*  Define the size of the queue. */
+#define QUEUE_SIZE 3 /*  Define the size of the queue. */
 
 class EventQueue {
 public:
@@ -34,7 +34,7 @@ public:
             return "NONE";
         case EventId::TIMER_ELAPSED:
             return "TIMER_ELAPSED";
-        case EventId::NRF_IRQ:
+        case EventId::ACTION:
             return "NRF_IRQ";
         case EventId::BUTTON_PRESSED:
             return "BUTTON_PRESSED";
