@@ -1,21 +1,8 @@
 #include "MotorController.h"
 
 #include "Arduino.h"
-#include "State.h"
 
-MotorController::MotorController()
-        : motor_right_pulse_count(0)
-        , motor_left_pulse_count(0)
-        , target_pulses_right(0)
-        , target_pulses_left(0)
-        , MOTOR_LEFT_PIN_A(-1)
-        , MOTOR_LEFT_PIN_B(-1)
-        , MOTOR_RIGHT_PIN_A(-1)
-        , MOTOR_RIGHT_PIN_B(-1)
-        , SPEED_SENSOR_LEFT_PIN(-1)
-        , SPEED_SENSOR_RIGHT_PIN(-1)
-{
-}
+MotorController::MotorController() = default;
 
 void MotorController::setPins(int lA, int lB, int rA, int rB, int sL, int sR)
 {
@@ -50,6 +37,7 @@ void MotorController::ResetCounterMotorRight()
     motor_right_pulse_count = 0;
     target_pulses_right = 0;
 }
+
 void MotorController::ResetCounterMotorLeft()
 {
     motor_left_pulse_count = 0;

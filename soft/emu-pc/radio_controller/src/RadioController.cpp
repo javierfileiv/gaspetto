@@ -21,7 +21,11 @@ RadioController::RadioController(EventQueue *gaspettoQueue, const uint8_t writin
         this->writing_addr[i] = writing_addr[i];
         this->reading_addr[i] = reading_addr[i];
     }
-    Serial.println(F("RadioController initialized."));
+}
+
+void RadioController::Init()
+{
+    Serial.println(F("Initializing RadioController."));
     Serial.print(F("Writing address: "));
     for (int i = 0; i < 5; i++) {
         Serial.print(writing_addr[i], HEX);
@@ -34,10 +38,6 @@ RadioController::RadioController(EventQueue *gaspettoQueue, const uint8_t writin
         Serial.print(F(" "));
     }
     Serial.println();
-}
-
-void RadioController::Init()
-{
     if (!radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
@@ -48,7 +48,6 @@ void RadioController::Init()
     radio.setPayloadSize(Event::packetSize());
     radio.openWritingPipe(writing_addr);
     radio.openReadingPipe(1, reading_addr);
-    printf_begin();
     radio.printDetails();
     radio.printPrettyDetails();
 #if NFR_IRQ
@@ -82,8 +81,8 @@ void RadioController::ProcessRadio()
         /* Post to active object queue. */
         gaspettoQueue->enqueue(evt);
     }
-    /* TX processing. */
-    while (!radioQueue.IsEmpty()) {
+    /* TX processing. Only send the first one. */
+    if (!radioQueue.IsEmpty()) {
         EventPacket packet;
         Event evt;
 

@@ -105,7 +105,7 @@ public:
         return Event(static_cast<EventId>(packet.eventId),
                      static_cast<CommandId>(packet.commandId));
     }
-    static constexpr std::size_t packetSize()
+    static constexpr uint8_t packetSize()
     {
         return sizeof(EventPacket);
     }

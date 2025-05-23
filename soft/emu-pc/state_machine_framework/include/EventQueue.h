@@ -7,7 +7,7 @@
 #include <cstdint>
 #endif
 
-#define QUEUE_SIZE 3 /*  Define the size of the queue. */
+#define QUEUE_SIZE 10 /*  Define the size of the queue. */
 
 class EventQueue {
 public:

@@ -5,7 +5,7 @@
 #include "Arduino.h"
 #include "Event.h" /*  Assuming you have your ActiveObject definition. */
 
-#define MAX_TIMED_EVENT_NODES 15 /*  Define a maximum number of scheduled events. */
+#define MAX_TIMED_EVENT_NODES 10 /*  Define a maximum number of scheduled events. */
 
 struct TimedEventNode {
     uint32_t triggerTimeMs;

@@ -1,6 +1,11 @@
 #pragma once
 #include <iostream>
+#include <mutex>
+#include <queue>
 #include <string>
+#include <sys/select.h>
+#include <termios.h>
+#include <unistd.h>
 
 enum SerialBase { DEC = 10, HEX = 16, OCT = 8, BIN = 2 };
 
@@ -52,6 +57,17 @@ public:
     {
         std::cout << "Serial started at baud rate: " << baud << std::endl;
     }
+
+    int available();
+    int read();
+    SerialEmulator();
+    ~SerialEmulator();
+
+private:
+    void fillBuffer();
+    std::queue<char> input_buffer;
+    std::mutex input_mutex;
+    struct termios oldt, newt;
 };
 
 /*  Create a global instance to mimic Arduino's Serial object. */
