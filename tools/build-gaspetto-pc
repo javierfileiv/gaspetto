@@ -3,7 +3,7 @@
 # This script builds the GaspettoBox and GaspettoCar firmware for the emu-pc.
 # It now uses the CMake build system and cleans up after itself.
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
 BUILD_DIR="$EMU_PC_DIR/build"
@@ -23,30 +23,41 @@ echo "Using $NUM_CORES cores for compilation"
 # Configure with CMake
 echo "Configuring project with CMake..."
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
-      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      ..
+	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
+	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+	-DGASPETTO_BOX=ON -DGASPETTO_CAR=ON -DNRF_SENDER=ON \
+	..
 
 # Build each target separately
 echo "Building GaspettoBox..."
 cmake --build . --parallel $NUM_CORES --target gaspetto_box
 
 if [ $? -ne 0 ]; then
-    echo "GaspettoBox build failed!" >&2
-    echo "Cleaning up build directory..."
-    cd "$EMU_PC_DIR"
-    rm -rf "$BUILD_DIR"
-    exit 1
+	echo "GaspettoBox build failed!" >&2
+	echo "Cleaning up build directory..."
+	cd "$EMU_PC_DIR"
+	rm -rf "$BUILD_DIR"
+	exit 1
 fi
 
 echo "Building GaspettoCar..."
 cmake --build . --parallel $NUM_CORES --target gaspetto_car
 
 if [ $? -ne 0 ]; then
-    echo "GaspettoCar build failed!" >&2
-    echo "Cleaning up build directory..."
-    rm -rf "$BUILD_DIR"
-    exit 1
+	echo "GaspettoCar build failed!" >&2
+	echo "Cleaning up build directory..."
+	rm -rf "$BUILD_DIR"
+	exit 1
+fi
+
+echo "Building NRF Sender..."
+cmake --build . --parallel $NUM_CORES --target nrf_sender
+
+if [ $? -ne 0 ]; then
+	echo "Send NRF Event build failed!" >&2
+	echo "Cleaning up build directory..."
+	rm -rf "$BUILD_DIR"
+	exit 1
 fi
 
 echo "All targets built successfully."

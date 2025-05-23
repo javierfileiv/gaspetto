@@ -21,6 +21,11 @@ if(CCACHE_FOUND)
   message(STATUS "Using ccache for faster builds")
 endif()
 
+# Project options for conditional builds
+option(GASPETTO_CAR "Build Gaspetto Car target" OFF)
+option(GASPETTO_BOX "Build Gaspetto Box target" OFF)
+option(NRF_SENDER "Build NRF Sender target" OFF)
+
 # Define common headers interface library
 add_library(common_headers INTERFACE)
 target_include_directories(
@@ -28,12 +33,19 @@ target_include_directories(
 )
 
 # Define global compile definitions before adding subdirectories
-add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE DEBUG_GASPETTO NRF_LOG)
+add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG)
 
-# Add subdirectories in correct dependency order
 add_subdirectory(arduino_framework)
 add_subdirectory(state_machine_framework)
 add_subdirectory(motor_controller)
 add_subdirectory(radio_controller)
-add_subdirectory(gaspetto_car)
-add_subdirectory(gaspetto_box)
+
+if(GASPETTO_CAR)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/targets/gaspetto_car)
+endif()
+if(GASPETTO_BOX)
+  add_subdirectory(targets/gaspetto_box)
+endif()
+if(NRF_SENDER)
+  add_subdirectory(targets/nrf_sender)
+endif()

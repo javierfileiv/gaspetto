@@ -1,102 +1,234 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "CMake Configure",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "-S", "${workspaceFolder}",
-                "-B", "${workspaceFolder}/build"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Debug Configure Car",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "-S", "${workspaceFolder}",
-                "-B", "${workspaceFolder}/build-car-debug",
-                "-DCMAKE_BUILD_TYPE=Debug"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Debug Configure Box",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "-S", "${workspaceFolder}",
-                "-B", "${workspaceFolder}/build-box-debug",
-                "-DCMAKE_BUILD_TYPE=Debug"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Build Gaspetto Car",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "${workspaceFolder}/build", "--target", "gaspetto_car"
-            ],
-            "dependsOn": ["CMake Configure"],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Build Gaspetto Box",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "${workspaceFolder}/build", "--target", "gaspetto_box"
-            ],
-            "dependsOn": ["CMake Configure"],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Build Gaspetto Car Debug",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "${workspaceFolder}/build-car-debug", "--target", "gaspetto_car"
-            ],
-            "dependsOn": ["CMake Debug Configure Car"],
-            "group": { "kind": "build", "isDefault": false },
-            "presentation": { "clear": true },
-            "problemMatcher": []
-        },
-        {
-            "label": "CMake Build Gaspetto Box Debug",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build", "${workspaceFolder}/build-box-debug", "--target", "gaspetto_box"
-            ],
-            "dependsOn": ["CMake Debug Configure Box"],
-            "group": { "kind": "build", "isDefault": false },
-            "presentation": { "clear": true },
-            "problemMatcher": []
-        }
-    ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "CMake Release Configure Car",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-car",
+				"-DCMAKE_BUILD_TYPE=Release",
+				"-DGASPETTO_CAR=ON"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Release Configure Box",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-box",
+				"-DCMAKE_BUILD_TYPE=Release",
+				"-DGASPETTO_BOX=ON"
+			],
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Release Configure NRF sender",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-nrf",
+				"-DCMAKE_BUILD_TYPE=Release",
+				"-DNRF_SENDER=ON"
+			],
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Build Gaspetto Car",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-car",
+				"--target",
+				"gaspetto_car"
+			],
+			"dependsOn": [
+				"CMake Release Configure Car"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "CMake Build Gaspetto Box",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-box",
+				"--target",
+				"gaspetto_box"
+			],
+			"dependsOn": [
+				"CMake Release Configure Box"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "CMake Build NRF Sender",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-nrf",
+				"--target",
+				"nrf_sender"
+			],
+			"dependsOn": [
+				"CMake Release Configure NRF sender"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "CMake Debug Configure Car",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-car-debug",
+				"-DCMAKE_BUILD_TYPE=Debug",
+				"-DGASPETTO_CAR=ON"
+			],
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Debug Configure Box",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-box-debug",
+				"-DCMAKE_BUILD_TYPE=Debug",
+				"-DGASPETTO_BOX=ON"
+			],
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Debug Configure NRF sender",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-nrf-debug",
+				"-DCMAKE_BUILD_TYPE=Debug",
+				"-DNRF_SENDER=ON"
+			],
+			"problemMatcher": [],
+			"hide": true
+		},
+		{
+			"label": "CMake Debug Gaspetto Car",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-car-debug",
+				"--target",
+				"gaspetto_car"
+			],
+			"dependsOn": [
+				"CMake Debug Configure Car"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "CMake Debug Gaspetto Box",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-box-debug",
+				"--target",
+				"gaspetto_box"
+			],
+			"dependsOn": [
+				"CMake Debug Configure Box"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "CMake Debug NRF Sender",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-nrf-debug",
+				"--target",
+				"nrf_sender"
+			],
+			"dependsOn": [
+				"CMake Debug Configure NRF sender"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+	]
 }

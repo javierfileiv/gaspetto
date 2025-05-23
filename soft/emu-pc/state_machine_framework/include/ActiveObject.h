@@ -18,6 +18,7 @@ public:
     ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
             : eventQueue(queue)
             , timeredEventQueue(timeredQueue)
+            , states{}
     {
     }
 
@@ -26,19 +27,13 @@ public:
         /* Initialize state. */
         states[static_cast<uint8_t>(state_id)] = state;
         /* Set up state machine references. */
-        for (int i = 0; i < static_cast<uint8_t>(StateId::MAX_STATE_ID); i++) {
-            if (states[i] != nullptr) {
-                states[i]->setMachine(this);
-            }
-        }
-    }
-    void SetInitialState(StateId state)
-    {
-        currentStateId = state;
+        if (states[static_cast<uint8_t>(state_id)] != nullptr)
+            states[static_cast<uint8_t>(state_id)]->setMachine(this);
     }
 
     void Init()
     {
+        currentStateId = _initialStateId;
         states[static_cast<int>(currentStateId)]->enter();
     }
 
@@ -57,22 +52,11 @@ public:
         return states[static_cast<uint8_t>(currentStateId)];
     }
 
-    virtual int postEvent(Event evt)
-    {
-        Serial.print(F("Default postEvent() empty implementation called.\n"));
-        return 0;
-        ;
-    }
+    virtual int postEvent(Event evt) = 0;
 
-    virtual void processNextEvent()
-    {
-        Serial.print(F("Default processNextEvent() empty implementation called.\n"));
-    };
+    virtual void processNextEvent() = 0;
 
-    virtual void enterLowPowerMode()
-    {
-        Serial.print(F("Default enterLowPowerMode() empty implementation called.\n"));
-    };
+    virtual void enterLowPowerMode() = 0;
 
     EventQueue *getEventQueue()
     {
@@ -89,6 +73,7 @@ protected:
     TimeredEventQueue *timeredEventQueue;
     State *states[static_cast<uint8_t>(StateId::MAX_STATE_ID)];
     StateId currentStateId;
+    StateId _initialStateId;
 };
 
 #endif // ACTIVE_OBJECT_H

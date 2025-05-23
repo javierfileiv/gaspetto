@@ -1,26 +1,14 @@
-#include "GaspettoCar_ino.h"
-#include "MotorEvent.h"
 #include "Serial.h"
 
 #include <atomic>
-#include <iostream>
+#include <chrono>
 #include <thread>
-#include <unistd.h>
 
-extern "C" {
-#include <termios.h>
-}
-
-/*  Global variables. */
-std::atomic<unsigned long> millisCounter(0);
-std::atomic<bool> running(true);
+std::atomic<unsigned long> millisCounter{ 0 };
 std::atomic<bool> lowPowerMode;
-void (*userFunc_)(void) = nullptr;
-MotorEvent event;
-MotorEvent evt_copy;
-EventPacket pkt;
 
 /*  Simulated millis function. */
+extern "C" {
 unsigned long millis(void)
 {
     return millisCounter.load();
@@ -31,113 +19,48 @@ long map(long x, long in_min, long in_max, long out_min, long out_max)
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-/*  Millis simulation thread. */
-static void emu_millisThread()
+void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode)
 {
-    while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1)); /*  Increment every
-                                                                      millisecond. */
-        millisCounter.fetch_add(1);
-    }
 }
 
-void attachInterrupt(uint8_t interruptNum, void (*userFunc)(void), uint8_t mode)
+void pinMode(int pin, int mode)
 {
-    userFunc_ = userFunc;
 }
 
-Event getEvent(void)
+void analogWrite(int pin, int value)
 {
-    evt_copy = event;
-    return evt_copy;
 }
 
-static void keyboardInput(void)
+int digitalPinToInterrupt(int pin)
 {
-    struct termios oldt, newt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-
-    char ch;
-    bool keyPressed = false;
-    while (true) {
-        if (read(STDIN_FILENO, &ch, 1) > 0) {
-            event = MotorEvent(EventId::NONE, CommandId::NONE); /*  Reset event. */
-            switch (ch) {
-#ifdef USE_RADIO_CONTROLLER
-            case 'E':
-            case 'e':
-                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
-                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-                break;
-            case 'D':
-            case 'd':
-                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_BACKWARD);
-                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-                break;
-            case 'S':
-            case 's':
-                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_LEFT);
-                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-                break;
-            case 'F':
-            case 'f':
-                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_RIGHT);
-                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-                break;
-            case 'C':
-            case 'c':
-                pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-                pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_STOP);
-                radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-                break;
-#else
-            case 'q':
-            case 'Q':
-                running = false; /*  Stop the program. */
-                break;
-            case 'F':
-            case 'f':
-                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_FORWARD);
-                break;
-            case 'b':
-            case 'B':
-                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_BACKWARD);
-                break;
-            case 'l':
-            case 'L':
-                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_LEFT);
-                break;
-            case 'r':
-            case 'R':
-                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_RIGHT);
-                break;
-            case 's':
-            case 'S':
-                event = MotorEvent(EventId::ACTION, CommandId::MOTOR_STOP);
-                break;
-            case 'p':
-            case 'P':
-                event = MotorEvent(EventId::BUTTON_PRESSED, CommandId::NONE);
-                break;
-#endif
-            }
-            ISR();
-            lowPowerMode.store(false);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(250)); /*  Polling delay. */
-    }
-
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); /*  Restore terminal settings. */
+    return pin; // Matches the macro definition
 }
 
-void enterLowPowerMode(void)
+void analogWriteFrequency(int freq)
+{
+    // Empty implementation
+}
+
+void printf_begin()
+{
+    // Empty implementation
+}
+
+int digitalRead(int pin)
+{
+    return 1;
+}
+
+void delay(int ms)
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
+void digitalWrite(int pin, int value)
+{
+}
+
+void SwitchToLowPowerMode(void)
 {
     Serial.println("Entering low-power mode...\n");
 #ifndef ARDUINO
@@ -149,26 +72,4 @@ void enterLowPowerMode(void)
     }
 #endif
 }
-
-int main()
-{
-    Serial.println("Starting simulation...\n");
-    /*  Start the simulation threads. */
-    std::thread millisSim(emu_millisThread);
-    std::thread keyboardSim(keyboardInput);
-    /*  Setuo the system. */
-    setup();
-    /*  Main loop. */
-    while (running) {
-        loop();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); /*  Add a small delay to
-                                                                       prevent CPU overuse.
-                                                                     */
-    }
-
-    /*  Stop the threads. */
-    running = false;
-    millisSim.join();
-    keyboardSim.join();
-    return 0;
-}
+} // extern "C"

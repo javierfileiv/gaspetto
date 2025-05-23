@@ -25,8 +25,10 @@ public:
     bool isTargetReached(void);
     void setPins(int lA, int lB, int rA, int rB, int sL, int sR);
 
-private:
+protected:
     MotorController();
+
+private:
     MotorController(const MotorController &) = delete;
     MotorController &operator=(const MotorController &) = delete;
     static void left_motor_speed_sensor_irq();

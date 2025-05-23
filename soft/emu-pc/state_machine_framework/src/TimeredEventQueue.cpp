@@ -19,7 +19,7 @@ bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
     int8_t newNodeIndex = allocateNode();
     if (newNodeIndex == -1)
         return false; /*  Queue is full. */
-#ifdef DEBUG_GASPETTO
+#ifdef GASPETTO_LOG
     Serial.print("scheduleEvent(): ");
     Serial.print(eventIdToString(evt.getEventId()));
     Serial.print(", ");

@@ -5,10 +5,10 @@
             "name": "Debug Gaspetto Car Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-car-debug/gaspetto_car/gaspetto_car",
+            "program": "${workspaceFolder}/build-car-debug/targets/gaspetto_car/gaspetto_car",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build-car-debug/gaspetto_car",
+            "cwd": "${workspaceFolder}/build-car-debug/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -19,16 +19,16 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "CMake Build Gaspetto Car Debug"
+            "preLaunchTask": "CMake Debug Configure Car"
         },
         {
             "name": "Debug Gaspetto Box Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-box-debug/gaspetto_box/gaspetto_box",
+            "program": "${workspaceFolder}/build-box-debug/targets/gaspetto_box/gaspetto_box",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build-box-debug/gaspetto_box",
+            "cwd": "${workspaceFolder}/build-box-debug/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -39,7 +39,27 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "CMake Build Gaspetto Box Debug"
-        }
+            "preLaunchTask": "CMake Debug Configure Box"
+        },
+        {
+            "name": "Debug NRF Sender Program",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build-nrf-debug/targets/nrf_sender/nrf_sender",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build-nrf-debug",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake Debug NRF Sender"
+        },
     ]
 }
