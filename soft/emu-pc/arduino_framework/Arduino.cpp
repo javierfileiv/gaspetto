@@ -33,17 +33,17 @@ void analogWrite(int pin, int value)
 
 int digitalPinToInterrupt(int pin)
 {
-    return pin; // Matches the macro definition
+    return pin; /* Matches the macro definition. */
 }
 
 void analogWriteFrequency(int freq)
 {
-    // Empty implementation
+    /* Empty implementation. */
 }
 
 void printf_begin()
 {
-    // Empty implementation
+    /* Empty implementation. */
 }
 
 int digitalRead(int pin)
@@ -66,10 +66,9 @@ void SwitchToLowPowerMode(void)
 #ifndef ARDUINO
     lowPowerMode.store(true);
     while (lowPowerMode.load()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 100 }); /*  Simulate
-                                                                          low-power sleep.
-                                                                        */
+        /* Simulate low power mode by sleeping. */
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
     }
 #endif
 }
-} // extern "C"
+}

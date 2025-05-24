@@ -7,5 +7,5 @@ target_include_directories(radio_controller_itf INTERFACE ${CMAKE_CURRENT_SOURCE
 target_link_libraries(
   radio_controller
   PUBLIC radio_controller_itf
-  PRIVATE arduino_framework state_machine_framework
+  PRIVATE arduino_framework_itf state_machine_framework
 )

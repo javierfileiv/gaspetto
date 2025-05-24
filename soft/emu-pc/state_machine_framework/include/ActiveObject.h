@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "EventQueue.h"
 #include "State.h"
-#include "TimeredEventQueue.h" // Ensure this header file exists and defines TimeredEventQueue
+#include "TimeredEventQueue.h" /* Ensure this header file exists and defines TimeredEventQueue. */
 
 #ifndef ARDUINO
 #include <cstdint>
@@ -76,4 +76,4 @@ protected:
     StateId _initialStateId;
 };
 
-#endif // ACTIVE_OBJECT_H
+#endif /* ACTIVE_OBJECT_H. */

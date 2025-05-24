@@ -4,6 +4,7 @@
 #include "IdleState.h"
 #include "MotorController.h"
 #include "ProcessingState.h"
+#include "RF24.h"
 #include "RadioController.h"
 #include "TimeredEventQueue.h"
 #include "radio_controller/defs.h"
@@ -11,19 +12,14 @@
 #include <cstdint>
 
 // const int NRF_IRQ_PIN = PB0;
-const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
-const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
-const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
-const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
-const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
-const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
-
+RF24 radio(CE_PIN, CSN_PIN);
 EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
-MotorController &motorController = MotorController::getInstance();
-RadioController radioControllerCar(&eventQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
+MotorController motorController;
+RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
+                                   gaspetto_car_pipe_name);
 GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, &motorController, nullptr);
 
 void ISR(void)
@@ -43,6 +39,7 @@ void setup()
     }
 #endif
     /* Initialize the motor controller. */
+    motorController.set_isr_instance(&motorController);
     motorController.setPins(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
                             MOTOR_RIGHT_PIN_B, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN);
     /* Initialize the GaspettoCar state machine. */

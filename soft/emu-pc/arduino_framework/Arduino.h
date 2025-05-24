@@ -1,4 +1,5 @@
 #pragma once
+#include "Arduino_pins_pc.h"
 #include "Event.h"
 #include "Serial.h"
 
@@ -8,26 +9,6 @@
 extern std::atomic<bool> lowPowerMode;
 extern std::atomic<unsigned long> millisCounter;
 extern SerialEmulator Serial;
-
-#define F(x) x
-#define PA0 0
-#define PA1 1
-#define PB0 0
-#define PB1 1
-#define PB10 10
-#define PB11 11
-#define PB_15 15
-#define PIN_A4 4
-#define RISING 0
-#define FALLING 1
-#define LOW 0
-#define HIGH 1
-#define INPUT 0
-#define INPUT_PULLUP 1
-#define OUTPUT 2
-#define INPUT_PULLDOWN 2
-#define LOW 0
-#define HIGH 1
 
 Event getEvent(void);
 

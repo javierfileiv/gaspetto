@@ -127,7 +127,7 @@
 				"-S",
 				"${workspaceFolder}",
 				"-B",
-				"${workspaceFolder}/build-car-debug",
+				"${workspaceFolder}/build-car",
 				"-DCMAKE_BUILD_TYPE=Debug",
 				"-DGASPETTO_CAR=ON"
 			],
@@ -142,7 +142,7 @@
 				"-S",
 				"${workspaceFolder}",
 				"-B",
-				"${workspaceFolder}/build-box-debug",
+				"${workspaceFolder}/build-box",
 				"-DCMAKE_BUILD_TYPE=Debug",
 				"-DGASPETTO_BOX=ON"
 			],
@@ -157,7 +157,7 @@
 				"-S",
 				"${workspaceFolder}",
 				"-B",
-				"${workspaceFolder}/build-nrf-debug",
+				"${workspaceFolder}/build-nrf",
 				"-DCMAKE_BUILD_TYPE=Debug",
 				"-DNRF_SENDER=ON"
 			],
@@ -170,7 +170,7 @@
 			"command": "cmake",
 			"args": [
 				"--build",
-				"${workspaceFolder}/build-car-debug",
+				"${workspaceFolder}/build-car",
 				"--target",
 				"gaspetto_car"
 			],
@@ -192,7 +192,7 @@
 			"command": "cmake",
 			"args": [
 				"--build",
-				"${workspaceFolder}/build-box-debug",
+				"${workspaceFolder}/build-box",
 				"--target",
 				"gaspetto_box"
 			],
@@ -214,7 +214,7 @@
 			"command": "cmake",
 			"args": [
 				"--build",
-				"${workspaceFolder}/build-nrf-debug",
+				"${workspaceFolder}/build-nrf",
 				"--target",
 				"nrf_sender"
 			],
@@ -230,5 +230,88 @@
 			},
 			"problemMatcher": []
 		},
+		{
+			"label": "CMake Configure UTest",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-S",
+				"${workspaceFolder}",
+				"-B",
+				"${workspaceFolder}/build-tests",
+				"-DCMAKE_BUILD_TYPE=Debug",
+				"-DBUILD_TESTS=ON"
+			],
+			"problemMatcher": [],
+			"hide": true,
+			"options": {
+				"env": {
+					"GMOCK_VERBOSE": "info"
+				}
+			}
+		},
+		{
+			"label": "CMake Build UTest",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${workspaceFolder}/build-tests",
+				"--target",
+				"utest"
+			],
+			"dependsOn": [
+				"CMake Configure UTest"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Run Pre Push test",
+			"type": "shell",
+			"command": "../../tools/build-gaspetto-pc",
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Run UTest",
+			"type": "shell",
+			"command": "${workspaceFolder}/build-tests/tests/utest",
+			"args": [
+				"--gtest_color=yes",
+				"--gtest_print_time=1",
+				"--gtest_catch_exceptions=0",
+				"--gtest_break_on_failure=0",
+				"--gtest_output=plain"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": false
+			},
+			"dependsOn": [
+				"CMake Build UTest"
+			],
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": [],
+			"options": {
+				"env": {
+					"GMOCK_VERBOSE": "info"
+				}
+			}
+		}
 	]
 }

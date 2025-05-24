@@ -2,20 +2,19 @@
 
 #include "Arduino.h"
 #include "Event.h"
-#include "RF24.h"
 
-#define CE_PIN PB_15
-#define CSN_PIN PIN_A4
-#define PA_LEVEL RF24_PA_LOW
-#define DATA_RATE RF24_1MBPS
+const int CE_PIN = PB_15;
+const int CSN_PIN = PIN_A4;
+const int PA_LEVEL = RF24_PA_LOW;
+const rf24_datarate_e DATA_RATE = RF24_1MBPS;
 
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
-RF24 radio(CE_PIN, CSN_PIN);
 
-RadioController::RadioController(EventQueue *gaspettoQueue, const uint8_t writing_addr[5],
-                                 const uint8_t reading_addr[5])
+RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
+                                 const uint8_t writing_addr[5], const uint8_t reading_addr[5])
         : gaspettoQueue(gaspettoQueue)
+        , _radio(radio)
 {
     for (int i = 0; i < 5; i++) {
         this->writing_addr[i] = writing_addr[i];
@@ -25,7 +24,6 @@ RadioController::RadioController(EventQueue *gaspettoQueue, const uint8_t writin
 
 void RadioController::Init()
 {
-    Serial.println(F("Initializing RadioController."));
     Serial.print(F("Writing address: "));
     for (int i = 0; i < 5; i++) {
         Serial.print(writing_addr[i], HEX);
@@ -38,36 +36,37 @@ void RadioController::Init()
         Serial.print(F(" "));
     }
     Serial.println();
-    if (!radio.begin()) {
+    if (!_radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
         }
     }
-    radio.setPALevel(PA_LEVEL);
-    radio.setDataRate(DATA_RATE);
-    radio.setPayloadSize(Event::packetSize());
-    radio.openWritingPipe(writing_addr);
-    radio.openReadingPipe(1, reading_addr);
-    radio.printDetails();
-    radio.printPrettyDetails();
+    _radio.setPALevel(PA_LEVEL);
+    _radio.setDataRate(DATA_RATE);
+    _radio.setPayloadSize(Event::packetSize());
+    _radio.openWritingPipe(writing_addr);
+    _radio.openReadingPipe(1, reading_addr);
+    _radio.printDetails();
+    _radio.printPrettyDetails();
 #if NFR_IRQ
     /* Set up interrupt for RX. */
     pinMode(NRF_IRQ, INPUT);
     attachInterrupt(digitalPinToInterrupt(NRF_IRQ), ISR, FALLING);
     radio.maskIRQ(0, 1, 1);
 #endif
-    radio.powerUp();
-    radio.startListening();
+    _radio.powerUp();
+    _radio.startListening();
 }
 
 void RadioController::ProcessRadio()
 {
     EventPacket packet;
     uint8_t pipe;
+    Serial.println(F("ProcessRadio():"));
 
     /* RX processing. */
-    if (radio.available(&pipe)) {
-        radio.read(&packet, sizeof(packet)); // fetch payload from FIFO
+    if (_radio.available(&pipe)) {
+        _radio.read(&packet, sizeof(packet)); /* Fetch payload from FIFO. */
         Serial.print(F("Received EventId:"));
         Serial.print(EventQueue::eventIdToString(static_cast<EventId>(packet.eventId)));
         Serial.print(F(" CommandId:"));
@@ -93,15 +92,15 @@ void RadioController::ProcessRadio()
         Serial.println(EventQueue::commandIdToString(evt.getCommand()));
         evt.toPacket(packet);
         /* Stop listening. */
-        radio.stopListening();
-        radio.write(&packet, sizeof(packet));
+        _radio.stopListening();
+        _radio.write(&packet, sizeof(packet));
         Serial.print(F("RadioController::ProcessRadio: Sent EventId:"));
         Serial.print(EventQueue::eventIdToString(static_cast<EventId>(packet.eventId)));
         Serial.print(F(" CommandId:"));
         Serial.print(EventQueue::commandIdToString(static_cast<CommandId>(packet.commandId)));
         Serial.println(F("."));
+        _radio.startListening();
     }
-    radio.startListening();
 }
 
 void RadioController::SendEvent(Event evt)
