@@ -1,19 +1,29 @@
-add_library(arduino_framework_impl STATIC Arduino.cpp)
+add_library(arduino_framework_itf INTERFACE)
 
 target_include_directories(
-  arduino_framework_impl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/RF24
+  arduino_framework_itf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/RF24
 )
-target_link_libraries(arduino_framework_impl PUBLIC common_headers radio_controller)
+
+add_library(arduino_framework_impl STATIC Arduino.cpp)
+target_link_libraries(
+  arduino_framework_impl PUBLIC state_machine_itf arduino_framework_itf radio_controller
+)
 
 target_sources(
-  arduino_framework_impl PRIVATE implementations/src/gaspetto_car.cpp
-                                 implementations/src/nrf_sender.cpp
+  arduino_framework_impl
+  PRIVATE implementations/src/gaspetto_car.cpp implementations/src/gaspetto_box.cpp
+          implementations/src/nrf_sender.cpp
 )
 
 add_library(
-  arduino_framework STATIC RF24/RF24.cpp Serial.cpp implementations/src/gaspetto_car.cpp
+  arduino_framework STATIC Serial.cpp implementations/src/gaspetto_car.cpp
                            implementations/src/nrf_sender.cpp
 )
+
+# Do not build emulated RF24 if testing, like that we use the mocked one.
+if(NOT BUILD_TESTS)
+  target_sources(arduino_framework PRIVATE RF24/RF24.cpp)
+endif()
 
 # Set a variable to indicate the current build target for arduino_framework
 if(GASPETTO_CAR)
@@ -34,5 +44,5 @@ target_include_directories(
 )
 
 target_link_libraries(
-  arduino_framework PUBLIC arduino_framework_impl common_headers radio_controller
+  arduino_framework PUBLIC arduino_framework_impl state_machine_itf radio_controller
 )

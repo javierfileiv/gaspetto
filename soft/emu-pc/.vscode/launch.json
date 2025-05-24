@@ -61,5 +61,25 @@
             ],
             "preLaunchTask": "CMake Debug NRF Sender"
         },
+        {
+            "name": "Debug Unit Tests (utest)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build-tests/tests/utest",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build-tests/tests",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake Build UTest"
+        }
     ]
 }

@@ -25,7 +25,7 @@ enum class CommandId : uint8_t {
     MAX_COMMAND_ID
 };
 
-// Stringify helpers for EventId and CommandId
+/* Stringify helpers for EventId and CommandId */
 static inline const char *eventIdToString(EventId id)
 {
     switch (id) {

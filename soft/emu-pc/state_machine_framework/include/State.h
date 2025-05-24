@@ -14,15 +14,12 @@ class State {
 public:
     virtual void enter()
     {
-        Serial.println("Default enter method in State class\n");
     }
     virtual void exit()
     {
-        Serial.println("Default exit method in State class\n");
     }
     virtual void processEvent(Event &evt)
     {
-        Serial.println("Default processEvent method in State class\n");
     }
     void setMachine(ActiveObject *m)
     {

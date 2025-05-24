@@ -10,3 +10,5 @@ soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx_bluepill
 soft/rx_stm_platformio/
 soft/arduino-tests/test_copilot/second/GaspettoBox
 **/compile_commands.json
+soft/emu-pc/tests/build-tests
+soft/emu-pc/tests/googletest

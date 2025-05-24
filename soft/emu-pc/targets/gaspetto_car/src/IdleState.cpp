@@ -16,7 +16,6 @@ void IdleState::enter()
 
 void IdleState::processEvent(Event &evt)
 {
-    Serial.println("Processing event in IdleState...\n");
     active_object->transitionTo(StateId::PROCESSING);
     State *currentState = active_object->getCurrentState();
     currentState->processEvent(evt);

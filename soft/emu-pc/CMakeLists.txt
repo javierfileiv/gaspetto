@@ -25,11 +25,12 @@ endif()
 option(GASPETTO_CAR "Build Gaspetto Car target" OFF)
 option(GASPETTO_BOX "Build Gaspetto Box target" OFF)
 option(NRF_SENDER "Build NRF Sender target" OFF)
+option(BUILD_TESTS "Build unit tests" OFF)
 
 # Define common headers interface library
-add_library(common_headers INTERFACE)
+add_library(state_machine_itf INTERFACE)
 target_include_directories(
-  common_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/state_machine_framework/include
+  state_machine_itf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/state_machine_framework/include
 )
 
 # Define global compile definitions before adding subdirectories
@@ -39,8 +40,9 @@ add_subdirectory(arduino_framework)
 add_subdirectory(state_machine_framework)
 add_subdirectory(motor_controller)
 add_subdirectory(radio_controller)
+add_subdirectory(tests)
 
-if(GASPETTO_CAR)
+if(GASPETTO_CAR OR BUILD_TESTS)
   add_subdirectory(${CMAKE_SOURCE_DIR}/targets/gaspetto_car)
 endif()
 if(GASPETTO_BOX)

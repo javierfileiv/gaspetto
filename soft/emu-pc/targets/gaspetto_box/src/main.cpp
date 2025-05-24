@@ -3,6 +3,8 @@
 #include "GaspettoBox.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
+#include "RF24.h"
+#include "RadioController.h"
 
 #include <atomic>
 
@@ -12,7 +14,9 @@
 // PB13,
 //                                PB14, PB15, PC13, PC14, PC15, PA8, PA9, PA10,
 //                                PA11, PA12}; // GPIO Pins for GND control
+// const int NRF_IRQ_PIN = PB0;
 
+RF24 radio(CE_PIN, CSN_PIN);
 IdleState idleState;
 ProcessingState processingState;
 EventQueue eventQueue;

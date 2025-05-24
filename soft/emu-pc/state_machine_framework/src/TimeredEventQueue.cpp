@@ -68,7 +68,7 @@ void TimeredEventQueue::processEvents(ActiveObject &ao)
         if (eventNodes_[current].triggerTimeMs > elapsedTime)
             eventNodes_[current].triggerTimeMs -= elapsedTime;
         else
-            eventNodes_[current].triggerTimeMs = 0; // Event is due
+            eventNodes_[current].triggerTimeMs = 0; /* Event is due. */
         current = eventNodes_[current].nextIndex;
     }
     while (headIndex_ != -1 && eventNodes_[headIndex_].triggerTimeMs == 0) {

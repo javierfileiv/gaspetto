@@ -20,27 +20,29 @@ cd "$BUILD_DIR"
 NUM_CORES=$(nproc)
 echo "Using $NUM_CORES cores for compilation"
 
-# Configure with CMake
-echo "Configuring project with CMake..."
+# Build each target separately
+echo "Building GaspettoBox..."
 cmake -DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
 	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-	-DGASPETTO_BOX=ON -DGASPETTO_CAR=ON -DNRF_SENDER=ON \
+	-DGASPETTO_BOX=ON \
 	..
 
-# Build each target separately
-echo "Building GaspettoBox..."
 cmake --build . --parallel $NUM_CORES --target gaspetto_box
 
 if [ $? -ne 0 ]; then
 	echo "GaspettoBox build failed!" >&2
 	echo "Cleaning up build directory..."
-	cd "$EMU_PC_DIR"
 	rm -rf "$BUILD_DIR"
 	exit 1
 fi
 
 echo "Building GaspettoCar..."
+cmake -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
+	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+	-DGASPETTO_CAR=ON \
+	..
 cmake --build . --parallel $NUM_CORES --target gaspetto_car
 
 if [ $? -ne 0 ]; then
@@ -51,6 +53,11 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Building NRF Sender..."
+cmake -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
+	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+	-DNRF_SENDER=ON \
+	..
 cmake --build . --parallel $NUM_CORES --target nrf_sender
 
 if [ $? -ne 0 ]; then
@@ -60,11 +67,31 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+echo "Building Unit Tests..."
+cmake -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
+	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+	-DBUILD_TESTS=ON \
+	..
+cmake --build . --parallel $NUM_CORES --target utest
+if [ $? -ne 0 ]; then
+    echo "Unit test build failed!" >&2
+    echo "Cleaning up build directory..."
+    rm -rf "$BUILD_DIR"
+    exit 1
+fi
+
+# Run unit tests after building
+./tests/utest
+if [ $? -ne 0 ]; then
+    echo "Unit tests failed!" >&2
+    exit 1
+fi
+
 echo "All targets built successfully."
 
 # Clean up everything
 echo "Removing all build outputs and directories..."
-cd "$EMU_PC_DIR"
 rm -rf "$BUILD_DIR"
 
-echo "Build verification complete. All outputs cleaned."
+# echo "Build verification complete. All outputs cleaned."

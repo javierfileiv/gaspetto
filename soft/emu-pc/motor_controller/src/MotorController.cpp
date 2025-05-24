@@ -2,33 +2,42 @@
 
 #include "Arduino.h"
 
+const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
+const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
+const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
+const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
+const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
+const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
+
+MotorController *MotorController::isr_instance = nullptr;
+
 MotorController::MotorController() = default;
 
 void MotorController::setPins(int lA, int lB, int rA, int rB, int sL, int sR)
 {
-    MOTOR_LEFT_PIN_A = lA;
-    MOTOR_LEFT_PIN_B = lB;
-    MOTOR_RIGHT_PIN_A = rA;
-    MOTOR_RIGHT_PIN_B = rB;
-    SPEED_SENSOR_LEFT_PIN = sL;
-    SPEED_SENSOR_RIGHT_PIN = sR;
+    motor_left_pin_a = lA;
+    motor_left_pin_b = lB;
+    motor_right_pin_a = rA;
+    motor_right_pin_b = rB;
+    speed_sensor_left_pin = sL;
+    speed_sensor_right_pin = sR;
 }
 
 void MotorController::InitMotorPins()
 {
-    pinMode(MOTOR_RIGHT_PIN_A, OUTPUT);
-    pinMode(MOTOR_RIGHT_PIN_B, OUTPUT);
-    pinMode(MOTOR_LEFT_PIN_A, OUTPUT);
-    pinMode(MOTOR_LEFT_PIN_B, OUTPUT);
+    pinMode(motor_left_pin_a, OUTPUT);
+    pinMode(motor_left_pin_b, OUTPUT);
+    pinMode(motor_right_pin_a, OUTPUT);
+    pinMode(motor_right_pin_b, OUTPUT);
 }
 
 void MotorController::InitSpeedSensor()
 {
-    pinMode(SPEED_SENSOR_LEFT_PIN, INPUT);
-    pinMode(SPEED_SENSOR_RIGHT_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(SPEED_SENSOR_LEFT_PIN), left_motor_speed_sensor_irq,
+    pinMode(speed_sensor_left_pin, INPUT);
+    pinMode(speed_sensor_right_pin, INPUT);
+    attachInterrupt(digitalPinToInterrupt(speed_sensor_left_pin), left_motor_speed_sensor_irq,
                     RISING);
-    attachInterrupt(digitalPinToInterrupt(SPEED_SENSOR_RIGHT_PIN), right_motor_speed_sensor_irq,
+    attachInterrupt(digitalPinToInterrupt(speed_sensor_right_pin), right_motor_speed_sensor_irq,
                     RISING);
 }
 
@@ -53,34 +62,39 @@ void MotorController::SetMotor(bool forward_motor_left, uint8_t motor_left_speed
     target_pulses_left = CentimetersToCount(distance_cm_left);
     target_pulses_right = CentimetersToCount(distance_cm_right);
     if (forward_motor_left) {
-        analogWrite(MOTOR_LEFT_PIN_A, mapDutyCycle(motor_left_speed));
-        analogWrite(MOTOR_LEFT_PIN_B, 0);
+        analogWrite(motor_left_pin_a, mapDutyCycle(motor_left_speed));
+        analogWrite(motor_left_pin_b, 0);
     } else {
-        analogWrite(MOTOR_LEFT_PIN_A, 0);
-        analogWrite(MOTOR_LEFT_PIN_B, mapDutyCycle(motor_left_speed));
+        analogWrite(motor_left_pin_a, 0);
+        analogWrite(motor_left_pin_b, mapDutyCycle(motor_left_speed));
     }
     if (forward_motor_right) {
-        analogWrite(MOTOR_RIGHT_PIN_A, mapDutyCycle(motor_right_speed));
-        analogWrite(MOTOR_RIGHT_PIN_B, 0);
+        analogWrite(motor_right_pin_a, mapDutyCycle(motor_right_speed));
+        analogWrite(motor_right_pin_b, 0);
     } else {
-        analogWrite(MOTOR_RIGHT_PIN_A, 0);
-        analogWrite(MOTOR_RIGHT_PIN_B, mapDutyCycle(motor_right_speed));
+        analogWrite(motor_right_pin_a, 0);
+        analogWrite(motor_right_pin_b, mapDutyCycle(motor_right_speed));
     }
-#ifndef ARDUINO
-    delay(1000);
-#endif
 }
 
-void MotorController::stopMotorRight() const
+void MotorController::StopBothMotors()
 {
-    analogWrite(MOTOR_RIGHT_PIN_A, 0);
-    analogWrite(MOTOR_RIGHT_PIN_B, 0);
+    stopMotorLeft();
+    stopMotorRight();
+    ResetCounterMotorLeft();
+    ResetCounterMotorRight();
 }
 
-void MotorController::stopMotorLeft() const
+void MotorController::stopMotorRight()
 {
-    analogWrite(MOTOR_LEFT_PIN_A, 0);
-    analogWrite(MOTOR_LEFT_PIN_B, 0);
+    analogWrite(motor_right_pin_a, 0);
+    analogWrite(motor_right_pin_b, 0);
+}
+
+void MotorController::stopMotorLeft()
+{
+    analogWrite(motor_left_pin_a, 0);
+    analogWrite(motor_left_pin_b, 0);
 }
 
 bool MotorController::isTargetReached()
@@ -88,26 +102,31 @@ bool MotorController::isTargetReached()
     bool right_reached = motor_right_pulse_count >= target_pulses_right;
     bool left_reached = motor_left_pulse_count >= target_pulses_left;
 
-    if (right_reached)
-        stopMotorRight();
     if (left_reached)
         stopMotorLeft();
+    if (right_reached)
+        stopMotorRight();
     if (right_reached && left_reached)
         return true;
     return false;
 }
 
-void MotorController::left_motor_speed_sensor_irq()
+// Global ISRs that use the current instance pointer
+void left_motor_speed_sensor_irq()
 {
-    MotorController::getInstance().motor_left_pulse_count++;
+    if (MotorController::isr_instance) {
+        MotorController::isr_instance->motor_left_pulse_count++;
+    }
 }
 
-void MotorController::right_motor_speed_sensor_irq()
+void right_motor_speed_sensor_irq()
 {
-    MotorController::getInstance().motor_right_pulse_count++;
+    if (MotorController::isr_instance) {
+        MotorController::isr_instance->motor_right_pulse_count++;
+    }
 }
 
-int MotorController::mapDutyCycle(int dutyCycle)
+uint32_t MotorController::mapDutyCycle(int dutyCycle)
 {
     return map(dutyCycle, 0, 100, 0, 255);
 }

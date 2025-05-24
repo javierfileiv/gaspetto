@@ -1,0 +1,3 @@
+[submodule "soft/emu-pc/tests/googletest"]
+	path = soft/emu-pc/tests/googletest
+	url = https://github.com/google/googletest.git
