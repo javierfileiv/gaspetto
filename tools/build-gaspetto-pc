@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
-BUILD_DIR="$EMU_PC_DIR/build"
+BUILD_DIR="$EMU_PC_DIR/build-pc"
 
 echo -e "${BLUE}Building Gaspetto firmware for emu-pc...${NC}"
 echo -e "Project root: $PROJECT_ROOT"
@@ -73,46 +73,8 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-echo -e "${YELLOW}Building Unit Tests...${NC}"
-cmake -DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
-	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-	-DBUILD_TESTS=ON \
-	..
-cmake --build . --parallel $NUM_CORES --target utest
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Unit test build failed!${NC}" >&2
-    echo "Cleaning up build directory..."
-    rm -rf "$BUILD_DIR"
-    exit 1
-fi
-
-# Run unit tests after building
-./tests/utest
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Unit tests failed!${NC}" >&2
-    exit 1
-fi
-
 echo -e "${GREEN}All targets built successfully.${NC}"
 
 # Clean up everything
 echo -e "${YELLOW}Removing all build outputs and directories...${NC}"
 rm -rf "$BUILD_DIR"
-
-if ! command -v pio &> /dev/null; then
-    echo -e "${RED}PlatformIO (pio) is not installed or not in PATH.${NC}"
-    echo "Please install PlatformIO to build GaspettoCar firmware."
-    exit 0
-fi
-
-echo -e "${BLUE}Build Arduino software with PlatformIO...${NC}"
-echo -e "${YELLOW}Building Gaspetto Car...${NC}"
-cd $PROJECT_ROOT/soft/pio/GaspettoCar_pio
-pio run
-echo -e "${YELLOW}Building NRF Sender...${NC}"
-cd $PROJECT_ROOT/soft/pio/NrfSender_pio
-pio run
-
-
-# echo "Build verification complete. All outputs cleaned."

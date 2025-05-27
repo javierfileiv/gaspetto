@@ -1,0 +1,64 @@
+name: Gaspetto CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_pc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install CMake
+        run: sudo apt-get update && sudo apt-get install -y cmake
+
+      - name: Run Gaspetto PC build script
+        run: ./tools/build-gaspetto-pc
+        shell: bash
+
+  utest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install CMake
+        run: sudo apt-get update && sudo apt-get install -y cmake
+
+      - name: Run Gaspetto PC utest
+        run: ./tools/build-gaspetto-utest
+        shell: bash
+
+  pio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Run Gaspetto Arduino build script with Platform IO
+        run: ./tools/build-gaspetto-pio
