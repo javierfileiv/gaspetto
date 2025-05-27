@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# This script builds the GaspettoBox and GaspettoCar firmware for the emu-pc.
+# It now uses the CMake build system and cleans up after itself.
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
+BUILD_DIR="$EMU_PC_DIR/build-pio"
+
+echo -e "${BLUE}Building Gaspetto for Arduino...${NC}"
+echo -e "Project root: $PROJECT_ROOT"
+
+if ! command -v pio &> /dev/null; then
+    echo -e "${RED}PlatformIO (pio) is not installed or not in PATH.${NC}"
+    echo "Please install PlatformIO to build GaspettoCar firmware."
+    exit 0
+fi
+
+echo -e "${BLUE}Build Arduino software with PlatformIO...${NC}"
+echo -e "${YELLOW}Building Gaspetto Car...${NC}"
+cd $PROJECT_ROOT/soft/pio/GaspettoCar_pio
+pio run
+echo -e "${YELLOW}Building NRF Sender...${NC}"
+cd $PROJECT_ROOT/soft/pio/NrfSender_pio
+pio run
