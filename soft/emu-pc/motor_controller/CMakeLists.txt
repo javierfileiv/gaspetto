@@ -7,5 +7,5 @@ target_include_directories(motor_controller_itf INTERFACE ${CMAKE_CURRENT_SOURCE
 target_link_libraries(
   motor_controller
   PUBLIC motor_controller_itf
-  PRIVATE arduino_framework state_machine_framework
+  PRIVATE arduino_framework_impl state_machine_framework
 )

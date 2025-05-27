@@ -3757,7 +3757,7 @@
 		)
 		(uuid "b146081d-f06c-43bd-86fc-50f2311c630f")
 	)
-	(text "vista PCB lado componentes, conector USB arriba\n"
+	(text "vista PCB lado componentes, conector USB uC arriba\n"
 		(exclude_from_sim no)
 		(at 286.766 226.314 0)
 		(effects
@@ -4207,16 +4207,6 @@
 	)
 	(wire
 		(pts
-			(xy 146.05 109.22) (xy 152.4 109.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "43ebefe9-c7dc-4f40-8ef9-fd408355f6fe")
-	)
-	(wire
-		(pts
 			(xy 170.18 157.48) (xy 170.18 180.34)
 		)
 		(stroke
@@ -4547,6 +4537,16 @@
 	)
 	(wire
 		(pts
+			(xy 201.93 134.62) (xy 201.93 85.09)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "90bd466f-ed80-48cd-87ec-5a31cdccedee")
+	)
+	(wire
+		(pts
 			(xy 114.3 50.8) (xy 203.2 50.8)
 		)
 		(stroke
@@ -4577,7 +4577,7 @@
 	)
 	(wire
 		(pts
-			(xy 214.63 85.09) (xy 146.05 85.09)
+			(xy 214.63 85.09) (xy 201.93 85.09)
 		)
 		(stroke
 			(width 0)
@@ -4624,6 +4624,16 @@
 			(type default)
 		)
 		(uuid "977e57e1-c69a-40db-a0e6-527aaa5ba9a3")
+	)
+	(wire
+		(pts
+			(xy 198.12 134.62) (xy 201.93 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9d9c81a4-1d2f-4aab-a2d4-5dfe3aa19550")
 	)
 	(wire
 		(pts
@@ -4844,16 +4854,6 @@
 			(type default)
 		)
 		(uuid "c3a92b03-d695-4673-8e0d-cf6073847871")
-	)
-	(wire
-		(pts
-			(xy 146.05 85.09) (xy 146.05 109.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c68c7fa5-25a4-48bb-996d-7e1bf7df232a")
 	)
 	(wire
 		(pts
@@ -5187,7 +5187,7 @@
 			)
 		)
 	)
-	(global_label "M1-IA PB11--"
+	(global_label "M1-IA PB11"
 		(shape input)
 		(at 236.22 219.71 90)
 		(fields_autoplaced yes)
@@ -5199,7 +5199,7 @@
 		)
 		(uuid "26ec7966-a14b-4322-890f-365fa5d4fc3f")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 236.22 201.7267 90)
+			(at 236.22 204.8715 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5844,7 +5844,7 @@
 				)
 			)
 		)
-		(property "Value" "L9110-M2"
+		(property "Value" "L9110-M2(B)"
 			(at 321.31 146.05 0)
 			(effects
 				(font
@@ -6408,7 +6408,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "a2a2918d-5ac2-4848-817d-dc1a0cf703b4")
 		(property "Reference" "M1"
 			(at 266.7 167.64 90)
@@ -6419,7 +6418,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "Motor_DC"
+		(property "Value" "Motor_DC Right"
 			(at 266.7 170.18 90)
 			(effects
 				(font
@@ -6725,7 +6724,7 @@
 				)
 			)
 		)
-		(property "Value" "L9110-M1"
+		(property "Value" "L9110-M1 (A)"
 			(at 322.58 171.45 0)
 			(effects
 				(font

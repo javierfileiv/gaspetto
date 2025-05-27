@@ -40,9 +40,9 @@ TEST_F(RadioControllerWithMotorControllerTest, ForwardEvent)
     uint8_t target_pulses = 0;
     const uint8_t distance = DISTANCE_CM_FWD_BWD;
 
-    /* Radio receive FWD event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    mock_RadioController.expect_process_event(&forwardEvent);
+    /* Radio receive FWD event. */
+    mock_RadioController.expect_receive_event(&forwardEvent);
     mock_RadioController.ProcessRadio();
     /* Motor moves FWD. */
     expect_move_forward(&target_pulses, distance, &target_pulses, distance);
@@ -52,7 +52,7 @@ TEST_F(RadioControllerWithMotorControllerTest, ForwardEvent)
     expect_stop_motor_right();
     execute_irq(target_pulses);
     car.processNextEvent();
-    mock_RadioController.expect_process_event(nullptr);
+    mock_RadioController.expect_receive_event(nullptr);
     mock_RadioController.ProcessRadio();
 }
 
@@ -63,7 +63,7 @@ TEST_F(RadioControllerWithMotorControllerTest, BackwardEvent)
 
     ASSERT_EQ(car.getCurrentState(), &idleState);
     /* Radio receive BWD event. */
-    mock_RadioController.expect_process_event(&backwardEvent);
+    mock_RadioController.expect_receive_event(&backwardEvent);
     mock_RadioController.ProcessRadio();
     /* Motor moves BWD. */
     expect_move_backward(&target_pulses, distance, &target_pulses, distance);
@@ -74,7 +74,7 @@ TEST_F(RadioControllerWithMotorControllerTest, BackwardEvent)
     execute_irq(target_pulses);
     car.processNextEvent();
     /* Receive nothing. */
-    mock_RadioController.expect_process_event(nullptr);
+    mock_RadioController.expect_receive_event(nullptr);
     mock_RadioController.ProcessRadio();
 }
 
@@ -86,7 +86,7 @@ TEST_F(RadioControllerWithMotorControllerTest, TurnRightEvent)
 
     /* Radio receive TURN RIGHT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    mock_RadioController.expect_process_event(&rightEvent);
+    mock_RadioController.expect_receive_event(&rightEvent);
     mock_RadioController.ProcessRadio();
     /* Motor TURNS RIGHT. */
     expect_turn_right(&target_pulses_left, distance_left, &target_pulses_right, distance_right);
@@ -102,7 +102,7 @@ TEST_F(RadioControllerWithMotorControllerTest, TurnRightEvent)
     execute_irq(diff);
     car.processNextEvent();
     /* Receive nothing. */
-    mock_RadioController.expect_process_event(nullptr);
+    mock_RadioController.expect_receive_event(nullptr);
     mock_RadioController.ProcessRadio();
 }
 
@@ -114,7 +114,7 @@ TEST_F(RadioControllerWithMotorControllerTest, TurnLeftEvent)
 
     /* Radio receive TURN LEFT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    mock_RadioController.expect_process_event(&leftEvent);
+    mock_RadioController.expect_receive_event(&leftEvent);
     mock_RadioController.ProcessRadio();
     /* Motor TURNS LEFT. */
     expect_turn_left(&target_pulses_left, distance_left, &target_pulses_right, distance_right);
@@ -130,7 +130,7 @@ TEST_F(RadioControllerWithMotorControllerTest, TurnLeftEvent)
     execute_irq(diff);
     car.processNextEvent();
     /* Receive nothing. */
-    mock_RadioController.expect_process_event(nullptr);
+    mock_RadioController.expect_receive_event(nullptr);
     mock_RadioController.ProcessRadio();
 }
 
@@ -138,7 +138,7 @@ TEST_F(RadioControllerWithMotorControllerTest, StopEvent)
 {
     /* Radio receive STOP event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    mock_RadioController.expect_process_event(&stopEvent);
+    mock_RadioController.expect_receive_event(&stopEvent);
     mock_RadioController.ProcessRadio();
     /* Motor receives STOP. */
     expect_both_motors_stop();
@@ -146,6 +146,6 @@ TEST_F(RadioControllerWithMotorControllerTest, StopEvent)
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &idleState);
     /* Receive nothing. */
-    mock_RadioController.expect_process_event(nullptr);
+    mock_RadioController.expect_receive_event(nullptr);
     mock_RadioController.ProcessRadio();
 }

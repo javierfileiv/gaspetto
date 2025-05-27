@@ -33,7 +33,7 @@ void MockRadioController::expect_radio_initialization()
     EXPECT_CALL(_mock_RF24, _startListening());
 }
 
-void MockRadioController::expect_process_event(Event *evt)
+void MockRadioController::expect_receive_event(Event *evt)
 {
     EXPECT_CALL(_mock_RF24, _available(_)).WillOnce(Return(evt ? true : false));
     if (evt)

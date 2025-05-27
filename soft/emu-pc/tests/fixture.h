@@ -32,7 +32,6 @@ public:
         mockMotorController.setPins(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
                                     MOTOR_RIGHT_PIN_B, SPEED_SENSOR_LEFT_PIN,
                                     SPEED_SENSOR_RIGHT_PIN);
-        MotorController::set_isr_instance(&mockMotorController);
     }
 
     void expect_car_init();
