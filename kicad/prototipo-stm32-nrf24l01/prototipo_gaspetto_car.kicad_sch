@@ -3757,7 +3757,7 @@
 		)
 		(uuid "b146081d-f06c-43bd-86fc-50f2311c630f")
 	)
-	(text "vista PCB lado componentes, conector USB arriba\n"
+	(text "vista PCB lado componentes, conector USB uC arriba\n"
 		(exclude_from_sim no)
 		(at 286.766 226.314 0)
 		(effects
@@ -6408,7 +6408,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "a2a2918d-5ac2-4848-817d-dc1a0cf703b4")
 		(property "Reference" "M1"
 			(at 266.7 167.64 90)
@@ -6419,7 +6418,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "Motor_DC"
+		(property "Value" "Motor_DC Right"
 			(at 266.7 170.18 90)
 			(effects
 				(font

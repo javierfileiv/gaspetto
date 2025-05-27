@@ -20,7 +20,7 @@ public:
     MockRadioController &operator=(const MockRadioController &) = delete;
 
     void expect_radio_initialization();
-    void expect_process_event(Event *evt = nullptr);
+    void expect_receive_event(Event *evt = nullptr);
 
 private:
     testing::StrictMock<MockRF24> &_mock_RF24;

@@ -20,7 +20,8 @@ TimeredEventQueue timeredEventQueue;
 MotorController motorController;
 RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
                                    gaspetto_car_pipe_name);
-GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, &motorController, nullptr);
+GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, &motorController,
+                         &radioControllerCar);
 
 void ISR(void)
 {
@@ -39,7 +40,6 @@ void setup()
     }
 #endif
     /* Initialize the motor controller. */
-    motorController.set_isr_instance(&motorController);
     motorController.setPins(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
                             MOTOR_RIGHT_PIN_B, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN);
     /* Initialize the GaspettoCar state machine. */

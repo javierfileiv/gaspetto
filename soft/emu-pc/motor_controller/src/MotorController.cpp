@@ -2,13 +2,6 @@
 
 #include "Arduino.h"
 
-const int MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. */
-const int MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. */
-const int MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left.  */
-const int MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  */
-const int SPEED_SENSOR_LEFT_PIN = PA0; /* Pin for left speed/distance sensor. */
-const int SPEED_SENSOR_RIGHT_PIN = PA1; /* Pin for right speed/distance sensor. */
-
 MotorController *MotorController::isr_instance = nullptr;
 
 MotorController::MotorController() = default;
@@ -29,12 +22,16 @@ void MotorController::InitMotorPins()
     pinMode(motor_left_pin_b, OUTPUT);
     pinMode(motor_right_pin_a, OUTPUT);
     pinMode(motor_right_pin_b, OUTPUT);
+    analogWriteFrequency(PWM_FREQ);
 }
 
 void MotorController::InitSpeedSensor()
 {
     pinMode(speed_sensor_left_pin, INPUT);
     pinMode(speed_sensor_right_pin, INPUT);
+    if (isr_instance == nullptr) {
+        isr_instance = this; // Set the static instance pointer
+    }
     attachInterrupt(digitalPinToInterrupt(speed_sensor_left_pin), left_motor_speed_sensor_irq,
                     RISING);
     attachInterrupt(digitalPinToInterrupt(speed_sensor_right_pin), right_motor_speed_sensor_irq,
@@ -53,9 +50,9 @@ void MotorController::ResetCounterMotorLeft()
     target_pulses_left = 0;
 }
 
-void MotorController::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
-                               uint8_t distance_cm_left, bool forward_motor_right,
-                               uint8_t motor_right_speed, uint8_t distance_cm_right)
+void MotorController::SetMotor(bool forward_motor_left, uint32_t motor_left_speed,
+                               uint32_t distance_cm_left, bool forward_motor_right,
+                               uint32_t motor_right_speed, uint32_t distance_cm_right)
 {
     ResetCounterMotorRight();
     ResetCounterMotorLeft();
@@ -114,16 +111,12 @@ bool MotorController::isTargetReached()
 // Global ISRs that use the current instance pointer
 void left_motor_speed_sensor_irq()
 {
-    if (MotorController::isr_instance) {
-        MotorController::isr_instance->motor_left_pulse_count++;
-    }
+    MotorController::isr_instance->motor_left_pulse_count++;
 }
 
 void right_motor_speed_sensor_irq()
 {
-    if (MotorController::isr_instance) {
-        MotorController::isr_instance->motor_right_pulse_count++;
-    }
+    MotorController::isr_instance->motor_right_pulse_count++;
 }
 
 uint32_t MotorController::mapDutyCycle(int dutyCycle)

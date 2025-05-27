@@ -11,6 +11,7 @@ public:
     MOCK_METHOD(int, digitalPinToInterrupt, (int pin));
     MOCK_METHOD(void, delay, (int ms));
     MOCK_METHOD(void, SwitchToLowPowerMode, ());
+    MOCK_METHOD(void, analogWriteFrequency, (int freq));
 
     void execute_irq_left(int n_times = 0)
     {

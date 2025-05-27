@@ -40,6 +40,7 @@ void SwitchToLowPowerMode(void);
 void pinMode(int pin, int mode);
 void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode);
 void analogWrite(int pin, int value);
+void analogWriteFrequency(int freq);
 int digitalPinToInterrupt(int pin);
 void delay(int ms);
 }

@@ -1,6 +1,6 @@
 #include "mock_MotorController.h"
 
-#define __MOTOR_PWM__ 17
+#define __MOTOR_PWM__ 15
 
 using testing::Return;
 
@@ -90,6 +90,7 @@ void MockMotorController::expect_motor_pins_init()
     EXPECT_CALL(_mock_arduino, pinMode(MOTOR_LEFT_PIN_B, OUTPUT));
     EXPECT_CALL(_mock_arduino, pinMode(MOTOR_RIGHT_PIN_A, OUTPUT));
     EXPECT_CALL(_mock_arduino, pinMode(MOTOR_RIGHT_PIN_B, OUTPUT));
+    EXPECT_CALL(_mock_arduino, analogWriteFrequency(PWM_FREQ));
 }
 
 void MockMotorController::expect_speed_sensor_init()

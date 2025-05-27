@@ -61,7 +61,7 @@ void Fixture::expect_stop_motor_right()
 
 void Fixture::expect_radio_process_event(Event *evt)
 {
-    mock_RadioController.expect_process_event(evt);
+    mock_RadioController.expect_receive_event(evt);
 }
 
 /* Actions on Active Object. */

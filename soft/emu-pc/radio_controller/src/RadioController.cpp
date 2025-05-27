@@ -3,11 +3,6 @@
 #include "Arduino.h"
 #include "Event.h"
 
-const int CE_PIN = PB_15;
-const int CSN_PIN = PIN_A4;
-const int PA_LEVEL = RF24_PA_LOW;
-const rf24_datarate_e DATA_RATE = RF24_1MBPS;
-
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
 
@@ -62,10 +57,10 @@ void RadioController::ProcessRadio()
 {
     EventPacket packet;
     uint8_t pipe;
-    Serial.println(F("ProcessRadio():"));
 
     /* RX processing. */
     if (_radio.available(&pipe)) {
+        Serial.println(F("ProcessRadio():"));
         _radio.read(&packet, sizeof(packet)); /* Fetch payload from FIFO. */
         Serial.print(F("Received EventId:"));
         Serial.print(EventQueue::eventIdToString(static_cast<EventId>(packet.eventId)));
