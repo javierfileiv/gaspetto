@@ -22,6 +22,7 @@ MockArduino::~MockArduino()
 void pinMode(int pin, int mode)
 {
     auto mock = MockArduino::get_instance();
+
     mock->pinMode(pin, mode);
 }
 
@@ -40,6 +41,7 @@ void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode)
 void analogWrite(int pin, int value)
 {
     auto mock = MockArduino::get_instance();
+
     mock->analogWrite(pin, value);
 }
 
@@ -51,11 +53,20 @@ int digitalPinToInterrupt(int pin)
 void delay(int ms)
 {
     auto mock = MockArduino::get_instance();
+
     mock->delay(ms);
 }
 
 void SwitchToLowPowerMode(void)
 {
     auto mock = MockArduino::get_instance();
+
     mock->SwitchToLowPowerMode();
+}
+
+void analogWriteFrequency(int freq)
+{
+    auto mock = MockArduino::get_instance();
+
+    mock->analogWriteFrequency(freq);
 }

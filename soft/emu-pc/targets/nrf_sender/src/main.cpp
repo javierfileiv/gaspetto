@@ -8,8 +8,8 @@
 #define CE_PIN 9
 #define CSN_PIN 10
 #else
-#define CE_PIN PB_15
-#define CSN_PIN PIN_A4
+#define CE_PIN PB15
+#define CSN_PIN PA4
 #endif
 
 const uint8_t gaspetto_box_pipe_name[] = "_box_";
@@ -24,7 +24,7 @@ void setup()
         delay(10);
     }
 #endif
-    Serial.println("NRF Event Sender (Arduino-style, PC/Arduino compatible)");
+    Serial.println("NRF Event Sender - Sends commands over radio");
     if (!radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
