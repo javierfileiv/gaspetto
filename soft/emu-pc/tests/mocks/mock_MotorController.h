@@ -1,6 +1,6 @@
 #ifndef MOCK_MOTOR_CONTROLLER_H
 #define MOCK_MOTOR_CONTROLLER_H
-#pragma once
+
 #include "MotorController.h"
 #include "mock_arduino.h"
 
