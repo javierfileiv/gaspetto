@@ -1,7 +1,5 @@
 #include "mock_MotorController.h"
 
-#define __MOTOR_PWM__ 15
-
 using testing::Return;
 
 uint32_t MockMotorController::mapDutyCycle(int dutyCycle)
@@ -17,7 +15,7 @@ uint32_t MockMotorController::CentimetersToCount(float cm)
 void MockMotorController::expect_turn_right(uint8_t *target_left, uint8_t distance_left,
                                             uint8_t *target_right, uint8_t distance_right)
 {
-    uint32_t pwm = this->mapDutyCycle(__MOTOR_PWM__);
+    uint32_t pwm = this->mapDutyCycle(MOTOR_PWM);
     *target_left = this->CentimetersToCount(distance_left);
     *target_right = this->CentimetersToCount(distance_right);
 
@@ -30,7 +28,7 @@ void MockMotorController::expect_turn_right(uint8_t *target_left, uint8_t distan
 void MockMotorController::expect_turn_left(uint8_t *target_left, uint8_t distance_left,
                                            uint8_t *target_right, uint8_t distance_right)
 {
-    uint32_t pwm = this->mapDutyCycle(__MOTOR_PWM__);
+    uint32_t pwm = this->mapDutyCycle(MOTOR_PWM);
     *target_left = this->CentimetersToCount(distance_left);
     *target_right = this->CentimetersToCount(distance_right);
 
@@ -43,7 +41,7 @@ void MockMotorController::expect_turn_left(uint8_t *target_left, uint8_t distanc
 void MockMotorController::expect_move_forward(uint8_t *target_left, uint8_t distance_left,
                                               uint8_t *target_right, uint8_t distance_right)
 {
-    uint32_t pwm = this->mapDutyCycle(__MOTOR_PWM__);
+    uint32_t pwm = this->mapDutyCycle(MOTOR_PWM);
     *target_left = this->CentimetersToCount(distance_left);
     *target_right = this->CentimetersToCount(distance_right);
 
@@ -56,7 +54,7 @@ void MockMotorController::expect_move_forward(uint8_t *target_left, uint8_t dist
 void MockMotorController::expect_move_backward(uint8_t *target_left, uint8_t distance_left,
                                                uint8_t *target_right, uint8_t distance_right)
 {
-    uint32_t pwm = this->mapDutyCycle(__MOTOR_PWM__);
+    uint32_t pwm = this->mapDutyCycle(MOTOR_PWM);
     *target_left = this->CentimetersToCount(distance_left);
     *target_right = this->CentimetersToCount(distance_right);
 

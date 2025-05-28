@@ -14,59 +14,37 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-# Add tests/ as an include directory for all relevant targets for test builds.
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-# Workaround: explicitly add the build path for gaspetto_car_impl.
-link_directories(${CMAKE_BINARY_DIR}/targets/gaspetto_car)
-
 add_executable(
   utest
   main.cpp
   gaspetto_car/test_motor_controller.cpp
   gaspetto_car/test_radio_controller.cpp
-  mock_arduino.cpp
-  mock_MotorController.cpp
-  mock_RadioController.cpp
-  mock_RF24.cpp
-  stub_RF24.cpp
+  mocks/mock_arduino.cpp
+  mocks/mock_MotorController.cpp
+  mocks/mock_RadioController.cpp
+  mocks/mock_RF24.cpp
+  mocks/stub_RF24.cpp
   fixture.cpp
 )
+target_include_directories(utest PRIVATE ./ mocks)
 
-target_include_directories(utest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-
-# Remove linkage to arduino_framework (implementation lib) from utest. Only link
-# arduino_framework_itf (interface lib).
 target_link_libraries(
   utest
   gtest
   gmock
   pthread
   gaspetto_car_impl
-  state_machine_framework
-  arduino_framework_itf
-  motor_controller
-  radio_controller
+  arduino_framework_impl
+  state_machine_framework_impl
+  motor_controller_impl
+  radio_controller_impl
 )
 
-# Enable parallel LTO for faster linking.
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  target_compile_options(utest PRIVATE -flto=auto)
-  target_link_options(utest PRIVATE -flto=auto)
-endif()
+# # Enable parallel LTO for faster linking. if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+# target_compile_options(utest PRIVATE -flto=auto) target_link_options(utest PRIVATE -flto=auto)
+# endif()
 
-# Also add tests/ include dir to dependencies so stub Arduino.h is found.
-foreach(dep gaspetto_car_impl state_machine_framework motor_controller)
-  if(TARGET ${dep})
-    target_include_directories(${dep} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-  endif()
-endforeach()
-
-# Add mock_RF24.cpp to test sources.
-set_property(
-  TARGET utest
-  APPEND
-  PROPERTY SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mock_RF24.cpp
-)
+# # Add mock_RF24.cpp to test sources. set_property( TARGET utest APPEND PROPERTY SOURCES
+# ${CMAKE_CURRENT_SOURCE_DIR}/mocks/mock_RF24.cpp )
 
 add_test(NAME utest COMMAND utest)
