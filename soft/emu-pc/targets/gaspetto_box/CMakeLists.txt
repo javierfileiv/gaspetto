@@ -7,7 +7,5 @@ add_executable(
 target_include_directories(gaspetto_box PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(
-  gaspetto_box PRIVATE arduino_framework state_machine_framework radio_controller
+  gaspetto_box PRIVATE arduino_framework_impl state_machine_framework_impl radio_controller_impl
 )
-
-target_compile_definitions(gaspetto_box PRIVATE GASPETTO_BOX)
