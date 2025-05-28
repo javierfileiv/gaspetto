@@ -24,7 +24,7 @@ void setup()
         delay(10);
     }
 #endif
-    Serial.println("NRF Event Sender (Arduino-style, PC/Arduino compatible)");
+    Serial.println("NRF Event Sender - Sends commands over radio");
     if (!radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
