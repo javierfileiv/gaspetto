@@ -27,18 +27,11 @@ option(GASPETTO_BOX "Build Gaspetto Box target" OFF)
 option(NRF_SENDER "Build NRF Sender target" OFF)
 option(BUILD_TESTS "Build unit tests" OFF)
 
-# Define common headers interface library
-add_library(state_machine_itf INTERFACE)
-target_include_directories(
-  state_machine_itf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/state_machine_framework/include
-)
-
 # Define global compile definitions before adding subdirectories
 add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG)
 
 add_subdirectory(arduino_framework)
 add_subdirectory(state_machine_framework)
-add_subdirectory(motor_controller)
 add_subdirectory(radio_controller)
 add_subdirectory(tests)
 

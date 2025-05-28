@@ -57,9 +57,11 @@ void GaspettoCar::stopMotorLeft()
 
 bool GaspettoCar::isTargetReached()
 {
-    if (!motorController || currentStateId == StateId::IDLE)
+    if (currentStateId == StateId::IDLE)
         return true;
-    return motorController->isTargetReached();
+    if (motorController)
+        return motorController->isTargetReached();
+    return true;
 }
 
 int GaspettoCar::postEvent(Event evt)
