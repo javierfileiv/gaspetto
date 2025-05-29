@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #include <mutex>
 #include <queue>
@@ -7,17 +8,19 @@
 #include <termios.h>
 #include <unistd.h>
 
-enum SerialBase { DEC = 10, HEX = 16, OCT = 8, BIN = 2 };
+#define DEC 10
+#define HEX 16
+#define OCT 8
+#define BIN 2
 
 class SerialEmulator {
 public:
-    /*  Mimics Serial.print. */
     template <typename T> void print(const T &data)
     {
         std::cout << data;
     }
 
-    template <typename T> void print(const T &data, SerialBase base)
+    template <typename T> void print(const T &data, int base)
     {
         if (base == HEX)
             std::cout << std::hex << std::uppercase << (int)data << std::dec;
@@ -41,7 +44,7 @@ public:
         std::cout << data << std::endl;
     }
 
-    template <typename T> void println(const T &data, SerialBase base)
+    template <typename T> void println(const T &data, int base)
     {
         print(data, base);
         std::cout << std::endl;

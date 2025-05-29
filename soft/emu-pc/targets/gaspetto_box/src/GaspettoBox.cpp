@@ -1,18 +1,23 @@
 #include "GaspettoBox.h"
 
-#include <iostream>
+#include "ActiveObject.h"
+#include "Arduino.h"
+#include "Context.h"
+#include "RadioController.h"
 
-GaspettoBox::GaspettoBox(State *idle, State *running, EventQueue *queue)
-        : ActiveObject(queue, nullptr)
+#include <cstdint>
+
+GaspettoBox::GaspettoBox(Context &ctx)
+        : _ctx(ctx)
+        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
 {
-    _initialStateId = StateId::IDLE;
-    InitMachine(StateId::IDLE, idle);
-    InitMachine(StateId::PROCESSING, running);
+    initMachine(StateId::IDLE, ctx.idleState);
+    initMachine(StateId::PROCESSING, ctx.processingState);
 }
 
-void GaspettoBox::Init()
+void GaspettoBox::init(StateId initialStateId)
 {
-    ActiveObject::Init();
+    ActiveObject::init(initialStateId);
 }
 
 int GaspettoBox::postEvent(Event evt)
@@ -39,7 +44,7 @@ void GaspettoBox::enterLowPowerMode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    Serial.println("Entering low-power mode...\n");
+    logln("Entering low-power mode...\n");
     SwitchToLowPowerMode();
 #else
     /*  Implement low-power mode for Arduino here. */
@@ -56,17 +61,17 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         lastDebounceTime = currentTime;
         if (!eventQueue->full()) {
             eventQueue->enqueue(evt);
-            Serial.println("Exiting low-power mode...\n");
+            logln("Exiting low-power mode...\n");
             lowPowerMode = false; /*  Wake the system up. */
         } else {
-            Serial.println("Event queue is full! Unable to enqueue event.\n");
+            logln("Event queue is full! Unable to enqueue event.\n");
         }
     }
 #else
     if (!eventQueue->IsFull()) {
         postEvent(evt);
     } else {
-        Serial.println("Event queue is full! Unable to enqueue event.\n");
+        logln("Event queue is full! Unable to enqueue event.\n");
     }
 #endif
 }

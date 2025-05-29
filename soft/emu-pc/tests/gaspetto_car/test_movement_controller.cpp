@@ -6,21 +6,19 @@ using ::testing::_;
 using ::testing::Return;
 using ::testing::StrictMock;
 
-class RadioControllerTest : public Fixture {};
+class MovementControllerTest : public Fixture {};
 
-TEST_F(RadioControllerTest, InitOnly)
+TEST_F(MovementControllerTest, InitOnly)
 {
 }
 
-class RadioControllerTest_CarInit : public RadioControllerTest {};
+class MovementController_CarInit : public MovementControllerTest {};
 
-TEST_F(RadioControllerTest_CarInit, ForwardEvent)
+TEST_F(MovementController_CarInit, ForwardEvent)
 {
+    /* Post FWD event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    /* Radio receive FWD event. */
-    expect_receive_event(&forwardEvent);
-    ProcessRadio();
-    /* Motor moves FWD. */
+    car.postEvent(forwardEvent);
     expect_move_forward(MOTOR_FREQ, MOTOR_FREQ);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
@@ -28,17 +26,13 @@ TEST_F(RadioControllerTest_CarInit, ForwardEvent)
     expect_stop_motor_right();
     execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
-    expect_receive_event(nullptr);
-    ProcessRadio();
 }
 
-TEST_F(RadioControllerTest_CarInit, BackwardEvent)
+TEST_F(MovementController_CarInit, BackwardEvent)
 {
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    /* Radio receive BWD event. */
-    expect_receive_event(&backwardEvent);
-    ProcessRadio();
-    /* Motor moves BWD. */
+    /* Post BWD event. */
+    car.postEvent(backwardEvent);
     expect_move_backward(MOTOR_FREQ, MOTOR_FREQ);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
@@ -46,20 +40,15 @@ TEST_F(RadioControllerTest_CarInit, BackwardEvent)
     expect_stop_motor_right();
     execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
-    /* Receive nothing. */
-    expect_receive_event(nullptr);
-    ProcessRadio();
 }
 
-TEST_F(RadioControllerTest_CarInit, TurnRightEvent)
+TEST_F(MovementController_CarInit, TurnRightEvent)
 {
     uint32_t diff = 0;
 
-    /* Radio receive TURN RIGHT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    expect_receive_event(&rightEvent);
-    ProcessRadio();
-    /* Motor TURNS RIGHT. */
+    /* Post TURN RIGHT event. */
+    car.postEvent(rightEvent);
     expect_turn_right(MOTOR_FREQ, MOTOR_FREQ);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
@@ -73,20 +62,15 @@ TEST_F(RadioControllerTest_CarInit, TurnRightEvent)
     expect_both_motors_stop();
     execute_irq(diff);
     car.processNextEvent();
-    /* Receive nothing. */
-    expect_receive_event(nullptr);
-    ProcessRadio();
 }
 
-TEST_F(RadioControllerTest_CarInit, TurnLeftEvent)
+TEST_F(MovementController_CarInit, TurnLeftEvent)
 {
     uint32_t diff = 0;
 
-    /* Radio receive TURN LEFT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    expect_receive_event(&leftEvent);
-    ProcessRadio();
-    /* Motor TURNS LEFT. */
+    /* Post TURN LEFT event. */
+    car.postEvent(leftEvent);
     expect_turn_left(MOTOR_FREQ, MOTOR_FREQ);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
@@ -100,23 +84,17 @@ TEST_F(RadioControllerTest_CarInit, TurnLeftEvent)
     expect_both_motors_stop();
     execute_irq(diff);
     car.processNextEvent();
-    /* Receive nothing. */
-    expect_receive_event(nullptr);
-    ProcessRadio();
 }
 
-TEST_F(RadioControllerTest_CarInit, StopEvent)
+TEST_F(MovementController_CarInit, StopEvent)
 {
-    /* Radio receive STOP event. */
+    uint32_t target_pulses = 0;
+
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    expect_receive_event(&stopEvent);
-    ProcessRadio();
-    /* Motor receives STOP. */
+    /* Post STOP event. */
+    car.postEvent(stopEvent);
     expect_both_motors_stop();
     expect_enter_low_power_mode();
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    /* Receive nothing. */
-    expect_receive_event(nullptr);
-    ProcessRadio();
 }

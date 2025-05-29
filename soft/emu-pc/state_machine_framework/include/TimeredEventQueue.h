@@ -3,14 +3,14 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
-#include "Event.h" /*  Assuming you have your ActiveObject definition. */
-
-#define MAX_TIMED_EVENT_NODES 10 /*  Define a maximum number of scheduled events. */
+#include "Event.h"
+#include "Log.h"
+#include "config_event.h"
 
 struct TimedEventNode {
     uint32_t triggerTimeMs;
     Event event;
-    int8_t nextIndex; /*  Index of the next node in the array (-1 for null). */
+    int8_t nextIndex;
     TimedEventNode()
             : triggerTimeMs(0)
             , nextIndex(-1)
@@ -18,14 +18,13 @@ struct TimedEventNode {
     }
 };
 
-class TimeredEventQueue {
+class TimeredEventQueue : public Log {
 public:
     TimeredEventQueue();
-    bool scheduleAbsoluteTimeEvent(uint32_t timeMs, Event event); /*  Schedule based on absolute
-                                                                     time. */
-    bool scheduleEventDelayed(uint32_t delayMs, Event event); /*  Schedule based on delay. */
+    bool scheduleAbsoluteTimeEvent(uint32_t timeMs, Event event); /*  Schedule on absolute time. */
+    bool scheduleEventDelayed(uint32_t delayMs, Event event); /*  Schedule on delay. */
     void processEvents(ActiveObject &ao);
-    void clear(); /*  Reset the queue. */
+    void clear();
 
     static const char *eventIdToString(EventId id)
     {
@@ -71,10 +70,8 @@ public:
 private:
     uint32_t lastProcessTime_;
     TimedEventNode eventNodes_[MAX_TIMED_EVENT_NODES];
-    int8_t headIndex_; /*  Index of the first event in the sorted list (-1 if
-                          empty). */
-    int8_t freeListHead_; /*  Index of the first free node in the array (-1 if
-                             full). */
+    int8_t headIndex_;
+    int8_t freeListHead_;
     int8_t allocateNode();
     void freeNode(uint8_t index);
 };

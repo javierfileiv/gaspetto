@@ -5,6 +5,8 @@
 #include "ProcessingState.h"
 #include "RF24.h"
 #include "RadioController.h"
+#include "TimeredEventQueue.h"
+#include "config_radio.h"
 
 #include <atomic>
 
@@ -19,8 +21,13 @@
 RF24 radio(CE_PIN, CSN_PIN);
 IdleState idleState;
 ProcessingState processingState;
+TimeredEventQueue timeredEventQueue;
 EventQueue eventQueue;
-GaspettoBox gaspetto_box(&idleState, &processingState, &eventQueue);
+RadioController radioController(radio, &eventQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
+Context context = {
+    &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
+};
+GaspettoBox gaspetto_box(context);
 
 /*  Button press simulation thread. */
 void ISR(void)
@@ -31,13 +38,28 @@ void ISR(void)
 #endif
 }
 
+void enter_low_power_mode()
+{
+#ifdef LOW_POWER_MODE
+#ifndef ARDUINO
+    Serial.println("Entering low-power mode...\n");
+    SwitchToLowPowerMode();
+#else
+    /*  Implement low-power mode for Arduino. */
+    /*  STM32 sleep modes or power-saving. */
+    delay(100); /*  Simulate low-power sleep. */
+#endif
+#endif
+}
+
 void setup()
 {
     Serial.begin(115200);
     Serial.println("Gaspetto Box Initialized");
     Serial.println("Starting up...\n");
     /* Initialize the GaspettoBox state machine. */
-    gaspetto_box.Init();
+    gaspetto_box.setLowPowerModeCallback(enter_low_power_mode);
+    gaspetto_box.init(StateId::IDLE);
     /* Set up ISR for button press simulation. */
     attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
 }

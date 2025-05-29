@@ -16,7 +16,7 @@ ReadHall::ReadHall(uint8_t (&adcPins)[GROUP_SIZE], uint8_t (&groupPins)[TOTAL_SE
     /*  Set GPIO pins as OUTPUT and set them HIGH (disable all sensors). */
     for (uint8_t i = 0; i < 20; i++) {
         pinMode(groupPins[i], OUTPUT);
-        digitalWrite(groupPins[i], HIGH); /*  Disable sensor. */
+        digitalWrite(groupPins[i], HIGH);
     }
 
     /*  Set ADC pins as INPUT. */
@@ -28,7 +28,7 @@ ReadHall::ReadHall(uint8_t (&adcPins)[GROUP_SIZE], uint8_t (&groupPins)[TOTAL_SE
 uint16_t *ReadHall::readHallSensors(uint8_t group)
 {
     if (group >= numGroups) {
-        Serial.println("Invalid group number");
+        logln("Invalid group number");
         return nullptr; /*  Return null pointer if the group number is invalid. */
     }
     /*  Enable the current group of sensors. */

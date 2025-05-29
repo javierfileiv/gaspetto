@@ -36,7 +36,7 @@ void setup()
 
     /*  Initialize nRF24L01+. */
     if (!radio.begin()) {
-        Serial.println("nRF24L01+ module not detected. Check connections.");
+        logln("nRF24L01+ module not detected. Check connections.");
         while (1)
             ;
     }
@@ -64,8 +64,7 @@ void loop()
     for (uint8_t group = 0; group < numGroups; group++) {
         /*  Enable the current group of sensors. */
         for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-            digitalWrite(groupPins[group * sensorsPerGroup + i], LOW); /*  Enable
-                                                                          sensor. */
+            digitalWrite(groupPins[group * sensorsPerGroup + i], LOW);
         }
 
         /*  Small delay to allow stabilization. */
@@ -78,19 +77,18 @@ void loop()
 
         /*  Disable the current group of sensors. */
         for (uint8_t i = 0; i < sensorsPerGroup; i++) {
-            digitalWrite(groupPins[group * sensorsPerGroup + i], HIGH); /*  Disable
-                                                                           sensor. */
+            digitalWrite(groupPins[group * sensorsPerGroup + i], HIGH);
         }
 
         /*  Transmit the ADC values via nRF24L01+. */
         if (radio.write(&adcValues, sizeof(adcValues))) {
-            Serial.print("Group ");
-            Serial.print(group);
-            Serial.println(" data sent successfully!");
+            log("Group ");
+            log(group);
+            logln(" data sent successfully!");
         } else {
-            Serial.print("Group ");
-            Serial.print(group);
-            Serial.println(" data transmission failed.");
+            log("Group ");
+            log(group);
+            logln(" data transmission failed.");
         }
 
         /*  Small delay before switching to the next group. */

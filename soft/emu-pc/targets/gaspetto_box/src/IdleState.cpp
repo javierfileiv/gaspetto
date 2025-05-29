@@ -2,9 +2,6 @@
 
 #include "GaspettoBox.h"
 
-#include <cassert>
-#include <iostream>
-
 void IdleState::enter()
 {
     active_object->enterLowPowerMode();

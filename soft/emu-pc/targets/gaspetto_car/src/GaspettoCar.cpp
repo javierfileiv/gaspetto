@@ -2,66 +2,57 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
-#include "MotorController.h"
+#include "Context.h"
+#include "MovementController.h"
 #include "RadioController.h"
-#include "State.h"
 
 #include <cstdint>
 
-GaspettoCar::GaspettoCar(State *idle, State *running, EventQueue *queue,
-                         MotorController *motorController, RadioController *radioController)
-        : ActiveObject(queue, nullptr)
-        , motorController(motorController)
-        , radioController(radioController)
+class State;
+
+GaspettoCar::GaspettoCar(Context &ctx)
+        : _ctx(ctx)
+        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
 
 {
-    _initialStateId = StateId::IDLE;
-    InitMachine(StateId::IDLE, idle);
-    InitMachine(StateId::PROCESSING, running);
+    initMachine(StateId::IDLE, ctx.idleState);
+    initMachine(StateId::PROCESSING, ctx.processingState);
 }
 
-void GaspettoCar::Init()
+void GaspettoCar::init(StateId initialStateId)
 {
-    if (motorController) {
-        motorController->InitMotorPins();
-        motorController->InitSpeedSensor();
-    }
-    if (radioController)
-        radioController->Init();
-    ActiveObject::Init();
+    _ctx.movementController->init(_ctx.pwm_freq);
+    _ctx.radioController->init();
+    ActiveObject::init(initialStateId);
 }
 
-void GaspettoCar::SetMotor(bool forward_motor_left, uint8_t motor_left_speed,
-                           uint8_t distance_cm_left, bool forward_motor_right,
-                           uint8_t motor_right_speed, uint8_t distance_cm_right)
+void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
+                           uint32_t distance_cm_left, bool forward_motor_right,
+                           uint32_t motor_right_speed, uint32_t distance_cm_right)
 {
-    if (motorController) {
-        motorController->SetMotor(forward_motor_left, motor_left_speed, distance_cm_left,
-                                  forward_motor_right, motor_right_speed, distance_cm_right);
-    }
-}
-
-void GaspettoCar::stopMotorRight()
-{
-    if (motorController) {
-        motorController->stopMotorRight();
-    }
-}
-
-void GaspettoCar::stopMotorLeft()
-{
-    if (motorController) {
-        motorController->stopMotorLeft();
+    if (_ctx.movementController) {
+        _ctx.movementController->setMotor(forward_motor_left, motor_left_speed, distance_cm_left,
+                                          forward_motor_right, motor_right_speed,
+                                          distance_cm_right);
     }
 }
 
 bool GaspettoCar::isTargetReached()
 {
+    bool right_reached = _ctx.movementController->getRightPulseCount() >=
+                         _ctx.movementController->getRightTargetPulses();
+    bool left_reached = _ctx.movementController->getLeftPulseCount() >=
+                        _ctx.movementController->getLeftTargetPulses();
+
     if (currentStateId == StateId::IDLE)
         return true;
-    if (motorController)
-        return motorController->isTargetReached();
-    return true;
+    if (left_reached)
+        _ctx.movementController->stopMotorLeft();
+    if (right_reached)
+        _ctx.movementController->stopMotorRight();
+    if (right_reached && left_reached)
+        return true;
+    return false;
 }
 
 int GaspettoCar::postEvent(Event evt)
@@ -71,6 +62,18 @@ int GaspettoCar::postEvent(Event evt)
         return 0;
     }
     return -1;
+}
+
+void GaspettoCar::stopMotorRight()
+{
+    logln(F("GaspettoCar::stopMotorRight() - Delegating to MovementController."));
+    _ctx.movementController->stopMotorRight();
+}
+
+void GaspettoCar::stopMotorLeft()
+{
+    logln(F("GaspettoCar::stopMotorLeft() - Delegating to MovementController."));
+    _ctx.movementController->stopMotorLeft();
 }
 
 void GaspettoCar::processNextEvent()
@@ -88,14 +91,8 @@ void GaspettoCar::processNextEvent()
 
 void GaspettoCar::enterLowPowerMode()
 {
-#ifdef LOW_POWER_MODE
-#ifndef ARDUINO
-    Serial.println("Entering low-power mode...\n");
-    SwitchToLowPowerMode();
-#else
-    /*  Implement low-power mode for Arduino here. */
-    /*  STM32 sleep modes or power-saving features. */
-    delay(100); /*  Simulate low-power sleep. */
-#endif
-#endif
+    if (enter_low_power_mode) {
+        enter_low_power_mode();
+        return;
+    }
 }

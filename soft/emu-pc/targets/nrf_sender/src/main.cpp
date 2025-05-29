@@ -50,7 +50,7 @@ void sendEvent(CommandId cmd)
     radio.stopListening();
     radio.write(&pkt, sizeof(pkt));
     Serial.print("Sent command: ");
-    Serial.println(commandIdToString(cmd));
+    Serial.println(Event::commandIdToString(cmd));
     radio.startListening();
 }
 

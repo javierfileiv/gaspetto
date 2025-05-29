@@ -19,20 +19,18 @@ bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
     int8_t newNodeIndex = allocateNode();
     if (newNodeIndex == -1)
         return false; /*  Queue is full. */
-#ifdef GASPETTO_LOG
-    Serial.print("scheduleEvent(): ");
-    Serial.print(eventIdToString(evt.getEventId()));
-    Serial.print(", ");
-    Serial.print("Command: ");
-    Serial.print(commandIdToString(evt.getCommand()));
-    Serial.print(", ");
-    Serial.print("Trigger Time: ");
-    Serial.print(timeMs);
-    Serial.print(" ms, ");
-    Serial.print("Current Time: ");
-    Serial.print(millis());
-    Serial.println(" ms");
-#endif
+    log("scheduleEvent(): ");
+    log(eventIdToString(evt.getEventId()));
+    log(", ");
+    log("Command: ");
+    log(commandIdToString(evt.getCommand()));
+    log(", ");
+    log("Trigger Time: ");
+    log(timeMs);
+    log(" ms, ");
+    log("Current Time: ");
+    log(millis());
+    logln(" ms");
     eventNodes_[newNodeIndex].triggerTimeMs = timeMs;
     eventNodes_[newNodeIndex].event = evt;
     eventNodes_[newNodeIndex].nextIndex = -1;

@@ -1,7 +1,7 @@
-#include "mock_arduino.h"
+#include "mock_Arduino.h"
 
 #include "Arduino.h"
-#include "mock_MotorController.h"
+#include "GaspettoCar.h" /* Need for pin definitions. */
 
 #include <atomic>
 #include <gmock/gmock.h>
@@ -43,6 +43,13 @@ void analogWrite(int pin, int value)
     auto mock = MockArduino::get_instance();
 
     mock->analogWrite(pin, value);
+}
+
+void digitalWrite(int pin, int value)
+{
+    auto mock = MockArduino::get_instance();
+
+    mock->digitalWrite(pin, value);
 }
 
 int digitalPinToInterrupt(int pin)

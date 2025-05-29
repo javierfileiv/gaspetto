@@ -25,47 +25,6 @@ enum class CommandId : uint8_t {
     MAX_COMMAND_ID
 };
 
-/* Stringify helpers for EventId and CommandId */
-static inline const char *eventIdToString(EventId id)
-{
-    switch (id) {
-    case EventId::NONE:
-        return "NONE";
-    case EventId::TIMER_ELAPSED:
-        return "TIMER_ELAPSED";
-    case EventId::ACTION:
-        return "NRF_IRQ";
-    case EventId::BUTTON_PRESSED:
-        return "BUTTON_PRESSED";
-    case EventId::MAX_EVENT_ID:
-        return "MAX_EVENT_ID";
-    default:
-        return "UNKNOWN_EVENT_ID";
-    }
-}
-
-static inline const char *commandIdToString(CommandId id)
-{
-    switch (id) {
-    case CommandId::NONE:
-        return "NONE";
-    case CommandId::MOTOR_FORWARD:
-        return "MOTOR_FORWARD";
-    case CommandId::MOTOR_BACKWARD:
-        return "MOTOR_BACKWARD";
-    case CommandId::MOTOR_RIGHT:
-        return "MOTOR_RIGHT";
-    case CommandId::MOTOR_LEFT:
-        return "MOTOR_LEFT";
-    case CommandId::MOTOR_STOP:
-        return "MOTOR_STOP";
-    case CommandId::MAX_COMMAND_ID:
-        return "MAX_COMMAND_ID";
-    default:
-        return "UNKNOWN_COMMAND_ID";
-    }
-}
-
 struct __attribute__((packed)) EventPacket {
     uint8_t eventId;
     uint8_t commandId;
@@ -108,6 +67,47 @@ public:
     static constexpr uint8_t packetSize()
     {
         return sizeof(EventPacket);
+    }
+
+    /* Stringify helpers for EventId and CommandId */
+    static const char *eventIdToString(EventId id)
+    {
+        switch (id) {
+        case EventId::NONE:
+            return "NONE";
+        case EventId::TIMER_ELAPSED:
+            return "TIMER_ELAPSED";
+        case EventId::ACTION:
+            return "ACTION";
+        case EventId::BUTTON_PRESSED:
+            return "BUTTON_PRESSED";
+        case EventId::MAX_EVENT_ID:
+            return "MAX_EVENT_ID";
+        default:
+            return "UNKNOWN_EVENT_ID";
+        }
+    }
+
+    static const char *commandIdToString(CommandId id)
+    {
+        switch (id) {
+        case CommandId::NONE:
+            return "NONE";
+        case CommandId::MOTOR_FORWARD:
+            return "MOTOR_FORWARD";
+        case CommandId::MOTOR_BACKWARD:
+            return "MOTOR_BACKWARD";
+        case CommandId::MOTOR_RIGHT:
+            return "MOTOR_RIGHT";
+        case CommandId::MOTOR_LEFT:
+            return "MOTOR_LEFT";
+        case CommandId::MOTOR_STOP:
+            return "MOTOR_STOP";
+        case CommandId::MAX_COMMAND_ID:
+            return "MAX_COMMAND_ID";
+        default:
+            return "UNKNOWN_COMMAND_ID";
+        }
     }
 
 protected:
