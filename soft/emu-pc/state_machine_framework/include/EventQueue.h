@@ -2,12 +2,11 @@
 #define EVENT_QUEUE_H
 
 #include "Event.h"
+#include "config_event.h"
 
 #ifndef ARDUINO
 #include <cstdint>
 #endif
-
-#define QUEUE_SIZE 10 /*  Define the size of the queue. */
 
 class EventQueue {
 public:
@@ -35,7 +34,7 @@ public:
         case EventId::TIMER_ELAPSED:
             return "TIMER_ELAPSED";
         case EventId::ACTION:
-            return "NRF_IRQ";
+            return "ACTION";
         case EventId::BUTTON_PRESSED:
             return "BUTTON_PRESSED";
         case EventId::MAX_EVENT_ID:

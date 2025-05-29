@@ -4,28 +4,6 @@
 #include "Arduino_pins_pc.h"
 
 #include <cstdint>
-#include <iostream>
-
-/* Dummy Serial implementation. */
-struct SerialType {
-    void print(const char *msg)
-    {
-        std::cout << msg;
-    }
-    void print(uint32_t val)
-    {
-        std::cout << val;
-    }
-    void println(const char *msg)
-    {
-        std::cout << msg << std::endl;
-    }
-    void println(uint32_t val)
-    {
-        std::cout << val << std::endl;
-    }
-};
-static SerialType Serial;
 
 /* Dummy millis implementation. */
 inline uint32_t millis()
@@ -40,6 +18,7 @@ void SwitchToLowPowerMode(void);
 void pinMode(int pin, int mode);
 void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode);
 void analogWrite(int pin, int value);
+void digitalWrite(int pin, int value);
 void analogWriteFrequency(int freq);
 int digitalPinToInterrupt(int pin);
 void delay(int ms);

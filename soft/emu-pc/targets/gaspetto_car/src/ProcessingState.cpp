@@ -1,7 +1,6 @@
 #include "ProcessingState.h"
 
 #include "GaspettoCar.h"
-#include "MotorController.h"
 
 #include <Arduino.h>
 
@@ -12,44 +11,39 @@
 
 void ProcessingState::processEvent(Event &evt)
 {
-    MotorController *motorController =
-            static_cast<GaspettoCar *>(active_object)->getMotorController();
+    log(F("ProcessingState: Processing EventId: "));
+    log(Event::eventIdToString(evt.getEventId()));
+    log(F(", CommandId: "));
+    log(Event::commandIdToString(evt.getCommand()));
+    logln(F("."));
 
-    if (!motorController) {
-        Serial.println("Motor controller not initialized.\n");
-        return;
+    GaspettoCar *ao = static_cast<GaspettoCar *>(active_object);
+
+    switch (evt.getEventId()) {
+    case EventId::ACTION: {
+        switch (evt.getCommand()) {
+        case CommandId::MOTOR_STOP:
+            ao->stopMotorLeft();
+            ao->stopMotorRight();
+            ao->transitionTo(StateId::IDLE);
+            logln(F("ProcessingState: -> Transition to IDLE (Explicit Stop Command)"));
+            break;
+        case CommandId::MOTOR_FORWARD:
+        case CommandId::MOTOR_BACKWARD:
+        case CommandId::MOTOR_LEFT:
+        case CommandId::MOTOR_RIGHT:
+            logln(F("ProcessingState: Ignoring new motor command while already processing a movement."));
+            break;
+        default:
+            log(F("ProcessingState: Unhandled ACTION command: "));
+            logln(Event::commandIdToString(evt.getCommand()));
+            break;
+        }
+    } break;
+    default: {
+        log(F("ProcessingState: Unhandled EventId: "));
+        logln(Event::eventIdToString(evt.getEventId()));
+        break;
     }
-
-    switch (evt.getCommand()) {
-    case CommandId::MOTOR_FORWARD:
-        /* Moving forward */
-        motorController->SetMotor(FORWARD, MOTOR_PWM, DISTANCE_CM_FWD_BWD, FORWARD, MOTOR_PWM,
-                                  DISTANCE_CM_FWD_BWD);
-        break;
-    case CommandId::MOTOR_BACKWARD:
-        /* Moving backward */
-        motorController->SetMotor(BACKWARD, MOTOR_PWM, DISTANCE_CM_FWD_BWD, BACKWARD, MOTOR_PWM,
-                                  DISTANCE_CM_FWD_BWD);
-        break;
-    case CommandId::MOTOR_RIGHT:
-        /* Turning right */
-        motorController->SetMotor(FORWARD, MOTOR_PWM, DISTANCE_CM_FWD_BWD, BACKWARD, MOTOR_PWM,
-                                  DISTANCE_CM_TURN_RIGHT);
-        break;
-    case CommandId::MOTOR_LEFT:
-        /* Turning left */
-        motorController->SetMotor(BACKWARD, MOTOR_PWM, DISTANCE_CM_TURN_LEFT, FORWARD, MOTOR_PWM,
-                                  DISTANCE_CM_FWD_BWD);
-        break;
-    case CommandId::MOTOR_STOP:
-        /* Stopping and transitioning to IDLE state */
-        motorController->StopBothMotors();
-        active_object->transitionTo(StateId::IDLE);
-        break;
-    default:
-        /* Unknown event in PROCESSING state */
-        Serial.println("Unknown event in PROCESSING state.\n");
-        assert(true);
-        break;
     }
 }
