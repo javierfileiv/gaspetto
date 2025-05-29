@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "Event.h"
+#include "config_radio.h"
 
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
@@ -17,22 +18,22 @@ RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
     }
 }
 
-void RadioController::Init()
+void RadioController::init()
 {
-    Serial.print(F("Writing address: "));
+    log(F("Writing address: "));
     for (int i = 0; i < 5; i++) {
-        Serial.print(writing_addr[i], HEX);
-        Serial.print(F(" "));
+        log(writing_addr[i], HEX);
+        log(F(" "));
     }
-    Serial.println();
-    Serial.print(F("Reading address: "));
+    logln();
+    log(F("Reading address: "));
     for (int i = 0; i < 5; i++) {
-        Serial.print(reading_addr[i], HEX);
-        Serial.print(F(" "));
+        log(reading_addr[i], HEX);
+        log(F(" "));
     }
-    Serial.println();
+    logln();
     if (!_radio.begin()) {
-        Serial.println(F("radio hardware is not responding!!"));
+        logln(F("radio hardware is not responding!!"));
         while (1) {
         }
     }
@@ -53,23 +54,23 @@ void RadioController::Init()
     _radio.startListening();
 }
 
-void RadioController::ProcessRadio()
+void RadioController::processRadio()
 {
     EventPacket packet;
     uint8_t pipe;
 
     /* RX processing. */
     if (_radio.available(&pipe)) {
-        Serial.println(F("ProcessRadio():"));
+        logln(F("ProcessRadio():"));
         _radio.read(&packet, sizeof(packet)); /* Fetch payload from FIFO. */
-        Serial.print(F("Received EventId:"));
-        Serial.print(EventQueue::eventIdToString(static_cast<EventId>(packet.eventId)));
-        Serial.print(F(" CommandId:"));
-        Serial.print(EventQueue::commandIdToString(static_cast<CommandId>(packet.commandId)));
-        Serial.println(F("."));
+        log(F("Received EventId:"));
+        log(Event::eventIdToString(static_cast<EventId>(packet.eventId)));
+        log(F(" CommandId:"));
+        log(Event::commandIdToString(static_cast<CommandId>(packet.commandId)));
+        logln(F("."));
         Event evt = Event::fromPacket(packet);
         if (radioQueue.IsFull()) {
-            Serial.println(F("RadioController::ProcessRadio: Queue is full."));
+            logln(F("RadioController::ProcessRadio: Queue is full."));
             return;
         }
         /* Post to active object queue. */
@@ -81,27 +82,27 @@ void RadioController::ProcessRadio()
         Event evt;
 
         radioQueue.dequeue(evt);
-        Serial.print(F("RadioController::ProcessRadio: "));
-        Serial.print(EventQueue::eventIdToString(evt.getEventId()));
-        Serial.print(F(" - "));
-        Serial.println(EventQueue::commandIdToString(evt.getCommand()));
+        log(F("RadioController::ProcessRadio: "));
+        log(Event::eventIdToString(evt.getEventId()));
+        log(F(" - "));
+        logln(Event::commandIdToString(evt.getCommand()));
         evt.toPacket(packet);
         /* Stop listening. */
         _radio.stopListening();
         _radio.write(&packet, sizeof(packet));
-        Serial.print(F("RadioController::ProcessRadio: Sent EventId:"));
-        Serial.print(EventQueue::eventIdToString(static_cast<EventId>(packet.eventId)));
-        Serial.print(F(" CommandId:"));
-        Serial.print(EventQueue::commandIdToString(static_cast<CommandId>(packet.commandId)));
-        Serial.println(F("."));
+        log(F("RadioController::ProcessRadio: Sent EventId:"));
+        log(Event::eventIdToString(static_cast<EventId>(packet.eventId)));
+        log(F(" CommandId:"));
+        log(Event::commandIdToString(static_cast<CommandId>(packet.commandId)));
+        logln(F("."));
         _radio.startListening();
     }
 }
 
-void RadioController::SendEvent(Event evt)
+void RadioController::sendEvent(Event evt)
 {
     if (radioQueue.IsFull()) {
-        Serial.println(F("RadioController::SendEvent: Queue is full."));
+        logln(F("RadioController::SendEvent: Queue is full."));
         return;
     }
     radioQueue.enqueue(evt);
