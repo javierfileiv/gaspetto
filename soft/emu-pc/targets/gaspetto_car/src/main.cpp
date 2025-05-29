@@ -1,13 +1,14 @@
 #include "Arduino.h"
+#include "Context.h"
 #include "EventQueue.h"
 #include "GaspettoCar.h"
 #include "IdleState.h"
-#include "MotorController.h"
+#include "MovementController.h"
 #include "ProcessingState.h"
 #include "RF24.h"
 #include "RadioController.h"
 #include "TimeredEventQueue.h"
-#include "radio_controller/defs.h"
+#include "config_radio.h"
 
 #include <cstdint>
 
@@ -17,17 +18,42 @@ EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
-MotorController motorController;
+MotorControl motorController(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
+                             MOTOR_RIGHT_PIN_B);
+MovementController carMovementController(motorController, SPEED_SENSOR_LEFT_PIN,
+                                         SPEED_SENSOR_RIGHT_PIN);
 RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
                                    gaspetto_car_pipe_name);
-GaspettoCar gaspetto_car(&idleState, &processingState, &eventQueue, &motorController,
-                         &radioControllerCar);
+Context context = {
+    &eventQueue,
+    &carMovementController,
+    &radioControllerCar,
+    &timeredEventQueue,
+    &idleState,
+    &processingState,
+    PWM_FREQ,
+};
+GaspettoCar gaspetto_car(context);
 
 void ISR(void)
 {
 #if !defined(ARDUINO) && defined(NRF_IRQ) && defined(USE_RADIO_CONTROLLER)
     Event evt = getEvent();
     gaspetto_car.postEvent(evt);
+#endif
+}
+
+void enter_low_power_mode()
+{
+#ifdef LOW_POWER_MODE
+#ifndef ARDUINO
+    Serial.println("Entering low-power mode...\n");
+    SwitchToLowPowerMode();
+#else
+    /*  Implement low-power mode for Arduino. */
+    /*  STM32 sleep modes or power-saving. */
+    delay(100); /*  Simulate low-power sleep. */
+#endif
 #endif
 }
 
@@ -39,11 +65,9 @@ void setup()
         /* Wait for serial port to connect. Needed for native USB port only */
     }
 #endif
-    /* Initialize the motor controller. */
-    motorController.setPins(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A,
-                            MOTOR_RIGHT_PIN_B, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN);
     /* Initialize the GaspettoCar state machine. */
-    gaspetto_car.Init();
+    gaspetto_car.setLowPowerModeCallback(enter_low_power_mode);
+    gaspetto_car.init(StateId::IDLE);
 #ifndef USE_RADIO_CONTROLLER
     timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::ACTION, CommandId::MOTOR_FORWARD));
     timeredEventQueue.scheduleEventDelayed(4000, Event(EventId::ACTION, CommandId::MOTOR_BACKWARD));
@@ -61,7 +85,7 @@ void setup()
 
 void loop()
 {
-    radioControllerCar.ProcessRadio();
+    radioControllerCar.processRadio();
     gaspetto_car.processNextEvent();
     timeredEventQueue.processEvents(gaspetto_car);
 }

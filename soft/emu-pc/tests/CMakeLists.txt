@@ -17,10 +17,9 @@ FetchContent_MakeAvailable(googletest)
 add_executable(
   utest
   main.cpp
-  gaspetto_car/test_motor_controller.cpp
+  gaspetto_car/test_movement_controller.cpp
   gaspetto_car/test_radio_controller.cpp
   mocks/mock_arduino.cpp
-  mocks/mock_MotorController.cpp
   mocks/mock_RadioController.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
@@ -36,15 +35,8 @@ target_link_libraries(
   gaspetto_car_impl
   arduino_framework_impl
   state_machine_framework_impl
-  motor_controller_impl
+  movement_controller_impl
   radio_controller_impl
 )
-
-# # Enable parallel LTO for faster linking. if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-# target_compile_options(utest PRIVATE -flto=auto) target_link_options(utest PRIVATE -flto=auto)
-# endif()
-
-# # Add mock_RF24.cpp to test sources. set_property( TARGET utest APPEND PROPERTY SOURCES
-# ${CMAKE_CURRENT_SOURCE_DIR}/mocks/mock_RF24.cpp )
 
 add_test(NAME utest COMMAND utest)

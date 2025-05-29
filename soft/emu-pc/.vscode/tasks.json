@@ -291,10 +291,6 @@
 			"command": "${workspaceFolder}/build-tests/tests/utest",
 			"args": [
 				"--gtest_color=yes",
-				"--gtest_print_time=1",
-				"--gtest_catch_exceptions=0",
-				"--gtest_break_on_failure=0",
-				"--gtest_output=plain"
 			],
 			"group": {
 				"kind": "test",
