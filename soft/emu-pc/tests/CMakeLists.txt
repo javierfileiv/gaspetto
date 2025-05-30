@@ -20,7 +20,6 @@ add_executable(
   gaspetto_car/test_movement_controller.cpp
   gaspetto_car/test_radio_controller.cpp
   mocks/mock_arduino.cpp
-  mocks/mock_RadioController.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
   fixture.cpp
