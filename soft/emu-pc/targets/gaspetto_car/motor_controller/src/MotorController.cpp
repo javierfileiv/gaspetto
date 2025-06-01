@@ -1,6 +1,7 @@
 #include "MotorController.h"
 
 #include "Arduino.h"
+#include "config_motor.h"
 
 MotorController *MotorController::isr_instance = nullptr;
 
@@ -8,34 +9,57 @@ MotorController::MotorController() = default;
 
 void MotorController::setPins(int lA, int lB, int rA, int rB, int sL, int sR)
 {
-    motor_left_pin_a = lA;
-    motor_left_pin_b = lB;
-    motor_right_pin_a = rA;
-    motor_right_pin_b = rB;
-    speed_sensor_left_pin = sL;
-    speed_sensor_right_pin = sR;
+    motor[LEFT].pin[A] = lA;
+    motor[LEFT].pin[B] = lB;
+    motor[LEFT].speed_sensor_pin = sL;
+    motor[RIGHT].pin[A] = rA;
+    motor[RIGHT].pin[B] = rB;
+    motor[RIGHT].speed_sensor_pin = sR;
+}
+
+#define SET_HW_TIMER(pin) \
+    new HardwareTimer((TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(pin), PinMap_PWM))
+#define TIME_CHANNEL(pin) STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(pin), PinMap_PWM))
+
+void MotorController::setPWMfrequency(MotorSide side, uint32_t frequency)
+{
+    motor[side].timer->setPWM(motor[side].tim_channel[A], motor[side].pin[A], frequency, 0);
+    motor[side].timer->setPWM(motor[side].tim_channel[B], motor[side].pin[B], frequency, 0);
+}
+
+void MotorController::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty)
+{
+    motor[side].timer->setCaptureCompare(motor[side].tim_channel[pin], percent_duty,
+                                         PERCENT_COMPARE_FORMAT);
 }
 
 void MotorController::InitMotorPins()
 {
-    pinMode(motor_left_pin_a, OUTPUT);
-    pinMode(motor_left_pin_b, OUTPUT);
-    pinMode(motor_right_pin_a, OUTPUT);
-    pinMode(motor_right_pin_b, OUTPUT);
-    analogWriteFrequency(PWM_FREQ);
+    pinMode(motor[LEFT].pin[A], OUTPUT);
+    pinMode(motor[LEFT].pin[B], OUTPUT);
+    pinMode(motor[RIGHT].pin[A], OUTPUT);
+    pinMode(motor[RIGHT].pin[B], OUTPUT);
+    motor[LEFT].timer = SET_HW_TIMER(motor[LEFT].pin[A]);
+    motor[LEFT].tim_channel[A] = TIME_CHANNEL(motor[LEFT].pin[A]);
+    motor[LEFT].tim_channel[B] = TIME_CHANNEL(motor[LEFT].pin[B]);
+    motor[RIGHT].timer = SET_HW_TIMER(motor[RIGHT].pin[A]);
+    motor[RIGHT].tim_channel[A] = TIME_CHANNEL(motor[RIGHT].pin[A]);
+    motor[RIGHT].tim_channel[B] = TIME_CHANNEL(motor[RIGHT].pin[B]);
+    setPWMfrequency(LEFT, PWM_FREQ);
+    setPWMfrequency(RIGHT, PWM_FREQ);
 }
 
 void MotorController::InitSpeedSensor()
 {
-    pinMode(speed_sensor_left_pin, INPUT);
-    pinMode(speed_sensor_right_pin, INPUT);
+    pinMode(motor[LEFT].speed_sensor_pin, INPUT);
+    pinMode(motor[RIGHT].speed_sensor_pin, INPUT);
     if (isr_instance == nullptr) {
         isr_instance = this; // Set the static instance pointer
     }
-    attachInterrupt(digitalPinToInterrupt(speed_sensor_left_pin), left_motor_speed_sensor_irq,
-                    RISING);
-    attachInterrupt(digitalPinToInterrupt(speed_sensor_right_pin), right_motor_speed_sensor_irq,
-                    RISING);
+    attachInterrupt(digitalPinToInterrupt(motor[LEFT].speed_sensor_pin),
+                    left_motor_speed_sensor_irq, RISING);
+    attachInterrupt(digitalPinToInterrupt(motor[RIGHT].speed_sensor_pin),
+                    right_motor_speed_sensor_irq, RISING);
 }
 
 void MotorController::ResetCounterMotorRight()
@@ -59,18 +83,18 @@ void MotorController::SetMotor(bool forward_motor_left, uint32_t motor_left_spee
     target_pulses_left = CentimetersToCount(distance_cm_left);
     target_pulses_right = CentimetersToCount(distance_cm_right);
     if (forward_motor_left) {
-        analogWrite(motor_left_pin_a, mapDutyCycle(motor_left_speed));
-        analogWrite(motor_left_pin_b, 0);
+        setPWMdutyCycle(LEFT, A, mapDutyCycle(motor_left_speed));
+        setPWMdutyCycle(LEFT, B, 0);
     } else {
-        analogWrite(motor_left_pin_a, 0);
-        analogWrite(motor_left_pin_b, mapDutyCycle(motor_left_speed));
+        setPWMdutyCycle(LEFT, A, 0);
+        setPWMdutyCycle(LEFT, B, mapDutyCycle(motor_left_speed));
     }
     if (forward_motor_right) {
-        analogWrite(motor_right_pin_a, mapDutyCycle(motor_right_speed));
-        analogWrite(motor_right_pin_b, 0);
+        setPWMdutyCycle(RIGHT, A, mapDutyCycle(motor_right_speed));
+        setPWMdutyCycle(RIGHT, B, 0);
     } else {
-        analogWrite(motor_right_pin_a, 0);
-        analogWrite(motor_right_pin_b, mapDutyCycle(motor_right_speed));
+        setPWMdutyCycle(RIGHT, A, 0);
+        setPWMdutyCycle(RIGHT, B, mapDutyCycle(motor_right_speed));
     }
 }
 
@@ -84,14 +108,14 @@ void MotorController::StopBothMotors()
 
 void MotorController::stopMotorRight()
 {
-    analogWrite(motor_right_pin_a, 0);
-    analogWrite(motor_right_pin_b, 0);
+    setPWMdutyCycle(RIGHT, A, 0);
+    setPWMdutyCycle(RIGHT, B, 0);
 }
 
 void MotorController::stopMotorLeft()
 {
-    analogWrite(motor_left_pin_a, 0);
-    analogWrite(motor_left_pin_b, 0);
+    setPWMdutyCycle(LEFT, A, 0);
+    setPWMdutyCycle(LEFT, B, 0);
 }
 
 bool MotorController::isTargetReached()
