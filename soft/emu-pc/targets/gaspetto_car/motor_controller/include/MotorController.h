@@ -1,12 +1,23 @@
 #ifndef MOTOR_CONTROLLER_H
 #define MOTOR_CONTROLLER_H
 
+#include "HardwareTimer.h"
 #include "State.h"
 #include "config_motor.h"
 
 #include <Arduino.h>
 #include <cstdint>
 #include <stdint.h>
+
+enum MotorSide { LEFT, RIGHT, MAX_SIDES };
+enum PinPerSide { A, B, MAX_PIN };
+
+struct MotorConfig {
+    uint32_t pin[MAX_PIN];
+    uint32_t tim_channel[MAX_PIN];
+    uint32_t speed_sensor_pin;
+    HardwareTimer *timer;
+};
 
 class MotorController {
 public:
@@ -22,6 +33,8 @@ public:
     void StopBothMotors();
     void stopMotorRight();
     void stopMotorLeft();
+    void setPWMfrequency(MotorSide side, uint32_t frequency);
+    void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
     bool isTargetReached(void);
     void setPins(int lA, int lB, int rA, int rB, int sL, int sR);
 
@@ -35,6 +48,9 @@ public:
     /* Pointer to the current instance for ISR access. */
     static MotorController *isr_instance;
 
+protected:
+    struct MotorConfig motor[MAX_SIDES];
+
 private:
     friend void left_motor_speed_sensor_irq();
     friend void right_motor_speed_sensor_irq();
@@ -42,8 +58,6 @@ private:
     volatile uint32_t motor_left_pulse_count;
     uint32_t target_pulses_right;
     uint32_t target_pulses_left;
-    int motor_left_pin_a, motor_left_pin_b, motor_right_pin_a, motor_right_pin_b;
-    int speed_sensor_left_pin, speed_sensor_right_pin;
 };
 
 void left_motor_speed_sensor_irq();

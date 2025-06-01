@@ -1,6 +1,7 @@
 #pragma once
 #include "Arduino_pins_pc.h"
 #include "Event.h"
+#include "HardwareTimer.h"
 #include "Serial.h"
 
 #include <atomic>
@@ -9,6 +10,11 @@
 extern std::atomic<bool> lowPowerMode;
 extern std::atomic<unsigned long> millisCounter;
 extern SerialEmulator Serial;
+
+#define digitalPinToPinName(pin) pin
+#define pinmap_peripheral(pin, map) nullptr
+#define pinmap_function(pin, map) pin
+#define STM_PIN_CHANNEL(pin) pin
 
 Event getEvent(void);
 

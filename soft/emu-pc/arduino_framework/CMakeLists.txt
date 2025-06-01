@@ -1,9 +1,11 @@
 add_library(arduino_framework_itf INTERFACE)
-target_include_directories(arduino_framework_itf INTERFACE include RF24)
+target_include_directories(arduino_framework_itf INTERFACE include RF24 HardwareTimer)
 add_library(arduino_framework_impl STATIC Serial.cpp)
 # Do not build emulated RF24 or Arduino if testing, like that we use the mocked one.
 if(NOT BUILD_TESTS)
-  target_sources(arduino_framework_impl PRIVATE RF24/RF24.cpp Arduino.cpp)
+  target_sources(
+    arduino_framework_impl PRIVATE RF24/RF24.cpp Arduino.cpp HardwareTimer/HardwareTimer.cpp
+  )
 endif()
 # Set a variable to indicate the current build target for arduino_framework
 if(GASPETTO_CAR)
