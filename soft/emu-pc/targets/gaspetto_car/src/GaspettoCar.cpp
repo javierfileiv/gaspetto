@@ -26,8 +26,10 @@ void GaspettoCar::Init()
         motorController->InitMotorPins();
         motorController->InitSpeedSensor();
     }
+#ifdef USE_RADIO_CONTROLLER
     if (radioController)
         radioController->Init();
+#endif
     ActiveObject::Init();
 }
 
