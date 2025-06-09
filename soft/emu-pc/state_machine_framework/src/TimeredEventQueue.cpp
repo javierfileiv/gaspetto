@@ -3,9 +3,9 @@
 #include "Arduino.h"
 
 TimeredEventQueue::TimeredEventQueue()
-        : headIndex_(-1)
+        : lastProcessTime_(millis())
+        , headIndex_(-1)
         , freeListHead_(0)
-        , lastProcessTime_(millis())
 {
     /*  Initialize the free list. */
     for (uint8_t i = 0; i < MAX_TIMED_EVENT_NODES - 1; ++i) {

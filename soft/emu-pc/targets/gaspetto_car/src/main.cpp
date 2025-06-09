@@ -12,25 +12,18 @@
 
 #include <cstdint>
 
-// const int NRF_IRQ_PIN = PB0;
-RF24 radio(CE_PIN, CSN_PIN);
-EventQueue eventQueue;
+RF24 _radio(CE_PIN, CSN_PIN);
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
 MotorControl motorControl(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A, MOTOR_RIGHT_PIN_B);
 MovementController carMovementController(motorControl, SPEED_SENSOR_LEFT_PIN,
                                          SPEED_SENSOR_RIGHT_PIN);
-RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
-                                   gaspetto_car_pipe_name);
+RadioController radioControllerCar(_radio, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
 Context context = {
-    &eventQueue,
-    &carMovementController,
-    &radioControllerCar,
-    &timeredEventQueue,
-    &idleState,
-    &processingState,
-    PWM_FREQ,
+    &carMovementController, &radioControllerCar,
+    &timeredEventQueue,     &idleState,
+    &processingState,       PWM_FREQ,
 };
 GaspettoCar gaspetto_car(context);
 
@@ -84,7 +77,5 @@ void setup()
 
 void loop()
 {
-    radioControllerCar.processRadio();
     gaspetto_car.processNextEvent();
-    timeredEventQueue.processEvents(gaspetto_car);
 }

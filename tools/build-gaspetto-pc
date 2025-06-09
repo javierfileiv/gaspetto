@@ -63,6 +63,7 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
 	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 	-DNRF_SENDER=ON \
+	-DARDUINO_AVR_UNO=ON \
 	..
 cmake --build . --parallel $NUM_CORES --target nrf_sender
 

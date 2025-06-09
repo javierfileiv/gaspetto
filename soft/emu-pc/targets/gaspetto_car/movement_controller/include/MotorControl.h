@@ -6,7 +6,7 @@
 #include <cstdint>
 
 enum MotorSide { LEFT, RIGHT, MAX_SIDES };
-enum PinPerSide { A, B, MAX_PIN };
+enum PinPerSide { DIR, SPEED, MAX_PIN };
 
 class HardwareTimer;
 

@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include "Context.h"
 #include "Log.h"
+#include "RadioController.h"
 
 #ifndef ARDUINO
 #include "Arduino_pins_pc.h"
@@ -29,6 +30,14 @@ public:
      */
     GaspettoCar(Context &ctx);
 
+    /** getContext(): Get the context of the GaspettoCar instance.
+     *  @return Reference to the Context instance.
+     */
+    inline Context &getContext()
+    {
+        return _ctx;
+    }
+
     /** init(): Initialize the GaspettoCar instance.
      *  @initialStateId: The initial state ID to start the state machine.
      */
@@ -52,6 +61,12 @@ public:
      * @return 0 on success, -1 on failure.
      */
     int postEvent(Event evt) override;
+
+    /** postRadioEvent(): Post an event to the radio event queue.
+     * @evt: The event to be posted.
+     * @return true on success, false on failure.
+     */
+    bool postRadioEvent(TelemetryData evt);
 
     /** processNextEvent(): Processe the next event in the event queue.
      *  Delegates to the current state.
@@ -111,5 +126,6 @@ private:
 
 private:
     Context &_ctx;
+    EventQueue<Event> eventQueue;
     void (*enter_low_power_mode)(void);
 };

@@ -5,13 +5,6 @@
 
 #include <cstdint>
 
-/* Dummy millis implementation. */
-inline uint32_t millis()
-{
-    static uint32_t t = 0;
-    return t += 100;
-}
-
 /* Arduino function declarations for test linkage. */
 extern "C" {
 void SwitchToLowPowerMode(void);
@@ -22,6 +15,7 @@ void digitalWrite(int pin, int value);
 void analogWriteFrequency(int freq);
 int digitalPinToInterrupt(int pin);
 void delay(int ms);
+uint32_t millis(void);
 }
 
 #endif /* ARDUINO_H. */

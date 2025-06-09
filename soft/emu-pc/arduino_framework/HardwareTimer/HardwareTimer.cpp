@@ -16,3 +16,7 @@ void HardwareTimer::setCaptureCompare(uint32_t channel, uint32_t compare,
 void HardwareTimer::setPWM(uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle)
 {
 }
+
+void HardwareTimer::pause(void)
+{
+}

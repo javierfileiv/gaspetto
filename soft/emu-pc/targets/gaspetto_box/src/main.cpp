@@ -22,10 +22,12 @@ RF24 radio(CE_PIN, CSN_PIN);
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
-EventQueue eventQueue;
-RadioController radioController(radio, &eventQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
+RadioController radioController(radio, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
 Context context = {
-    &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
+    &timeredEventQueue,
+    &radioController,
+    &idleState,
+    &processingState,
 };
 GaspettoBox gaspetto_box(context);
 

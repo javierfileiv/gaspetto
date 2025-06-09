@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include "Context.h"
 #include "Log.h"
+#include "RadioController.h"
 
 #ifndef ARDUINO
 extern std::atomic<bool> lowPowerMode;
@@ -13,6 +14,15 @@ public:
      *  @ctx: Reference to the Context instance containing dependencies.
      */
     GaspettoBox(Context &ctx);
+
+    /** getContext(): Get the context of the GaspettoCar instance.
+     *  @return Reference to the Context instance.
+     */
+    inline Context &getContext()
+    {
+        return _ctx;
+    }
+
     /** Init(): Initialize the GaspettoBox state machine.
      *  @initialStateId: The initial state ID to start the state machine.
      */
@@ -23,6 +33,12 @@ public:
      * @return 0 on success, -1 on failure.
      */
     int postEvent(Event evt) override;
+
+    /** postRadioEvent(): Post an event to the radio event queue.
+     * @evt: The event to be posted.
+     * @return true on success, false on failure.
+     */
+    bool postRadioEvent(TelemetryData evt);
 
     /** processNextEvent(): Processe the next event in the event queue.
      *  Delegates to the current state.
@@ -50,5 +66,6 @@ public:
 
 private:
     Context &_ctx;
+    EventQueue<Event> eventQueue;
     void (*enter_low_power_mode)(void);
 };

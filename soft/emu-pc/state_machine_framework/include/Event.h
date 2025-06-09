@@ -7,14 +7,8 @@
 #include "Arduino.h"
 #endif
 
-enum class EventId : uint8_t {
-    NONE,
-    TIMER_ELAPSED,
-    ACTION,
-    BUTTON_PRESSED,
-    RADIO_TX,
-    MAX_EVENT_ID
-};
+enum class EventId : uint8_t { NONE, TIMER_ELAPSED, ACTION, BUTTON_PRESSED, MAX_EVENT_ID };
+
 enum class CommandId : uint8_t {
     NONE,
     MOTOR_FORWARD,
@@ -37,33 +31,40 @@ public:
             , command(command)
     {
     }
+
     virtual ~Event() = default;
     EventId getEventId() const
     {
         return eventId;
     }
+
     CommandId getCommand() const
     {
         return command;
     }
+
     void setEventId(EventId id)
     {
         eventId = id;
     }
+
     void setCommand(CommandId cmd)
     {
         command = cmd;
     }
+
     void toPacket(EventPacket &packet) const
     {
         packet.eventId = static_cast<uint8_t>(eventId);
         packet.commandId = static_cast<uint8_t>(command);
     }
+
     static Event fromPacket(const EventPacket &packet)
     {
         return Event(static_cast<EventId>(packet.eventId),
                      static_cast<CommandId>(packet.commandId));
     }
+
     static constexpr uint8_t packetSize()
     {
         return sizeof(EventPacket);

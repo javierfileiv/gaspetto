@@ -8,16 +8,12 @@
 #include <cstdint>
 #endif
 
-class EventQueue;
-class TimeredEventQueue;
 class Log;
 
 class ActiveObject : public Log {
 public:
-    ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
-            : eventQueue(queue)
-            , timeredEventQueue(timeredQueue)
-            , states{}
+    ActiveObject()
+            : states{}
     {
     }
 
@@ -57,19 +53,7 @@ public:
 
     virtual void enterLowPowerMode() = 0;
 
-    EventQueue *getEventQueue()
-    {
-        return eventQueue;
-    }
-
-    TimeredEventQueue *getTimeredEventQueue()
-    {
-        return timeredEventQueue;
-    }
-
 protected:
-    EventQueue *eventQueue;
-    TimeredEventQueue *timeredEventQueue;
     State *states[static_cast<uint8_t>(StateId::MAX_STATE_ID)];
     StateId currentStateId;
 };

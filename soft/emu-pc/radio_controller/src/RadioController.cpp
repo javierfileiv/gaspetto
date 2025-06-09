@@ -4,13 +4,12 @@
 #include "Event.h"
 #include "config_radio.h"
 
-const uint64_t address = 0xdeadbeef11LL;
-float payload = 0.0;
+#include <printf.h>
 
-RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
-                                 const uint8_t writing_addr[5], const uint8_t reading_addr[5])
-        : gaspettoQueue(gaspettoQueue)
-        , _radio(radio)
+RadioController::RadioController(RF24 &radio, const uint8_t writing_addr[5],
+                                 const uint8_t reading_addr[5])
+        : _radio(radio)
+        , radioQueue(RADIO_QUEUE_SIZE)
 {
     for (int i = 0; i < 5; i++) {
         this->writing_addr[i] = writing_addr[i];
@@ -37,11 +36,14 @@ void RadioController::init()
         while (1) {
         }
     }
+    printf_begin();
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
     _radio.setPayloadSize(Event::packetSize());
-    _radio.openWritingPipe(writing_addr);
-    _radio.openReadingPipe(1, reading_addr);
+    _radio.openWritingPipe(gaspetto_box_pipe_name);
+    _radio.openReadingPipe(1, gaspetto_car_pipe_name);
+    _radio.setRetries(3, 5);
+    _radio.setAutoAck(true);
     _radio.printDetails();
     _radio.printPrettyDetails();
 #if NFR_IRQ
@@ -56,11 +58,11 @@ void RadioController::init()
 
 void RadioController::processRadio()
 {
-    EventPacket packet;
     uint8_t pipe;
-
     /* RX processing. */
     if (_radio.available(&pipe)) {
+        EventPacket packet;
+
         logln(F("ProcessRadio():"));
         _radio.read(&packet, sizeof(packet)); /* Fetch payload from FIFO. */
         log(F("Received EventId:"));
@@ -76,39 +78,33 @@ void RadioController::processRadio()
         /* Post to active object queue. */
         gaspettoQueue->enqueue(evt);
     }
-    /* TX processing. Only send the first one. */
+    /* TX processing. */
     if (!radioQueue.IsEmpty()) {
-        EventPacket packet;
-        Event evt;
+        TelemetryData evt;
 
         radioQueue.dequeue(evt);
-        log(F("RadioController::ProcessRadio: "));
-        log(Event::eventIdToString(evt.getEventId()));
-        log(F(" - "));
-        logln(Event::commandIdToString(evt.getCommand()));
-        evt.toPacket(packet);
         /* Stop listening. */
         _radio.stopListening();
-        _radio.write(&packet, sizeof(packet));
-        log(F("RadioController::ProcessRadio: Sent EventId:"));
-        log(Event::eventIdToString(static_cast<EventId>(packet.eventId)));
-        log(F(" CommandId:"));
-        log(Event::commandIdToString(static_cast<CommandId>(packet.commandId)));
-        logln(F("."));
+
         _radio.startListening();
     }
 }
 
-void RadioController::sendEvent(Event evt)
-{
-    if (radioQueue.IsFull()) {
-        logln(F("RadioController::SendEvent: Queue is full."));
-        return;
-    }
-    radioQueue.enqueue(evt);
-}
-
-EventQueue *RadioController::getRadioQueue()
+EventQueue<TelemetryData> *RadioController::getRadioQueue()
 {
     return &radioQueue;
+}
+
+bool RadioController::postRadioEvent(TelemetryData evt)
+{
+    if (radioQueue.IsFull()) {
+        logln(F("RadioController::PostEvent: Gaspetto queue is full."));
+        return false;
+    }
+    return radioQueue.enqueue(evt);
+}
+
+void RadioController::setEventQueue(EventQueue<Event> *queue)
+{
+    gaspettoQueue = queue;
 }

@@ -1,15 +1,16 @@
 #include "Serial.h"
+#include "printf.h"
 
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-std::atomic<unsigned long> millisCounter{ 0 };
+std::atomic<uint32_t> millisCounter{ 0 };
 std::atomic<bool> lowPowerMode;
 
-/*  Simulated millis function. */
 extern "C" {
-unsigned long millis(void)
+/*  Simulated millis function. */
+uint32_t millis(void)
 {
     return millisCounter.load();
 }

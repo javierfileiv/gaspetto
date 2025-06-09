@@ -25,6 +25,7 @@ public:
 
     void setPWM(uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle);
     void setCaptureCompare(uint32_t channel, uint32_t compare, TimerCompareFormat_t format);
+    void pause(void);
 };
 
 #endif /* HARDWARETIMER_H */

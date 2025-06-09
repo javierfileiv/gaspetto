@@ -5,6 +5,7 @@
 #include "Context.h"
 #include "MovementController.h"
 #include "RadioController.h"
+#include "TimeredEventQueue.h"
 
 #include <cstdint>
 
@@ -12,7 +13,8 @@ class State;
 
 GaspettoCar::GaspettoCar(Context &ctx)
         : _ctx(ctx)
-        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
+        , eventQueue(EVENT_QUEUE_SIZE)
+        , ActiveObject()
 
 {
     initMachine(StateId::IDLE, ctx.idleState);
@@ -22,6 +24,7 @@ GaspettoCar::GaspettoCar(Context &ctx)
 void GaspettoCar::init(StateId initialStateId)
 {
     _ctx.movementController->init(_ctx.pwm_freq);
+    _ctx.radioController->setEventQueue(&eventQueue);
     _ctx.radioController->init();
     ActiveObject::init(initialStateId);
 }
@@ -39,58 +42,71 @@ void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
 
 bool GaspettoCar::isTargetReached()
 {
-    bool right_reached = _ctx.movementController->getRightPulseCount() >=
+    bool right_reached = _ctx.movementController->getRightPulseCount() >
                          _ctx.movementController->getRightTargetPulses();
-    bool left_reached = _ctx.movementController->getLeftPulseCount() >=
+    bool left_reached = _ctx.movementController->getLeftPulseCount() >
                         _ctx.movementController->getLeftTargetPulses();
 
     if (currentStateId == StateId::IDLE)
-        return true;
+        return false;
     if (left_reached)
         _ctx.movementController->stopMotorLeft();
     if (right_reached)
         _ctx.movementController->stopMotorRight();
-    if (right_reached && left_reached)
+    if (right_reached && left_reached) {
+        _ctx.movementController->resetCounterMotorRight();
+        _ctx.movementController->resetCounterMotorLeft();
         return true;
+    }
     return false;
 }
 
 int GaspettoCar::postEvent(Event evt)
 {
-    if (eventQueue) {
-        eventQueue->enqueue(evt);
+    if (!eventQueue.IsFull()) {
+        eventQueue.enqueue(evt);
         return 0;
     }
     return -1;
 }
 
+bool GaspettoCar::postRadioEvent(TelemetryData evt)
+{
+    if (_ctx.radioController)
+        return _ctx.radioController->getRadioQueue()->enqueue(evt);
+    return false;
+}
+
 void GaspettoCar::stopMotorRight()
 {
-    logln(F("GaspettoCar::stopMotorRight() - Delegating to MovementController."));
     _ctx.movementController->stopMotorRight();
 }
 
 void GaspettoCar::stopMotorLeft()
 {
-    logln(F("GaspettoCar::stopMotorLeft() - Delegating to MovementController."));
     _ctx.movementController->stopMotorLeft();
 }
 
 void GaspettoCar::processNextEvent()
 {
-    if (isTargetReached()) {
-        if (eventQueue && !eventQueue->IsEmpty()) {
-            Event evt;
+    if (_ctx.radioController)
+        _ctx.radioController->processRadio();
+    if (_ctx.timeredEventQueue)
+        _ctx.timeredEventQueue->processEvents(*this);
+    if (!eventQueue.IsEmpty()) {
+        Event evt;
 
-            State *currentState = states[static_cast<uint8_t>(currentStateId)];
-            eventQueue->dequeue(evt);
-            currentState->processEvent(evt);
-        }
+        State *currentState = states[static_cast<uint8_t>(currentStateId)];
+        eventQueue.dequeue(evt);
+        currentState->processEvent(evt);
     }
+    if (isTargetReached())
+        transitionTo(StateId::IDLE);
 }
 
 void GaspettoCar::enterLowPowerMode()
 {
+    logln(F("IdleState: low power mode."));
     if (enter_low_power_mode) {
         enter_low_power_mode();
         return;

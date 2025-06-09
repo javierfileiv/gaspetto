@@ -24,6 +24,9 @@ if ! command -v pio &> /dev/null; then
 fi
 
 echo -e "${BLUE}Build Arduino software with PlatformIO...${NC}"
+echo -e "${YELLOW}Building Gaspetto Box...${NC}"
+cd $PROJECT_ROOT/soft/pio/GaspettoBox_pio
+pio run
 echo -e "${YELLOW}Building Gaspetto Car...${NC}"
 cd $PROJECT_ROOT/soft/pio/GaspettoCar_pio
 pio run

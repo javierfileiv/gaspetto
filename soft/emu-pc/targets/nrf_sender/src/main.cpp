@@ -1,19 +1,18 @@
 #include "Arduino.h"
 #include "Event.h"
 #include "RF24.h"
-
-#include <Arduino.h>
+#include "config_radio.h"
 
 #ifdef ARDUINO_AVR_UNO
 #define CE_PIN 9
 #define CSN_PIN 10
+#define HARDWARE_SERIAL Serial
 #else
+#define HARDWARE_SERIAL Serial1
 #define CE_PIN PB15
 #define CSN_PIN PA4
 #endif
 
-const uint8_t gaspetto_box_pipe_name[] = "_box_";
-const uint8_t gaspetto_car_pipe_name[] = "_car_";
 RF24 radio(CE_PIN, CSN_PIN);
 
 void setup()
@@ -26,12 +25,12 @@ void setup()
 #endif
     Serial.println("NRF Event Sender - Sends commands over radio");
     if (!radio.begin()) {
-        Serial.println(F("radio hardware is not responding!!"));
+        HARDWARE_SERIAL.println(F("radio hardware is not responding!!"));
         while (1) {
         } /* Hold in infinite loop. */
     }
-    radio.setPALevel(RF24_PA_LOW);
-    radio.setDataRate(RF24_1MBPS);
+    radio.setPALevel(PA_LEVEL);
+    radio.setDataRate(DATA_RATE); // better reliability
     radio.setAddressWidth(5);
     radio.setPayloadSize(Event::packetSize());
     radio.openWritingPipe(gaspetto_car_pipe_name);
@@ -49,15 +48,15 @@ void sendEvent(CommandId cmd)
     evt.toPacket(pkt);
     radio.stopListening();
     radio.write(&pkt, sizeof(pkt));
-    Serial.print("Sent command: ");
-    Serial.println(Event::commandIdToString(cmd));
+    HARDWARE_SERIAL.print("Sent command: ");
+    HARDWARE_SERIAL.println(Event::commandIdToString(cmd));
     radio.startListening();
 }
 
 void loop()
 {
-    if (Serial.available()) {
-        char ch = Serial.read();
+    if (HARDWARE_SERIAL.available()) {
+        char ch = HARDWARE_SERIAL.read();
         switch (ch) {
         case 'w':
         case 'W':
@@ -81,5 +80,11 @@ void loop()
             break;
         }
     }
-    delay(100);
+    if (radio.available()) {
+        uint8_t pkt;
+        radio.read(&pkt, sizeof(pkt));
+        HARDWARE_SERIAL.print("Received event: cmd= ");
+        HARDWARE_SERIAL.println(pkt);
+    }
+    delay(10);
 }

@@ -20,6 +20,8 @@ public:
     MOCK_METHOD(void, _setPALevel, (uint8_t level, bool lnaEnable));
     MOCK_METHOD(bool, _setDataRate, (rf24_datarate_e speed));
     MOCK_METHOD(void, _setPayloadSize, (uint8_t size));
+    MOCK_METHOD(void, _setRetries, (uint8_t delay, uint8_t count));
+    MOCK_METHOD(void, _setAutoAck, (bool enable));
     MOCK_METHOD(void, _setChannel, (uint8_t channel));
     MOCK_METHOD(void, _powerUp, ());
     MOCK_METHOD(void, _powerDown, ());
@@ -27,6 +29,7 @@ public:
     bool begin(void) override;
     void startListening(void) override;
     void stopListening(void) override;
+    bool available() override;
     bool available(uint8_t *pipe_num) override;
     void read(void *buf, uint8_t len) override;
     bool write(const void *buf, uint8_t len) override;
@@ -36,6 +39,8 @@ public:
     void powerUp(void) override;
     bool setDataRate(rf24_datarate_e speed) override;
     void setPayloadSize(uint8_t size) override;
+    void setRetries(unsigned char delay, unsigned char count);
+    void setAutoAck(bool enable);
     void simulateReceivedPacket(uint8_t pipe, const void *data, uint8_t len) override;
     void simulateFailedTransmission() override;
     void simulateSuccessfulTransmission() override;

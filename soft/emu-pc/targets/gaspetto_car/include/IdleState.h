@@ -1,6 +1,7 @@
 #pragma once
-#include "Event.h"
 #include "State.h"
+
+class Event;
 
 class IdleState : public State {
 public:

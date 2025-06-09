@@ -12,12 +12,14 @@ public:
     MOCK_METHOD(void, analogWrite, (int pin, int value));
     MOCK_METHOD(int, digitalPinToInterrupt, (int pin));
     MOCK_METHOD(void, delay, (int ms));
+    MOCK_METHOD(uint32_t, millis, ());
     MOCK_METHOD(void, SwitchToLowPowerMode, ());
     MOCK_METHOD(void, analogWriteFrequency, (int freq));
     MOCK_METHOD(void, setCaptureCompare,
                 (uint32_t channel, uint32_t compare, TimerCompareFormat_t format));
     MOCK_METHOD(void, setPWM,
                 (uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle));
+    MOCK_METHOD(void, pause, ());
 
     void execute_irq_left(int n_times = 0)
     {

@@ -8,7 +8,7 @@
 #include <thread>
 
 extern std::atomic<bool> lowPowerMode;
-extern std::atomic<unsigned long> millisCounter;
+extern std::atomic<uint32_t> millisCounter;
 extern SerialEmulator Serial;
 
 #define digitalPinToPinName(pin) pin
@@ -20,7 +20,7 @@ Event getEvent(void);
 
 extern "C" {
 
-unsigned long millis(void);
+uint32_t millis(void);
 void SwitchToLowPowerMode(void);
 long map(long x, long in_min, long in_max, long out_min, long out_max);
 void pinMode(int pin, int mode);

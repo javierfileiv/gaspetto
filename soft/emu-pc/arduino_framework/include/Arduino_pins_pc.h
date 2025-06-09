@@ -8,7 +8,8 @@
 #define PB10 10
 #define PB11 11
 #define PB15 15
-#define PA4 4
+#define PIN_A4 4
+#define PIN_A2 2
 #define RISING 0
 #define FALLING 1
 #define LOW 0

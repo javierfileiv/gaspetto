@@ -25,11 +25,12 @@ void enter_low_power_mode(void);
 class Fixture : public ::testing::Test {
 public:
     Fixture()
-            : radioController(_mock_RF24, &eventQueue, test_writing_addr, test_reading_addr)
+            : radioController(_mock_RF24, test_writing_addr, test_reading_addr)
             , motorControl(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A, MOTOR_RIGHT_PIN_B)
             , carMovementController(motorControl, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN)
-            , ctx({ &eventQueue, &carMovementController, &radioController, nullptr, &idleState,
-                    &processingState, PWM_FREQ })
+            , eventQueue(EVENT_QUEUE_SIZE)
+            , ctx({ &carMovementController, &radioController, nullptr, &idleState, &processingState,
+                    PWM_FREQ })
             , car(ctx)
     {
     }
@@ -63,7 +64,6 @@ public:
     /* Radio. */
     void expect_radio_initialization();
     void expect_receive_event(Event *evt = nullptr);
-    void expect_transmit_event(Event evt);
     void ProcessRadio();
     void RxRadioEvent(Event evt);
     void expect_send_event(Event *evt = nullptr);
@@ -109,7 +109,7 @@ protected:
     Event rightEvent{ EventId::ACTION, CommandId::MOTOR_RIGHT };
 
 private:
-    EventQueue eventQueue;
+    EventQueue<Event> eventQueue;
     RadioController radioController;
     MovementController carMovementController;
     MotorControl motorControl;

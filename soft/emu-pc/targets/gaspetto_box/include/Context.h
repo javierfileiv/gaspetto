@@ -4,7 +4,8 @@
 #include "IdleState.h"
 #include "ProcessingState.h"
 
-class EventQueue;
+template <typename T> class EventQueue;
+class Event;
 class TimeredEventQueue;
 class RadioController;
 
@@ -14,7 +15,6 @@ class RadioController;
  * them easier to pass around and manage.
  */
 struct Context {
-    EventQueue *mainEventQueue;
     TimeredEventQueue *timeredEventQueue;
     RadioController *radioController;
     IdleState *idleState;

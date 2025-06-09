@@ -1,5 +1,7 @@
 #include "fixture.h"
 
+#include "LogData.h"
+
 using testing::NotNull;
 using testing::Return;
 using testing::Invoke;
@@ -37,14 +39,20 @@ void Fixture::expect_movement_controller_init()
 void Fixture::expect_motor_control_init()
 {
     /* Configure pins and set PWM freq. */
-    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[A], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[B], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[A], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[B], OUTPUT));
+    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[DIR], OUTPUT));
+    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[SPEED], OUTPUT));
+    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[DIR], OUTPUT));
+    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[SPEED], OUTPUT));
+    EXPECT_CALL(_mock_arduino, digitalWrite(motor[LEFT].pin[DIR], LOW));
+    EXPECT_CALL(_mock_arduino, digitalWrite(motor[LEFT].pin[SPEED], LOW));
+    EXPECT_CALL(_mock_arduino, digitalWrite(motor[RIGHT].pin[DIR], LOW));
+    EXPECT_CALL(_mock_arduino, digitalWrite(motor[RIGHT].pin[SPEED], LOW));
+    EXPECT_CALL(_mock_arduino, pause).Times(2);
     EXPECT_CALL(_mock_arduino, setPWM);
     EXPECT_CALL(_mock_arduino, setPWM);
     EXPECT_CALL(_mock_arduino, setPWM);
     EXPECT_CALL(_mock_arduino, setPWM);
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(_, LOW, PERCENT_COMPARE_FORMAT)).Times(4);
 }
 
 void Fixture::expect_enter_low_power_mode()
@@ -58,11 +66,13 @@ void Fixture::expect_move_forward(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[LEFT].pin[A], _leftPercent, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[B], 0, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[DIR], _leftPercent, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[RIGHT].pin[A], _rightPercent, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[B], 0, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[RIGHT].pin[DIR], _rightPercent, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[RIGHT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -70,12 +80,12 @@ void Fixture::expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[A], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[LEFT].pin[B], _leftPercent, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[A], 0, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[SPEED], _leftPercent, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[RIGHT].pin[B], _rightPercent, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[RIGHT].pin[SPEED], _rightPercent, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -83,12 +93,13 @@ void Fixture::expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[A], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[LEFT].pin[B], _leftPercent, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[SPEED], _leftPercent, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[RIGHT].pin[A], _rightPercent, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[B], 0, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[RIGHT].pin[DIR], _rightPercent, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[RIGHT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -97,23 +108,26 @@ void Fixture::expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[LEFT].pin[A], _leftPercent, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[B], 0, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[A], 0, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[DIR], _leftPercent, PERCENT_COMPARE_FORMAT));
     EXPECT_CALL(_mock_arduino,
-                setCaptureCompare(motor[RIGHT].pin[B], _rightPercent, PERCENT_COMPARE_FORMAT));
+                setCaptureCompare(motor[LEFT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[RIGHT].pin[SPEED], _rightPercent, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_stop_motor_left()
 {
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[A], 0, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[B], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[LEFT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_stop_motor_right()
 {
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[A], 0, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[B], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[DIR], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_arduino,
+                setCaptureCompare(motor[RIGHT].pin[SPEED], 0, PERCENT_COMPARE_FORMAT));
 }
 
 void Fixture::expect_both_motors_stop()
@@ -152,8 +166,6 @@ void Fixture::expect_receive_event(Event *evt)
     if (evt)
         EXPECT_CALL(_mock_RF24, _read(_, Event::packetSize()))
                 .WillOnce([evt](void *buf, uint8_t len) {
-                    std::cout << "_read called with buf=" << buf << " len=" << (int)len
-                              << std::endl;
                     if (evt) {
                         EventPacket packet;
                         evt->toPacket(packet);
@@ -162,18 +174,6 @@ void Fixture::expect_receive_event(Event *evt)
                 });
 }
 
-void Fixture::expect_transmit_event(Event evt)
-{
-    EventPacket packet;
-
-    evt.toPacket(packet);
-    auto do_check = [&packet](const void *buf, size_t len) {
-        ASSERT_EQ(len, Event::packetSize());
-        ASSERT_EQ(memcmp(buf, &packet, Event::packetSize()), 0);
-    };
-    EXPECT_CALL(_mock_RF24, _write(NotNull(), Event::packetSize()))
-            .WillOnce(DoAll(Invoke(do_check), Return(true)));
-}
 void Fixture::ProcessRadio()
 {
     radioController.processRadio();

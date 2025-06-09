@@ -44,6 +44,13 @@ void MockRF24::stopListening(void)
     mock->_stopListening();
 }
 
+bool MockRF24::available()
+{
+    auto mock = MockRF24::get_instance();
+
+    return mock->_available();
+}
+
 bool MockRF24::available(uint8_t *pipe_num)
 {
     auto mock = MockRF24::get_instance();
@@ -109,6 +116,20 @@ void MockRF24::powerUp(void)
     auto mock = MockRF24::get_instance();
 
     mock->_powerUp();
+}
+
+void MockRF24::setRetries(unsigned char delay, unsigned char count)
+{
+    auto mock = MockRF24::get_instance();
+
+    mock->_setRetries(delay, count);
+}
+
+void MockRF24::setAutoAck(bool enable)
+{
+    auto mock = MockRF24::get_instance();
+
+    mock->_setAutoAck(enable);
 }
 
 void MockRF24::simulateReceivedPacket(uint8_t, const void *data, uint8_t len)

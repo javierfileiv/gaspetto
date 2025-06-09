@@ -45,10 +45,13 @@ public:
     virtual void powerUp(void);
     virtual void startListening(void);
     virtual void stopListening(void);
+    virtual bool available();
     virtual bool available(uint8_t *pipe_num);
     virtual void read(void *buf, uint8_t len);
     virtual bool write(const void *buf, uint8_t len);
     void setAddressWidth(uint8_t a_width);
+    void setRetries(uint8_t delay, uint8_t count);
+    void setAutoAck(bool enable);
     /* PC emulation specific methods */
     virtual void simulateReceivedPacket(uint8_t pipe, const void *data, uint8_t len);
     virtual void simulateFailedTransmission();

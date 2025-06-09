@@ -9,7 +9,8 @@
 
 GaspettoBox::GaspettoBox(Context &ctx)
         : _ctx(ctx)
-        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
+        , eventQueue(EVENT_QUEUE_SIZE)
+        , ActiveObject()
 {
     initMachine(StateId::IDLE, ctx.idleState);
     initMachine(StateId::PROCESSING, ctx.processingState);
@@ -17,13 +18,15 @@ GaspettoBox::GaspettoBox(Context &ctx)
 
 void GaspettoBox::init(StateId initialStateId)
 {
+    _ctx.radioController->setEventQueue(&eventQueue);
+    _ctx.radioController->init();
     ActiveObject::init(initialStateId);
 }
 
 int GaspettoBox::postEvent(Event evt)
 {
-    if (eventQueue) {
-        eventQueue->enqueue(evt);
+    if (!eventQueue.IsFull()) {
+        eventQueue.enqueue(evt);
         return 0;
     }
     return -1;
@@ -31,11 +34,11 @@ int GaspettoBox::postEvent(Event evt)
 
 void GaspettoBox::processNextEvent()
 {
-    if (eventQueue && !eventQueue->IsEmpty()) {
+    if (!eventQueue.IsEmpty()) {
         Event evt;
 
         State *currentState = states[static_cast<uint8_t>(currentStateId)];
-        eventQueue->dequeue(evt);
+        eventQueue.dequeue(evt);
         currentState->processEvent(evt);
     }
 }
@@ -68,7 +71,7 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         }
     }
 #else
-    if (!eventQueue->IsFull()) {
+    if (!eventQueue.IsFull()) {
         postEvent(evt);
     } else {
         logln("Event queue is full! Unable to enqueue event.\n");

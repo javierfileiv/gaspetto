@@ -1,4 +1,3 @@
-/* filepath: /home/fixp/sourceCode/gaspetto/soft/emu-pc/arduino_framework/RF24.cpp */
 #include "RF24.h"
 
 #include <cstring>
@@ -16,6 +15,7 @@ void rf24_log(const std::string &msg)
     std::cout << msg << std::endl;
 #endif
 }
+
 void rf24_log_noendl(const std::string &msg)
 {
 #if NRF_LOG
@@ -27,6 +27,7 @@ void rf24_log_noendl(const std::string &msg)
 RF24::RF24(rf24_gpio_pin_t, rf24_gpio_pin_t, uint32_t)
 {
 }
+
 RF24::RF24(uint32_t)
 {
 }
@@ -35,43 +36,60 @@ bool RF24::begin(void)
 {
     return true;
 }
+
 void RF24::setPALevel(uint8_t, bool)
 {
 }
+
 bool RF24::setDataRate(rf24_datarate_e)
 {
     return true;
 }
+
 void RF24::setPayloadSize(uint8_t)
 {
 }
+
 void RF24::openWritingPipe(const uint8_t *)
 {
 }
+
 void RF24::openReadingPipe(uint8_t, const uint8_t *)
 {
 }
+
 void RF24::printDetails(void)
 {
 }
+
 void RF24::printPrettyDetails(void)
 {
 }
+
 void RF24::powerUp(void)
 {
 }
+
 void RF24::startListening(void)
 {
 }
+
 void RF24::stopListening(void)
 {
 }
+
+bool RF24::available()
+{
+    return g_data_available;
+}
+
 bool RF24::available(uint8_t *pipe_num)
 {
     if (pipe_num)
         *pipe_num = 0;
     return g_data_available;
 }
+
 void RF24::read(void *buf, uint8_t len)
 {
     if (g_data_available) {
@@ -79,6 +97,7 @@ void RF24::read(void *buf, uint8_t len)
         g_data_available = false;
     }
 }
+
 bool RF24::write(const void *, uint8_t)
 {
     return true;
@@ -89,14 +108,24 @@ void RF24::setAddressWidth(uint8_t width)
     rf24_log("RF24 PC Emulation address width set to " + std::to_string((int)width) + " bytes.");
 }
 
+void RF24::setRetries(uint8_t delay, uint8_t count)
+{
+}
+
+void RF24::setAutoAck(bool enable)
+{
+}
+
 void RF24::simulateReceivedPacket(uint8_t, const void *data, uint8_t len)
 {
     std::memcpy(g_payload, data, len > 32 ? 32 : len);
     g_data_available = true;
 }
+
 void RF24::simulateFailedTransmission()
 {
 }
+
 void RF24::simulateSuccessfulTransmission()
 {
 }

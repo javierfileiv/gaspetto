@@ -2,5 +2,5 @@ add_library(state_machine_framework_itf INTERFACE)
 target_include_directories(state_machine_framework_itf INTERFACE include)
 target_link_libraries(state_machine_framework_itf INTERFACE arduino_framework_itf)
 
-add_library(state_machine_framework_impl STATIC src/EventQueue.cpp src/TimeredEventQueue.cpp)
+add_library(state_machine_framework_impl STATIC src/TimeredEventQueue.cpp)
 target_link_libraries(state_machine_framework_impl PUBLIC state_machine_framework_itf)
