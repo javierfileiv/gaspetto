@@ -9,13 +9,21 @@
  * https://howtomechatronics.com/tutorials/arduino/arduino-and-mpu6050-accelerometer-and-gyroscope-tutorial/
  */
 #include <Wire.h>
-// control pins for left and right motors
-const int leftSpeed = 9; // means pin 9 on the Arduino controls the speed of left motor
-const int rightSpeed = 5;
-const int left1 = 3; // left 1 and left 2 control the direction of rotation of left motor
-const int left2 = 2;
-const int right1 = 8;
-const int right2 = 4;
+
+// L9110S control pins for left motor
+// These pins control both direction and speed (via PWM) for the left motor
+const int L9110_left_IN1 = PB15; // Connect to A-IA or INA on your L9110S module for the left motor
+const int L9110_left_IN2 = PB14; // Connect to A-IB or INB on your L9110S module for the left motor
+
+// L9110S control pins for right motor
+// These pins control both direction and speed (via PWM) for the right motor
+const int L9110_right_IN1 = PB11; // Connect to B-IA or INC on your L9110S module for the right
+                                  // motor
+const int L9110_right_IN2 = PB10; // Connect to B-IB or IND on your L9110S module for the right
+                                  // motor
+
+// Note: The original 'leftSpeed' (pin 9) and 'rightSpeed' (pin 5) are no longer used as separate
+// Enable pins. Speed control (PWM) is now applied directly to the active input pin of the L9110S.
 
 const int MPU = 0x68; // MPU6050 I2C address
 float AccX, AccY, AccZ; // linear acceleration
@@ -46,13 +54,12 @@ void calculateError();
 void readAcceleration();
 void readGyro();
 void stopCar();
-void forward();
-void left();
-void right();
+// Removed forward(), left(), right() as they are now integrated directly into driving() and
+// rotate()
 
 void setup()
 {
-    Serial.begin(9600);
+    Serial.begin(115200);
     Wire.begin(); // Initialize comunication
     Wire.beginTransmission(MPU); // Start communication with MPU6050 // MPU=0x68
     Wire.write(0x6B); // Talk to the register 6B
@@ -61,12 +68,16 @@ void setup()
     // Call this function if you need to get the IMU error values for your module
     calculateError();
     delay(20);
-    pinMode(left1, OUTPUT);
-    pinMode(left2, OUTPUT);
-    pinMode(right1, OUTPUT);
-    pinMode(right2, OUTPUT);
-    pinMode(leftSpeed, OUTPUT);
-    pinMode(rightSpeed, OUTPUT);
+
+    // Initialize L9110S motor control pins as outputs
+    pinMode(L9110_left_IN1, OUTPUT);
+    pinMode(L9110_left_IN2, OUTPUT);
+    pinMode(L9110_right_IN1, OUTPUT);
+    pinMode(L9110_right_IN2, OUTPUT);
+
+    // No need for separate speed pins (like leftSpeed, rightSpeed) with L9110S
+    // as PWM is applied directly to the direction input pins.
+
     currentTime = micros();
 }
 
@@ -186,13 +197,21 @@ void driving()
 { // called by void loop(), which isDriving = true
     int deltaAngle = round(targetAngle - angle); // rounding is neccessary, since you never get
                                                  // exact values in reality
-    forward();
+
+    // Set motor directions and apply speed for forward movement
+    // Right motor forward direction
+    digitalWrite(L9110_right_IN2, LOW); // Set inactive pin LOW
+    analogWrite(L9110_right_IN1, rightSpeedVal); // Apply PWM to active pin
+
+    // Left motor forward direction
+    digitalWrite(L9110_left_IN2, LOW); // Set inactive pin LOW
+    analogWrite(L9110_left_IN1, leftSpeedVal); // Apply PWM to active pin
+
     if (deltaAngle != 0) {
         controlSpeed();
-        rightSpeedVal = maxSpeed;
-        analogWrite(rightSpeed, rightSpeedVal);
-        analogWrite(leftSpeed, leftSpeedVal);
+        rightSpeedVal = maxSpeed; // Assuming the right motor is set to max speed when correcting
     }
+    // The analogWrite calls are already done above.
 }
 
 void controlSpeed()
@@ -222,16 +241,30 @@ void rotate()
 { // called by void loop(), which isDriving = false
     int deltaAngle = round(targetAngle - angle);
     int targetGyroX;
+
     if (abs(deltaAngle) <= 1) {
         stopCar();
     } else {
-        if (angle > targetAngle) { // turn left
-            left();
-        } else if (angle < targetAngle) { // turn right
-            right();
+        if (angle > targetAngle) { // turn left (Left motor forward, Right motor reverse)
+            // Left motor forward direction
+            digitalWrite(L9110_left_IN2, LOW); // Set inactive pin LOW
+            analogWrite(L9110_left_IN1, leftSpeedVal); // Apply PWM to active pin
+
+            // Right motor reverse direction
+            digitalWrite(L9110_right_IN1, LOW); // Set inactive pin LOW
+            analogWrite(L9110_right_IN2, rightSpeedVal); // Apply PWM to active pin
+
+        } else if (angle < targetAngle) { // turn right (Left motor reverse, Right motor forward)
+            // Left motor reverse direction
+            digitalWrite(L9110_left_IN1, LOW); // Set inactive pin LOW
+            analogWrite(L9110_left_IN2, leftSpeedVal); // Apply PWM to active pin
+
+            // Right motor forward direction
+            digitalWrite(L9110_right_IN2, LOW); // Set inactive pin LOW
+            analogWrite(L9110_right_IN1, rightSpeedVal); // Apply PWM to active pin
         }
 
-        // setting up propoertional control, see Step 3 on the website
+        // setting up proportional control, see Step 3 on the website
         if (abs(deltaAngle) > 30) {
             targetGyroX = 60;
         } else {
@@ -245,9 +278,8 @@ void rotate()
         } else {
             leftSpeedVal = changeSpeed(leftSpeedVal, -1);
         }
-        rightSpeedVal = leftSpeedVal;
-        analogWrite(rightSpeed, rightSpeedVal);
-        analogWrite(leftSpeed, leftSpeedVal);
+        rightSpeedVal = leftSpeedVal; // Assuming speeds are synchronized for rotation
+        // The analogWrite calls are now inside the if/else if blocks for direction.
     }
 }
 
@@ -324,35 +356,9 @@ void readGyro()
 
 void stopCar()
 {
-    digitalWrite(right1, LOW);
-    digitalWrite(right2, LOW);
-    digitalWrite(left1, LOW);
-    digitalWrite(left2, LOW);
-    analogWrite(rightSpeed, 0);
-    analogWrite(leftSpeed, 0);
-}
-
-void forward()
-{ // drives the car forward, assuming leftSpeedVal and rightSpeedVal are set high enough
-    digitalWrite(right1, HIGH); // the right motor rotates FORWARDS when right1 is HIGH and right2
-                                // is LOW
-    digitalWrite(right2, LOW);
-    digitalWrite(left1, HIGH);
-    digitalWrite(left2, LOW);
-}
-
-void left()
-{ // rotates the car left, assuming speed leftSpeedVal and rightSpeedVal are set high enough
-    digitalWrite(right1, LOW);
-    digitalWrite(right2, HIGH);
-    digitalWrite(left1, HIGH);
-    digitalWrite(left2, LOW);
-}
-
-void right()
-{
-    digitalWrite(right1, HIGH);
-    digitalWrite(right2, LOW);
-    digitalWrite(left1, LOW);
-    digitalWrite(left2, HIGH);
+    // For L9110S, setting both input pins LOW effectively stops the motor (braking)
+    digitalWrite(L9110_right_IN1, LOW);
+    digitalWrite(L9110_right_IN2, LOW);
+    digitalWrite(L9110_left_IN1, LOW);
+    digitalWrite(L9110_left_IN2, LOW);
 }
