@@ -64,11 +64,13 @@ void setup()
     gaspetto_car.init(StateId::IDLE);
 #ifndef USE_RADIO_CONTROLLER
     timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::ACTION, CommandId::MOTOR_FORWARD));
-    timeredEventQueue.scheduleEventDelayed(4000, Event(EventId::ACTION, CommandId::MOTOR_BACKWARD));
-    timeredEventQueue.scheduleEventDelayed(10000, Event(EventId::ACTION, CommandId::MOTOR_RIGHT));
     timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
-    timeredEventQueue.scheduleEventDelayed(2000, Event(EventId::ACTION, CommandId::MOTOR_LEFT));
-    timeredEventQueue.scheduleEventDelayed(17000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+    timeredEventQueue.scheduleEventDelayed(9000, Event(EventId::ACTION, CommandId::MOTOR_BACKWARD));
+    timeredEventQueue.scheduleEventDelayed(12000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+    timeredEventQueue.scheduleEventDelayed(15000, Event(EventId::ACTION, CommandId::MOTOR_RIGHT));
+    timeredEventQueue.scheduleEventDelayed(18000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+    timeredEventQueue.scheduleEventDelayed(21000, Event(EventId::ACTION, CommandId::MOTOR_LEFT));
+    timeredEventQueue.scheduleEventDelayed(24000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
 #else
 #ifdef NRF_IRQ
     /* Set up ISR for NRF IRQ. */

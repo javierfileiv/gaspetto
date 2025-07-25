@@ -24,23 +24,23 @@ void IdleState::processEvent(Event &evt)
             car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, FORWARD,
                           INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD);
             active_object->transitionTo(StateId::PROCESSING);
-            logln("Transition to PROCESSING (Turn Forward)");
+            logln("Transition to PROCESSING (Move Forward)");
             break;
         case CommandId::MOTOR_BACKWARD:
             car->setMotor(BACKWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, BACKWARD,
                           INITIAL_MOTOR_SPEED, 20);
             active_object->transitionTo(StateId::PROCESSING);
-            logln(F("Transition to PROCESSING (Turn Backward)"));
+            logln(F("Transition to PROCESSING (Move Backward)"));
             break;
         case CommandId::MOTOR_LEFT:
-            car->setMotor(BACKWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_TURN_LEFT, FORWARD,
+            car->setMotor(BACKWARD, TURN_MOTOR_SPEED, DISTANCE_CM_TURN_LEFT, FORWARD,
                           INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD);
             active_object->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Turn Left)"));
             break;
         case CommandId::MOTOR_RIGHT:
             car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, BACKWARD,
-                          INITIAL_MOTOR_SPEED, DISTANCE_CM_TURN_RIGHT);
+                          TURN_MOTOR_SPEED, DISTANCE_CM_TURN_RIGHT);
 
             active_object->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Turn Right)"));
