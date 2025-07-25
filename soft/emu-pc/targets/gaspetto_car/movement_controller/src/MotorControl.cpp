@@ -38,6 +38,8 @@ void MotorControl::init(uint32_t pwm_freq)
 
 void MotorControl::setMotorLeft(bool forward, uint8_t speed_percent)
 {
+    setPWMdutyCycle(LEFT, BWD, LOW);
+    setPWMdutyCycle(LEFT, FWD, LOW);
     if (forward) {
         setPWMdutyCycle(LEFT, BWD, speed_percent);
         setPWMdutyCycle(LEFT, FWD, LOW);
@@ -49,6 +51,8 @@ void MotorControl::setMotorLeft(bool forward, uint8_t speed_percent)
 
 void MotorControl::setMotorRight(bool forward, uint8_t speed_percent)
 {
+    setPWMdutyCycle(RIGHT, BWD, LOW);
+    setPWMdutyCycle(RIGHT, FWD, LOW);
     if (forward) {
         setPWMdutyCycle(RIGHT, BWD, speed_percent);
         setPWMdutyCycle(RIGHT, FWD, LOW);
