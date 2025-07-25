@@ -90,15 +90,15 @@ void GaspettoCar::processNextEvent()
         _ctx.timeredEventQueue->processEvents(*this);
     }
 #endif
-    if (isTargetReached()) {
-        if (eventQueue && !eventQueue->IsEmpty()) {
-            Event evt;
+    // if (isTargetReached()) {
+    if (eventQueue && !eventQueue->IsEmpty()) {
+        Event evt;
 
-            State *currentState = states[static_cast<uint8_t>(currentStateId)];
-            eventQueue->dequeue(evt);
-            currentState->processEvent(evt);
-        }
+        State *currentState = states[static_cast<uint8_t>(currentStateId)];
+        eventQueue->dequeue(evt);
+        currentState->processEvent(evt);
     }
+    // }
 }
 
 void GaspettoCar::enterLowPowerMode()

@@ -3,6 +3,7 @@
 
 #include "IdleState.h"
 #include "ProcessingState.h"
+#include "TimeredEventQueue.h"
 
 class EventQueue;
 class MovementController;

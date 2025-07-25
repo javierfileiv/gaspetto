@@ -12,7 +12,8 @@
 
 typedef void (*LowPowerModeCallback)();
 const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
-const uint32_t INITIAL_MOTOR_SPEED = 50;
+const uint32_t INITIAL_MOTOR_SPEED = 40;
+const uint32_t TURN_MOTOR_SPEED = 20;
 const uint32_t MOTOR_LEFT_BWD = PB14; /* Example PWM pin for motor left. D4 on salaea. */
 const uint32_t MOTOR_LEFT_FWD = PB15; /* Direction pin for motor left.  D5 on salaea. */
 const uint32_t MOTOR_RIGHT_FWD = PB11; /* PWM pin for motor right. D1 on salaea. */
