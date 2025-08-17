@@ -6368,11 +6368,12 @@
 	)
 	(text "VCC (9v)\nGND"
 		(exclude_from_sim no)
-		(at 260.35 261.874 0)
+		(at 256.286 261.366 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
+			(justify left)
 		)
 		(uuid "6c74a353-128d-4383-8195-17ca4f0f0c61")
 	)
@@ -6388,7 +6389,7 @@
 	)
 	(text "TIM1_CH2N"
 		(exclude_from_sim no)
-		(at 209.55 118.618 0)
+		(at 141.986 92.71 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6448,7 +6449,7 @@
 	)
 	(text "TIM1_CH3N"
 		(exclude_from_sim no)
-		(at 209.55 115.824 0)
+		(at 155.194 89.916 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -8322,7 +8323,7 @@
 			)
 		)
 	)
-	(global_label "M2-IB  PB1"
+	(global_label "M2-IB  PB15"
 		(shape input)
 		(at 231.14 219.71 90)
 		(fields_autoplaced yes)
@@ -8334,7 +8335,7 @@
 		)
 		(uuid "3f8532a9-a1ec-4fc8-a530-49282935aa2f")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 231.14 204.932 90)
+			(at 231.14 203.7225 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8696,7 +8697,7 @@
 			)
 		)
 	)
-	(global_label "M2-IA  PB0"
+	(global_label "M2-IA  PB14"
 		(shape input)
 		(at 228.6 219.71 90)
 		(fields_autoplaced yes)
@@ -8708,7 +8709,7 @@
 		)
 		(uuid "d81ba9f2-dce0-4cbe-b889-6783d7267f95")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 228.6 205.1134 90)
+			(at 228.6 203.9039 90)
 			(effects
 				(font
 					(size 1.27 1.27)
