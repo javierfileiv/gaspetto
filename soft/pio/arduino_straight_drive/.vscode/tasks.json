@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Debug Arduino Environment",
+            "type": "shell",
+            "command": "platformio debug --environment arduino_straight_drive",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Debug Arduino Environment",
+            "type": "shell",
+            "command": "platformio debug --environment arduino_straight_drive",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Direct GDB Launch Arduino",
+            "type": "shell",
+            "command": "~/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb -x .pioinit --ex 'target extended-remote ${input:debugPort}' --ex 'monitor swdp_scan' --ex 'attach 1' --ex 'load' --ex 'tbreak main' --ex 'continue' .pio/build/arduino_straight_drive/firmware.elf",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Pre-Debug (arduino_straight_drive)",
+            "type": "shell",
+            "command": "platformio debug --environment arduino_straight_drive --interface=gdb -x .pioinit",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "debugPort",
+            "type": "promptString",
+            "description": "Debug port (e.g., /dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00)",
+            "default": "/dev/serial/by-id/usb-Black_Magic_Debug_Black_Magic_Probe__ST-Link_v2__v1.10.0-229-g98f11d47_A7864BB1-if00"
+        }
+    ]
+}
