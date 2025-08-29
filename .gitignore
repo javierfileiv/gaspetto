@@ -14,3 +14,4 @@ soft/emu-pc/tests/build-tests
 soft/emu-pc/tests/googletest
 soft/pio/GaspettoBox_pio/.pio/
 soft/pio/GaspettoBox_pio/.vscode/c_cpp_properties.json
+soft/pio/arduino_straight_drive/tools/capture.csv
