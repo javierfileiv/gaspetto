@@ -31,6 +31,27 @@
             "command": "platformio debug --environment arduino_straight_drive --interface=gdb -x .pioinit",
             "group": "build",
             "problemMatcher": []
+        },
+        {
+            "label": "Debug Motor Test",
+            "type": "shell",
+            "command": "platformio debug --environment motor_test",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Pre-Debug Motor Test",
+            "type": "shell",
+            "command": "platformio debug --environment motor_test --interface=gdb -x .pioinit",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Direct GDB Launch Motor Test",
+            "type": "shell",
+            "command": "~/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb -x .pioinit --ex 'target extended-remote ${input:debugPort}' --ex 'monitor swdp_scan' --ex 'attach 1' --ex 'load' --ex 'tbreak main' --ex 'continue' .pio/build/motor_test/firmware.elf",
+            "group": "build",
+            "problemMatcher": []
         }
     ],
     "inputs": [

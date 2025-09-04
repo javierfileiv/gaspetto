@@ -57,8 +57,24 @@ void IMUOrientation::update(){
     float az = a.acceleration.z - offsets.accZ;
     float gx = (g.gyro.x - offsets.gyroX) * RAD_TO_DEG; // deg/s
     float gy = (g.gyro.y - offsets.gyroY) * RAD_TO_DEG;
-    float gz = (g.gyro.z - offsets.gyroZ) * RAD_TO_DEG;
-        lastGyroZDeg = gz;
+    float rawGz = (g.gyro.z - offsets.gyroZ) * RAD_TO_DEG;
+
+    // Spike rejection
+    bool spike = fabs(rawGz) > IMU_GYROZ_SPIKE_REJECT_DEG_S;
+    if (spike) {
+        rawGz = lastGyroZDeg; // hold previous
+    }
+    lastGyroSpike = spike;
+
+    // Bias estimation: update only if not a spike and magnitude moderate
+    if (!spike && fabs(rawGz) < IMU_GYROZ_CLAMP_DEG_S*0.6f) {
+        gyroZBias = gyroZBias + IMU_GYROZ_BIAS_ALPHA * (rawGz - gyroZBias);
+    }
+    float gz = rawGz - gyroZBias;
+    // Clamp
+    if (gz > IMU_GYROZ_CLAMP_DEG_S) gz = IMU_GYROZ_CLAMP_DEG_S;
+    if (gz < -IMU_GYROZ_CLAMP_DEG_S) gz = -IMU_GYROZ_CLAMP_DEG_S;
+    lastGyroZDeg = gz;
 
     // Integrate yaw directly from gyro (will drift without mag)
     yawDeg += gz * dt;
@@ -73,5 +89,14 @@ void IMUOrientation::update(){
 
     // Normalize yaw within -180..180
     if (yawDeg > 180.0f)  yawDeg -= 360.0f;
+    if (yawDeg < -180.0f) yawDeg += 360.0f;
+}
+
+void IMUOrientation::idleYawDampen(float dt) {
+    // Exponential decay toward zero (simple high-pass like correction when idle)
+    float factor = 1.0f - (IMU_IDLE_YAW_DAMP_RATE * dt);
+    if (factor < 0) factor = 0;
+    yawDeg *= factor;
+    if (yawDeg > 180.0f) yawDeg -= 360.0f; // keep normalization
     if (yawDeg < -180.0f) yawDeg += 360.0f;
 }
