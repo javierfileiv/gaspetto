@@ -42,6 +42,7 @@ build_step "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"      "GaspettoCar"
 build_step "$PROJECT_ROOT/soft/pio/NrfSender_pio"        "NrfSender"
 build_step "$PROJECT_ROOT/soft/pio/arduino_straight_drive" "Arduino Straight Drive"
 build_step "$PROJECT_ROOT/soft/pio/arduino_hw_test"      "Arduino HW Test"
+build_step "$PROJECT_ROOT/soft/pio/mpu_plot"             "MPU Plot"
 
 END_TS=$(date +%s)
 ELAPSED=$((END_TS-START_TS))
