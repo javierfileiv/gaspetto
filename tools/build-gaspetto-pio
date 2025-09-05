@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# This script builds the GaspettoBox and GaspettoCar firmware for the emu-pc.
-# It now uses the CMake build system and cleans up after itself.
+# Unified PlatformIO build script that aborts on first failure.
+
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,22 +12,52 @@ NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
-BUILD_DIR="$EMU_PC_DIR/build-pio"
 
-echo -e "${BLUE}Building Gaspetto for Arduino...${NC}"
-echo -e "Project root: $PROJECT_ROOT"
+START_TS=$(date +%s)
+CURRENT_STEP="(initialization)"
 
-if ! command -v pio &> /dev/null; then
-    echo -e "${RED}PlatformIO (pio) is not installed or not in PATH.${NC}"
-    echo "Please install PlatformIO to build GaspettoCar firmware."
-    exit 0
+trap 'echo -e "${RED}ERROR: Build failed at step: ${CURRENT_STEP}${NC}" >&2' ERR
+
+echo -e "${BLUE}Building Gaspetto (PlatformIO multi-project)${NC}"
+echo -e "Root: $PROJECT_ROOT"
+
+if ! command -v pio &>/dev/null; then
+    echo -e "${RED}PlatformIO (pio) not found in PATH.${NC}" >&2
+    exit 1
 fi
 
-echo -e "${BLUE}Build Arduino software with PlatformIO...${NC}"
-echo -e "${YELLOW}Building Gaspetto Car...${NC}"
-cd $PROJECT_ROOT/soft/pio/GaspettoCar_pio
-pio run
-echo -e "${YELLOW}Building NRF Sender...${NC}"
-cd $PROJECT_ROOT/soft/pio/NrfSender_pio
-pio run
+build_step() {
+    local path="$1"; shift
+    local label="$1"; shift
+    CURRENT_STEP="$label"
+    echo -e "${YELLOW}==> $label (${path})${NC}"
+    pushd "$path" >/dev/null
+    pio run "$@"
+    popd >/dev/null
+    echo -e "${GREEN}✔ $label OK${NC}"
+}
+
+# List of builds (path label [extra pio args...])
+build_step "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"      "GaspettoCar"
+build_step "$PROJECT_ROOT/soft/pio/NrfSender_pio"        "NrfSender"
+build_step "$PROJECT_ROOT/soft/pio/arduino_straight_drive" "Arduino Straight Drive"
+
+END_TS=$(date +%s)
+ELAPSED=$((END_TS-START_TS))
+echo -e "${GREEN}All builds succeeded in ${ELAPSED}s${NC}"
+
+# Optional cleanup of PlatformIO build directories
+if [[ "${CLEAN_BUILD:-1}" == "1" ]]; then
+    echo -e "${BLUE}Cleaning build artifacts (.pio) directories...${NC}"
+    while IFS= read -r -d '' dir; do
+        if [[ -d "$dir/.pio" ]]; then
+            echo -e "  Removing $dir/.pio"
+            rm -rf "$dir/.pio" || echo -e "${YELLOW}Warning: failed to remove $dir/.pio${NC}" >&2
+        fi
+    done < <(find "$PROJECT_ROOT/soft/pio" -maxdepth 2 -type d -print0)
+    echo -e "${GREEN}Cleanup complete.${NC}"
+else
+    echo -e "${YELLOW}Skipping cleanup (set CLEAN_BUILD=1 to enable).${NC}"
+fi
+
+exit 0
