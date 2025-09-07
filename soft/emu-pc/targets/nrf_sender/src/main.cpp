@@ -8,8 +8,8 @@
 #define CE_PIN 9
 #define CSN_PIN 10
 #else
-#define CE_PIN PB15
-#define CSN_PIN PA4
+#define CE_PIN PB_15
+#define CSN_PIN PA_4
 #endif
 
 const uint8_t gaspetto_box_pipe_name[] = "_box_";

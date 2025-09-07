@@ -10,14 +10,18 @@
 #endif
 #include <stdint.h>
 
-const uint32_t MOTOR_FREQ = 15;
-const uint32_t PWM_FREQ = 15; /* Set PWM frequency to 15Hz. */
-const uint32_t MOTOR_LEFT_PIN_A = PB11; /* Example PWM pin for motor left. D4 on salaea. */
-const uint32_t MOTOR_LEFT_PIN_B = PB10; /* Direction pin for motor left.  D5 on salaea. */
-const uint32_t SPEED_SENSOR_RIGHT_PIN = PA0; /* Pin for right speed/distance sensor. D3 on salaea.*/
-const uint32_t SPEED_SENSOR_LEFT_PIN = PA1; /* Pin for left speed/distance sensor. D0 on salaea. */
-const uint32_t MOTOR_RIGHT_PIN_A = PB0; /* PWM pin for motor right. D1 on salaea. */
-const uint32_t MOTOR_RIGHT_PIN_B = PB1; /* Direction pin for motor right. D2 on salaea. */
+typedef void (*LowPowerModeCallback)();
+const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
+const uint32_t INITIAL_MOTOR_SPEED = 50;
+const uint32_t TURN_MOTOR_SPEED = 30;
+
+const uint32_t MOTOR_LEFT_BWD = PB_14; /* Example PWM pin for motor left. D4 on salaea. */
+const uint32_t MOTOR_LEFT_FWD = PB_15; /* Direction pin for motor left.  D5 on salaea. */
+const uint32_t MOTOR_RIGHT_FWD = PB_11; /* PWM pin for motor right. D1 on salaea. */
+const uint32_t MOTOR_RIGHT_BWD = PB_10; /* Direction pin for motor right. D2 on salaea. */
+const uint32_t SPEED_SENSOR_LEFT_PIN = PA_1; /* Pin for left speed/distance sensor. D0 on salaea. */
+const uint32_t SPEED_SENSOR_RIGHT_PIN = PA_0; /* Pin for right speed/distance sensor. D3 on
+                                                 salaea.*/
 const uint32_t DISTANCE_CM_FWD_BWD = 50;
 const uint32_t DISTANCE_CM_TURN_RIGHT = 15;
 const uint32_t DISTANCE_CM_TURN_LEFT = 20;

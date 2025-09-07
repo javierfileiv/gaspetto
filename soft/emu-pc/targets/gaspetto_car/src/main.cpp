@@ -18,19 +18,14 @@ EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
-MotorControl motorControl(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A, MOTOR_RIGHT_PIN_B);
+MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD);
 MovementController carMovementController(motorControl, SPEED_SENSOR_LEFT_PIN,
                                          SPEED_SENSOR_RIGHT_PIN);
 RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
                                    gaspetto_car_pipe_name);
 Context context = {
-    &eventQueue,
-    &carMovementController,
-    &radioControllerCar,
-    &timeredEventQueue,
-    &idleState,
-    &processingState,
-    PWM_FREQ,
+    &eventQueue, &carMovementController, &radioControllerCar, &timeredEventQueue,
+    &idleState,  &processingState,       MOTOR_FREQ,
 };
 GaspettoCar gaspetto_car(context);
 
@@ -84,10 +79,5 @@ void setup()
 
 void loop()
 {
-#ifdef USE_RADIO_CONTROLLER
-    radioControllerCar.ProcessRadio();
-#else
-    timeredEventQueue.processEvents(gaspetto_car);
-#endif
     gaspetto_car.processNextEvent();
 }
