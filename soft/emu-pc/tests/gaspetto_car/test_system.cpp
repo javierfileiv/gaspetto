@@ -26,7 +26,7 @@ TEST_F(CarSystemBehaviorTest, ForwardEvent)
     /* Only one command, but pulses will be read several times by PID. */
     expect_read_irq_pulses();
     /* Motor moves FWD. */
-    expect_move_forward(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
+    expect_move_forward(INITIAL_MOTOR_FREQ, INITIAL_MOTOR_FREQ);
     SimulateCarMainLoop([&]() { return gaspettoCar.getCurrentState() == &idleState; });
     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
     target_pulses_left = ctx.movementController->getLeftTargetPulses();
@@ -49,7 +49,7 @@ TEST_F(CarSystemBehaviorTest, ForwardEvent)
 //     expect_receive_event(backwardEvent);
 //     ProcessRadio();
 //     /* Motor moves BWD. */
-//     expect_move_backward(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
+//     expect_move_backward(INITIAL_MOTOR_FREQ, INITIAL_MOTOR_FREQ);
 //     ProcessCar();
 //     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
 //     expect_stop_motor_left();
@@ -69,7 +69,7 @@ TEST_F(CarSystemBehaviorTest, ForwardEvent)
 //     expect_receive_event(rightEvent);
 //     ProcessRadio();
 //     /* Motor TURNS RIGHT. */
-//     expect_turn_right(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
+//     expect_turn_right(INITIAL_MOTOR_FREQ, INITIAL_MOTOR_FREQ);
 //     ProcessCar();
 //     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
 //     /* Expect stop motor right.*/
@@ -95,7 +95,7 @@ TEST_F(CarSystemBehaviorTest, ForwardEvent)
 //     expect_receive_event(leftEvent);
 //     ProcessRadio();
 //     /* Motor TURNS LEFT. */
-//     expect_turn_left(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
+//     expect_turn_left(INITIAL_MOTOR_FREQ, INITIAL_MOTOR_FREQ);
 //     ProcessCar();
 //     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
 //     /* Expect stop motor left.*/

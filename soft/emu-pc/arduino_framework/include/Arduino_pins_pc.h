@@ -1,14 +1,15 @@
 #pragma once
 
 #define F(x) x
-#define PA0 3
-#define PA1 4
-#define PB0 0
-#define PB1 1
-#define PB10 10
-#define PB11 11
-#define PB15 15
-#define PA4 4
+#define PA_0 3
+#define PA_1 4
+#define PB_0 0
+#define PB_1 1
+#define PB_10 10
+#define PB_11 11
+#define PB_14 14
+#define PB_15 15
+#define PA_4 4
 #define RISING 0
 #define FALLING 1
 #define LOW 0

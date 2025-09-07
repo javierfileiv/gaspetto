@@ -18,6 +18,7 @@ public:
                 (uint32_t channel, uint32_t compare, TimerCompareFormat_t format));
     MOCK_METHOD(void, setPWM,
                 (uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle));
+    MOCK_METHOD(void, hw_timer_pause, ());
 
     void execute_irq_left(int n_times = 0)
     {

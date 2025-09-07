@@ -3,8 +3,13 @@
 #include "ActiveObject.h"
 #include "Arduino.h"
 #include "Context.h"
+#include "EventQueue.h"
 #include "MovementController.h"
+#ifdef USE_RADIO_CONTROLLER
 #include "RadioController.h"
+#else
+#include "TimeredEventQueue.h"
+#endif
 
 #include <cstdint>
 
@@ -28,7 +33,7 @@ void GaspettoCar::init(StateId initialStateId)
     if (_ctx.radioController)
         _ctx.radioController->init();
 #endif
-    ActiveObject::init(StateId::IDLE);
+    ActiveObject::init(initialStateId);
 }
 
 void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
@@ -62,8 +67,8 @@ bool GaspettoCar::isTargetReached()
 
 int GaspettoCar::postEvent(Event evt)
 {
-    if (eventQueue) {
-        eventQueue->enqueue(evt);
+    if (_ctx.mainEventQueue) {
+        _ctx.mainEventQueue->enqueue(evt);
         return 0;
     }
     return -1;
@@ -83,6 +88,15 @@ void GaspettoCar::stopMotorLeft()
 
 void GaspettoCar::processNextEvent()
 {
+#ifdef USE_RADIO_CONTROLLER
+    if (_ctx.radioController) {
+        _ctx.radioController->processRadio();
+    }
+#else
+    if (_ctx.timeredEventQueue) {
+        _ctx.timeredEventQueue->processEvents(*this);
+    }
+#endif
     if (isTargetReached()) {
         if (eventQueue && !eventQueue->IsEmpty()) {
             Event evt;

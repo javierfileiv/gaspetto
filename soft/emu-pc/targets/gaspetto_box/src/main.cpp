@@ -61,7 +61,7 @@ void setup()
     gaspetto_box.setLowPowerModeCallback(enter_low_power_mode);
     gaspetto_box.init(StateId::IDLE);
     /* Set up ISR for button press simulation. */
-    attachInterrupt(digitalPinToInterrupt(PB0), ISR, RISING);
+    attachInterrupt(digitalPinToInterrupt(PB_0), ISR, RISING);
 }
 
 void loop()

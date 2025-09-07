@@ -101,6 +101,13 @@ void HardwareTimer::setPWM(uint32_t channel, PinName pin, uint32_t frequency, ui
     mock->setPWM(channel, pin, frequency, dutycycle);
 }
 
+void HardwareTimer::pause()
+{
+    auto mock = MockArduino::get_instance();
+
+    mock->hw_timer_pause();
+}
+
 extern "C" {
 
 long map(long x, long in_min, long in_max, long out_min, long out_max)
