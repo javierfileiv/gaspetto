@@ -68,3 +68,7 @@ void RF24::simulateFailedTransmission()
 void RF24::simulateSuccessfulTransmission()
 {
 }
+
+void RF24::setAddressWidth(uint8_t)
+{
+}

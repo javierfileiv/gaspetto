@@ -39,6 +39,7 @@ void RadioController::init()
     }
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
+    _radio.setAddressWidth(5);
     _radio.setPayloadSize(Event::packetSize());
     _radio.openWritingPipe(writing_addr);
     _radio.openReadingPipe(1, reading_addr);

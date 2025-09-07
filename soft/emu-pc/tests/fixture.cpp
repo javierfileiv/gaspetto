@@ -127,6 +127,7 @@ void Fixture::expect_radio_initialization()
     EXPECT_CALL(_mock_RF24, _begin()).WillOnce(Return(true));
     EXPECT_CALL(_mock_RF24, _setPALevel(PA_LEVEL, true));
     EXPECT_CALL(_mock_RF24, _setDataRate(DATA_RATE)).WillOnce(Return(true));
+    EXPECT_CALL(_mock_RF24, _setAddressWidth(5));
     EXPECT_CALL(_mock_RF24, _setPayloadSize(Event::packetSize()));
     EXPECT_CALL(_mock_RF24, _openWritingPipe(::testing::_))
             .WillOnce(::testing::Invoke([this](const uint8_t *ptr) {
