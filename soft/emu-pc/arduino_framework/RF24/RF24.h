@@ -48,7 +48,7 @@ public:
     virtual bool available(uint8_t *pipe_num);
     virtual void read(void *buf, uint8_t len);
     virtual bool write(const void *buf, uint8_t len);
-    void setAddressWidth(uint8_t a_width);
+    virtual void setAddressWidth(uint8_t a_width);
     /* PC emulation specific methods */
     virtual void simulateReceivedPacket(uint8_t pipe, const void *data, uint8_t len);
     virtual void simulateFailedTransmission();

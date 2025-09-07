@@ -23,6 +23,7 @@ public:
     MOCK_METHOD(void, _setChannel, (uint8_t channel));
     MOCK_METHOD(void, _powerUp, ());
     MOCK_METHOD(void, _powerDown, ());
+    MOCK_METHOD(void, _setAddressWidth, (uint8_t width));
 
     bool begin(void) override;
     void startListening(void) override;
@@ -39,6 +40,7 @@ public:
     void simulateReceivedPacket(uint8_t pipe, const void *data, uint8_t len) override;
     void simulateFailedTransmission() override;
     void simulateSuccessfulTransmission() override;
+    void setAddressWidth(uint8_t width) override;
 
 public:
     MockRF24(rf24_gpio_pin_t _cepin, rf24_gpio_pin_t _cspin, uint32_t _spi_speed = 10000000);

@@ -124,3 +124,10 @@ void MockRF24::simulateFailedTransmission()
 void MockRF24::simulateSuccessfulTransmission()
 {
 }
+
+void MockRF24::setAddressWidth(uint8_t width)
+{
+    auto mock = MockRF24::get_instance();
+
+    mock->_setAddressWidth(width);
+}
