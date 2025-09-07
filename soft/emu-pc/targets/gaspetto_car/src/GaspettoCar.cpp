@@ -21,9 +21,14 @@ GaspettoCar::GaspettoCar(Context &ctx)
 
 void GaspettoCar::init(StateId initialStateId)
 {
-    _ctx.movementController->init(_ctx.pwm_freq);
-    _ctx.radioController->init();
-    ActiveObject::init(initialStateId);
+    if (_ctx.movementController) {
+        _ctx.movementController->init(_ctx.pwm_freq);
+    }
+#ifdef USE_RADIO_CONTROLLER
+    if (_ctx.radioController)
+        _ctx.radioController->init();
+#endif
+    ActiveObject::init(StateId::IDLE);
 }
 
 void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
