@@ -84,7 +84,10 @@ void setup()
 
 void loop()
 {
-    radioControllerCar.processRadio();
-    gaspetto_car.processNextEvent();
+#ifdef USE_RADIO_CONTROLLER
+    radioControllerCar.ProcessRadio();
+#else
     timeredEventQueue.processEvents(gaspetto_car);
+#endif
+    gaspetto_car.processNextEvent();
 }
