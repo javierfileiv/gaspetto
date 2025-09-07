@@ -26,10 +26,10 @@ class Fixture : public ::testing::Test {
 public:
     Fixture()
             : radioController(_mock_RF24, &eventQueue, test_writing_addr, test_reading_addr)
-            , motorControl(MOTOR_LEFT_PIN_A, MOTOR_LEFT_PIN_B, MOTOR_RIGHT_PIN_A, MOTOR_RIGHT_PIN_B)
+            , motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD)
             , carMovementController(motorControl, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN)
             , ctx({ &eventQueue, &carMovementController, &radioController, nullptr, &idleState,
-                    &processingState, PWM_FREQ })
+                    &processingState, MOTOR_FREQ })
             , car(ctx)
     {
     }
@@ -60,11 +60,16 @@ public:
     void expect_stop_motor_right();
     void expect_both_motors_stop();
 
+protected:
+    void expect_set_motor_left(bool forward, uint8_t speed_percent);
+    void expect_set_motor_right(bool forward, uint8_t speed_percent);
+
+public:
     /* Radio. */
     void expect_radio_initialization();
-    void expect_receive_event(Event *evt = nullptr);
+    void radio_receive_event(Event *evt = nullptr);
     void expect_transmit_event(Event evt);
-    void ProcessRadio();
+    void expect_process_radio_no_event();
     void RxRadioEvent(Event evt);
     void expect_send_event(Event *evt = nullptr);
 

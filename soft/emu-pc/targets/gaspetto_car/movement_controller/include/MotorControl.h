@@ -82,17 +82,17 @@ public:
 private:
     /** setMotorLeft():
      * Set the left motor's direction and speed (PWM duty cycle 0-100).
-     * @forward: true for forward, false for backward.
      * @speed_percent: Speed percentage (0-100).
+     * @forward: true for forward, false for backward.
      */
-    void setMotorLeft(bool forward, uint8_t speed_percent);
+    void setMotorLeft(uint8_t speed_percent, bool forward);
 
     /** setMotorRight():
      * Set the right motor's direction and speed (PWM duty cycle 0-100).
-     * @forward: true for forward, false for backward.
      * @speed_percent: Speed percentage (0-100).
+     * @forward: true for forward, false for backward.
      */
-    void setMotorRight(bool forward, uint8_t speed_percent);
+    void setMotorRight(uint8_t speed_percent, bool forward);
 };
 
 #endif // MOTOR_CONTROLLER_H
