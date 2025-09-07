@@ -2,6 +2,7 @@
 #define ARDUINO_H
 /* Minimal stub for Arduino.h for unit tests. */
 #include "Arduino_pins_pc.h"
+#include "HardwareTimer.h"
 
 #include <cstdint>
 
