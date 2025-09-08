@@ -8,11 +8,11 @@
 #include "pin_definitions.h"
 
 #include <Arduino.h>
+#include <PID_v1.h>
 #include <RF24.h>
 #include <RadioProtocol.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <PID_v1.h>
 
 #ifndef RADIO_CE_PIN
 #define RADIO_CE_PIN PB0
@@ -42,21 +42,20 @@ bool turningInPlace           = false; // For 90-degree turns
 float baseSpeed               = 0.0f;
 unsigned long straightStartMs = 0;
 float currentPwmFreq          = 17.0f; // Set to 17Hz for slow movement
-char lastCommand              = 'I'; // Track last command for telemetry
-float pidError                = 0.0f; // Current PID error for telemetry
+char lastCommand              = 'I';   // Track last command for telemetry
+float pidError                = 0.0f;  // Current PID error for telemetry
 
 // Continuous telemetry during PID movement
-unsigned long lastTelemetryMs = 0;
+unsigned long lastTelemetryMs           = 0;
 const unsigned long telemetryIntervalMs = 500; // Send telemetry every 1 second during PID
 
 // Movement timer variables
 unsigned long movementDurationMs = 5000; // Default 5 seconds
-unsigned long movementStartMs = 0;
-bool timedMovement = false;
+unsigned long movementStartMs    = 0;
+bool timedMovement               = false;
 
 // Forward declarations
 void sendTelemetry();
-
 
 // Motor helper: DRV8871 style (two inputs per motor). One side PWM, other LOW.
 struct MotorPins
@@ -106,10 +105,11 @@ void updateStraightDriving()
         return;
 
     // Check if timed movement has expired
-    if (timedMovement && (millis() - movementStartMs >= movementDurationMs)) {
+    if (timedMovement && (millis() - movementStartMs >= movementDurationMs))
+    {
         straightDriving = false;
-        turningInPlace = false;
-        timedMovement = false;
+        turningInPlace  = false;
+        timedMovement   = false;
         driveOne(motorLeft, 0);
         driveOne(motorRight, 0);
         Serial.println(F("Movement timer expired - stopping"));
@@ -121,9 +121,12 @@ void updateStraightDriving()
 
     // Handle 360-degree wraparound for PID
     double yawDifference = yawSetpoint - currentYaw;
-    if (yawDifference > 180.0) {
+    if (yawDifference > 180.0)
+    {
         currentYaw += 360.0;
-    } else if (yawDifference < -180.0) {
+    }
+    else if (yawDifference < -180.0)
+    {
         currentYaw -= 360.0;
     }
 
@@ -136,34 +139,38 @@ void updateStraightDriving()
     // Apply base speed with PID correction
     int leftPWM, rightPWM;
 
-    if (turningInPlace) {
+    if (turningInPlace)
+    {
         // For turning in place, use PID output to control motor speeds
         // PID output range is -180 to +180, normalize to -1.0 to +1.0
         double correctionScale = motorOffsetOutput / 180.0;
-        correctionScale = constrain(correctionScale, -1.0, 1.0);
+        correctionScale        = constrain(correctionScale, -1.0, 1.0);
 
         // INVERTED LOGIC: Try reversing the motor assignments
         // When PID output is positive (need correction), apply opposite to what we had
-        leftPWM  = (int)(-correctionScale * baseSpeed);  // Reversed
-        rightPWM = (int)(correctionScale * baseSpeed);   // Reversed
+        leftPWM  = (int)(-correctionScale * baseSpeed); // Reversed
+        rightPWM = (int)(correctionScale * baseSpeed);  // Reversed
 
         // Check if turn is complete (within 5 degrees of target)
-        if (abs(pidError) < 5.0) {
+        if (abs(pidError) < 5.0)
+        {
             Serial.println(F("Turn complete - stopping"));
             straightDriving = false;
-            turningInPlace = false;
-            leftPWM = 0;
-            rightPWM = 0;
+            turningInPlace  = false;
+            leftPWM         = 0;
+            rightPWM        = 0;
         }
-    } else {
+    }
+    else
+    {
         // Straight driving (forward or backward)
         float speedScale = baseSpeed / 255.0f;
 
         // Convert PID output to motor correction
-        double correctionScale = motorOffsetOutput / 180.0; // Normalize to ±1.0 range
-        correctionScale = constrain(correctionScale, -0.3, 0.3); // Limit correction strength
+        double correctionScale = motorOffsetOutput / 180.0;             // Normalize to ±1.0 range
+        correctionScale        = constrain(correctionScale, -0.3, 0.3); // Limit correction strength
 
-        float left  = speedScale - correctionScale * 0.5; // Apply correction
+        float left  = speedScale - correctionScale * 0.5;               // Apply correction
         float right = speedScale + correctionScale * 0.5;
 
         // Convert back to PWM range
@@ -176,19 +183,22 @@ void updateStraightDriving()
 
     // Send continuous telemetry during PID movement
     unsigned long currentTime = millis();
-    if (currentTime - lastTelemetryMs >= telemetryIntervalMs) {
+    if (currentTime - lastTelemetryMs >= telemetryIntervalMs)
+    {
         sendTelemetry();
         lastTelemetryMs = currentTime;
     }
-}void processCommand(const String &cmd)
+}
+
+void processCommand(const String &cmd)
 {
     if (cmd.length() < 1)
         return;
 
-    char motor = cmd.charAt(0);
+    char motor  = cmd.charAt(0);
     lastCommand = motor; // Track command for telemetry
 
-    int value  = 0;
+    int value = 0;
     if (cmd.length() > 1)
     {
         value = cmd.substring(1).toInt();
@@ -236,28 +246,31 @@ void updateStraightDriving()
         if (imuOk && value > 0)
         {
             // Capture current yaw as the target heading
-            yawSetpoint = imu.yaw();  // Set PID setpoint to current direction
-            targetYaw = yawSetpoint;   // Keep for telemetry compatibility
-            baseSpeed = -(float)value; // Negative for backward movement
+            yawSetpoint = imu.yaw();     // Set PID setpoint to current direction
+            targetYaw   = yawSetpoint;   // Keep for telemetry compatibility
+            baseSpeed   = -(float)value; // Negative for backward movement
 
             // Reset and configure PID
             myPID.SetTunings(Kp, Ki, Kd);
             myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
-            myPID.SetSampleTime(50); // 50ms sample time for 20Hz update rate
-            myPID.SetMode(1); // AUTOMATIC mode
+            myPID.SetSampleTime(50);              // 50ms sample time for 20Hz update rate
+            myPID.SetMode(1);                     // AUTOMATIC mode
 
             straightDriving = true;
-            turningInPlace = false;
+            turningInPlace  = false;
             straightStartMs = millis();
 
             // Reset telemetry timer for continuous debug output
             lastTelemetryMs = millis();
 
             // Initialize timer if set
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -265,7 +278,8 @@ void updateStraightDriving()
             Serial.print(value);
             Serial.print(F(", target yaw: "));
             Serial.print(targetYaw);
-            if (timedMovement) {
+            if (timedMovement)
+            {
                 Serial.print(F(", timer: "));
                 Serial.print(movementDurationMs);
                 Serial.print(F("ms"));
@@ -279,7 +293,7 @@ void updateStraightDriving()
         else
         {
             straightDriving = false;
-            turningInPlace = false;
+            turningInPlace  = false;
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Backward driving stopped"));
@@ -291,14 +305,14 @@ void updateStraightDriving()
         if (imuOk && value > 0)
         {
             // Capture current yaw as the target heading
-            yawSetpoint = imu.yaw();  // Set PID setpoint to current direction
-            targetYaw = yawSetpoint;   // Keep for telemetry compatibility
-            baseSpeed = (float)value;
+            yawSetpoint = imu.yaw();   // Set PID setpoint to current direction
+            targetYaw   = yawSetpoint; // Keep for telemetry compatibility
+            baseSpeed   = (float)value;
 
             // Reset and configure PID
             myPID.SetTunings(Kp, Ki, Kd);
             myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
-            myPID.SetSampleTime(50); // 50ms sample time for 20Hz update rate
+            myPID.SetSampleTime(50);              // 50ms sample time for 20Hz update rate
             myPID.SetMode(1); // AUTOMATIC mode (using 1 instead of AUTOMATIC constant)
 
             straightDriving = true;
@@ -308,10 +322,13 @@ void updateStraightDriving()
             lastTelemetryMs = millis();
 
             // Initialize timer if set
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -319,7 +336,8 @@ void updateStraightDriving()
             Serial.print(value);
             Serial.print(F(", target yaw: "));
             Serial.print(targetYaw);
-            if (timedMovement) {
+            if (timedMovement)
+            {
                 Serial.print(F(", timer: "));
                 Serial.print(movementDurationMs);
                 Serial.print(F("ms"));
@@ -345,8 +363,8 @@ void updateStraightDriving()
         {
             // Same as F command but with negative speed for backward movement
             yawSetpoint = imu.yaw();
-            targetYaw = yawSetpoint;
-            baseSpeed = -(float)value; // Negative for backward
+            targetYaw   = yawSetpoint;
+            baseSpeed   = -(float)value; // Negative for backward
 
             myPID.SetTunings(Kp, Ki, Kd);
             myPID.SetOutputLimits(-180.0, 180.0);
@@ -354,14 +372,17 @@ void updateStraightDriving()
             myPID.SetMode(1);
 
             straightDriving = true;
-            turningInPlace = false;
+            turningInPlace  = false;
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -369,7 +390,8 @@ void updateStraightDriving()
             Serial.print(value);
             Serial.print(F(", target yaw: "));
             Serial.print(targetYaw);
-            if (timedMovement) {
+            if (timedMovement)
+            {
                 Serial.print(F(", timer: "));
                 Serial.print(movementDurationMs);
                 Serial.print(F("ms"));
@@ -383,7 +405,7 @@ void updateStraightDriving()
         else
         {
             straightDriving = false;
-            turningInPlace = false;
+            turningInPlace  = false;
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Backward driving stopped"));
@@ -399,10 +421,11 @@ void updateStraightDriving()
             if (imuOk)
             {
                 float currentYaw = imu.yaw();
-                yawSetpoint = currentYaw - 90.0; // Turn left 90 degrees
+                yawSetpoint      = currentYaw - 90.0; // Turn left 90 degrees
 
                 // Handle 360-degree wraparound
-                if (yawSetpoint < -180.0) {
+                if (yawSetpoint < -180.0)
+                {
                     yawSetpoint += 360.0;
                 }
 
@@ -415,7 +438,7 @@ void updateStraightDriving()
                 myPID.SetMode(1);
 
                 straightDriving = false;
-                turningInPlace = true;
+                turningInPlace  = true;
                 straightStartMs = millis();
                 lastTelemetryMs = millis();
 
@@ -436,10 +459,11 @@ void updateStraightDriving()
             if (imuOk)
             {
                 float currentYaw = imu.yaw();
-                yawSetpoint = currentYaw + 90.0; // Turn right 90 degrees
+                yawSetpoint      = currentYaw + 90.0; // Turn right 90 degrees
 
                 // Handle 360-degree wraparound
-                if (yawSetpoint > 180.0) {
+                if (yawSetpoint > 180.0)
+                {
                     yawSetpoint -= 360.0;
                 }
 
@@ -452,7 +476,7 @@ void updateStraightDriving()
                 myPID.SetMode(1);
 
                 straightDriving = false;
-                turningInPlace = true;
+                turningInPlace  = true;
                 straightStartMs = millis();
                 lastTelemetryMs = millis();
 
@@ -466,7 +490,7 @@ void updateStraightDriving()
             {
                 Serial.println(F("IMU not available for turning"));
             }
-            return; // Exit early for two-character command
+            return;     // Exit early for two-character command
         }
         else if (imuOk) // Original Z command
         {
@@ -544,7 +568,7 @@ void updateStraightDriving()
     case 'k':
         if (value >= 0)
         {
-            Kp = value / 1000.0; // Value in thousandths (e.g., K50 = 0.05)
+            Kp = value / 1000.0;          // Value in thousandths (e.g., K50 = 0.05)
             myPID.SetTunings(Kp, Ki, Kd); // Update PID controller
             Serial.print(F("Kp updated to: "));
             Serial.println(Kp, 4);
@@ -559,7 +583,7 @@ void updateStraightDriving()
     case 'i':
         if (value >= 0)
         {
-            Ki = value / 1000.0; // Value in thousandths (e.g., I500 = 0.5)
+            Ki = value / 1000.0;          // Value in thousandths (e.g., I500 = 0.5)
             myPID.SetTunings(Kp, Ki, Kd); // Update PID controller
             Serial.print(F("Ki updated to: "));
             Serial.println(Ki, 4);
@@ -574,7 +598,7 @@ void updateStraightDriving()
     case 'v':
         if (value >= 0)
         {
-            Kd = value / 1000.0; // Value in thousandths (e.g., V200 = 0.2)
+            Kd = value / 1000.0;          // Value in thousandths (e.g., V200 = 0.2)
             myPID.SetTunings(Kp, Ki, Kd); // Update PID controller
             Serial.print(F("Kd updated to: "));
             Serial.println(Kd, 4);
@@ -598,7 +622,7 @@ void updateStraightDriving()
         {
             // Disable timer by setting to 0
             movementDurationMs = 0;
-            timedMovement = false;
+            timedMovement      = false;
             Serial.println(F("Movement timer disabled"));
         }
         break;
@@ -609,28 +633,31 @@ void updateStraightDriving()
         if (imuOk && value > 0)
         {
             // Capture current yaw as the target heading
-            yawSetpoint = imu.yaw();  // Set PID setpoint to current direction
-            targetYaw = yawSetpoint;   // Keep for telemetry compatibility
-            baseSpeed = (float)value;
+            yawSetpoint = imu.yaw();   // Set PID setpoint to current direction
+            targetYaw   = yawSetpoint; // Keep for telemetry compatibility
+            baseSpeed   = (float)value;
 
             // Reset and configure PID
             myPID.SetTunings(Kp, Ki, Kd);
             myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
-            myPID.SetSampleTime(50); // 50ms sample time for 20Hz update rate
-            myPID.SetMode(1); // AUTOMATIC mode
+            myPID.SetSampleTime(50);              // 50ms sample time for 20Hz update rate
+            myPID.SetMode(1);                     // AUTOMATIC mode
 
             straightDriving = true;
-            turningInPlace = false;
+            turningInPlace  = false;
             straightStartMs = millis();
 
             // Reset telemetry timer for continuous debug output
             lastTelemetryMs = millis();
 
             // Initialize timer if set
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -638,7 +665,8 @@ void updateStraightDriving()
             Serial.print(value);
             Serial.print(F(", target yaw: "));
             Serial.print(targetYaw);
-            if (timedMovement) {
+            if (timedMovement)
+            {
                 Serial.print(F(", timer: "));
                 Serial.print(movementDurationMs);
                 Serial.print(F("ms"));
@@ -652,7 +680,7 @@ void updateStraightDriving()
         else
         {
             straightDriving = false;
-            turningInPlace = false;
+            turningInPlace  = false;
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Forward driving stopped"));
@@ -665,8 +693,9 @@ void updateStraightDriving()
         if (imuOk && value > 0)
         {
             // Set target yaw to current yaw + 90 degrees (turn left)
-            yawSetpoint = imu.yaw() - 90.0;  // Left turn subtracts 90 degrees
-            if (yawSetpoint < -180.0) yawSetpoint += 360.0; // Wrap around
+            yawSetpoint = imu.yaw() - 90.0; // Left turn subtracts 90 degrees
+            if (yawSetpoint < -180.0)
+                yawSetpoint += 360.0;       // Wrap around
             targetYaw = yawSetpoint;
             baseSpeed = (float)value;
 
@@ -677,15 +706,18 @@ void updateStraightDriving()
             myPID.SetMode(1);
 
             straightDriving = false;
-            turningInPlace = true;
+            turningInPlace  = true;
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
             // Initialize timer if set
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -704,7 +736,7 @@ void updateStraightDriving()
         else
         {
             straightDriving = false;
-            turningInPlace = false;
+            turningInPlace  = false;
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Left turn stopped"));
@@ -717,8 +749,9 @@ void updateStraightDriving()
         if (imuOk && value > 0)
         {
             // Set target yaw to current yaw + 90 degrees (turn right)
-            yawSetpoint = imu.yaw() + 90.0;  // Right turn adds 90 degrees
-            if (yawSetpoint > 180.0) yawSetpoint -= 360.0; // Wrap around
+            yawSetpoint = imu.yaw() + 90.0; // Right turn adds 90 degrees
+            if (yawSetpoint > 180.0)
+                yawSetpoint -= 360.0;       // Wrap around
             targetYaw = yawSetpoint;
             baseSpeed = (float)value;
 
@@ -729,15 +762,18 @@ void updateStraightDriving()
             myPID.SetMode(1);
 
             straightDriving = false;
-            turningInPlace = true;
+            turningInPlace  = true;
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
             // Initialize timer if set
-            if (movementDurationMs > 0) {
-                timedMovement = true;
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
                 movementStartMs = millis();
-            } else {
+            }
+            else
+            {
                 timedMovement = false;
             }
 
@@ -756,7 +792,7 @@ void updateStraightDriving()
         else
         {
             straightDriving = false;
-            turningInPlace = false;
+            turningInPlace  = false;
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Right turn stopped"));
@@ -769,8 +805,8 @@ void updateStraightDriving()
         driveOne(motorLeft, 0);
         driveOne(motorRight, 0);
         straightDriving = false;
-        turningInPlace = false;
-        timedMovement = false;
+        turningInPlace  = false;
+        timedMovement   = false;
         Serial.println(F("EMERGENCY STOP - All movement stopped"));
         break;
 
@@ -795,14 +831,17 @@ void setup()
     {
     }
     Serial.println(F("Motor PWM Test Receiver"));
-    Serial.println(
-        F("Commands: L<val>, R<val>, B<val>, F<val> (forward+PID), Z (reset yaw)"));
-    Serial.println(F("         Q<freq> (set PWM frequency), P (show PID), T<val> (tune PID), D (debug telemetry)"));
-    Serial.println(F("         M<ms> (set movement timer), K<val> (set Kp), I<val> (set Ki), V<val> (set Kd)"));
-    Serial.println(F("PID Movement: W<val> (forward), S<val> (backward), A<val> (left 90°), E<val> (right 90°)"));
+    Serial.println(F("Commands: L<val>, R<val>, B<val>, F<val> (forward+PID), Z (reset yaw)"));
+    Serial.println(F(
+        "         Q<freq> (set PWM frequency), P (show PID), T<val> (tune PID), D (debug telemetry)"));
+    Serial.println(F(
+        "         M<ms> (set movement timer), K<val> (set Kp), I<val> (set Ki), V<val> (set Kd)"));
+    Serial.println(F(
+        "PID Movement: W<val> (forward), S<val> (backward), A<val> (left 90°), E<val> (right 90°)"));
     Serial.println(F("         X (emergency stop all movement)"));
     Serial.println(F("PWM range: -255 to +255 (optimized for 17Hz slow movement)"));
-    Serial.println(F("WASDX controls: W30 forward, S30 backward, A50 left turn, E50 right turn, X stop"));
+    Serial.println(
+        F("WASDX controls: W30 forward, S30 backward, A50 left turn, E50 right turn, X stop"));
 
     // Setup motor pins
     pinMode(PIN_A_MOTOR_LEFT, OUTPUT);
@@ -827,8 +866,8 @@ void setup()
     driveOne(motorRight, 0);
 
     // Initialize PID
-    myPID.SetMode(1); // AUTOMATIC mode (using 1 instead of AUTOMATIC constant)
-    myPID.SetSampleTime(50); // 50ms sample time
+    myPID.SetMode(1);                     // AUTOMATIC mode (using 1 instead of AUTOMATIC constant)
+    myPID.SetSampleTime(50);              // 50ms sample time
     myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
 
     // IMU setup
@@ -843,7 +882,8 @@ void setup()
     {
         imuOk = false;
         Serial.println(F("IMU FAILED - only direct motor control available"));
-        while(1);
+        while (1)
+            ;
     }
 
     // Radio setup
@@ -869,7 +909,8 @@ void setup()
     Serial.println(F("Ready for PWM test commands"));
 }
 
-void sendTelemetry() {
+void sendTelemetry()
+{
     TelemetryPacket telemetry;
 
     // Initialize all fields to prevent garbage data
@@ -877,13 +918,13 @@ void sendTelemetry() {
 
     // Fill with current values
     telemetry.targetYaw = targetYaw;
-    telemetry.yaw = imuOk ? imu.yaw() : 0.0f;
-    telemetry.err = pidError;
-    telemetry.pwmFreq = currentPwmFreq;
-    telemetry.kp = Kp;
-    telemetry.ki = Ki;
-    telemetry.kd = Kd;
-    telemetry.imuOk = imuOk ? 1 : 0;
+    telemetry.yaw       = imuOk ? imu.yaw() : 0.0f;
+    telemetry.err       = pidError;
+    telemetry.pwmFreq   = currentPwmFreq;
+    telemetry.kp        = Kp;
+    telemetry.ki        = Ki;
+    telemetry.kd        = Kd;
+    telemetry.imuOk     = imuOk ? 1 : 0;
 
     // Update radio address for telemetry and send
     radio.stopListening();
@@ -895,7 +936,8 @@ void sendTelemetry() {
     radio.openWritingPipe(RADIO_ADDR_CMD);
     radio.startListening();
 
-    if (!result) {
+    if (!result)
+    {
         Serial.println(F("Telemetry send failed"));
     }
 }

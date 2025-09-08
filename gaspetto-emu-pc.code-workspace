@@ -1,7 +1,10 @@
 {
 	"folders": [
-		{
-			"path": "soft/emu-pc"
-		}
-	]
+        {
+            "path": "soft/emu-pc"
+        },
+        {
+            "path": "soft/pio/arduino_straight_drive"
+        }
+    ]
 }
