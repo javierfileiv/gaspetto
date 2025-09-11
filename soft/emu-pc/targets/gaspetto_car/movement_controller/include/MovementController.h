@@ -58,15 +58,59 @@ public:
      */
     void stopMotorRight();
 
+    /**
+     * resetCounterMotorLeft: reset the left motor pulse counter and target
+     */
+    void resetCounterMotorLeft();
+
+    /**
+     * resetCounterMotorRight: reset the right motor pulse counter and target
+     */
+    void resetCounterMotorRight();
+
+    /**
+     * incrementLeftPulseCount: increment the left motor pulse count (for ISR)
+     */
+    void incrementLeftPulseCount();
+
+    /**
+     * incrementRightPulseCount: increment the right motor pulse count (for ISR)
+     */
+    void incrementRightPulseCount();
+
+    /**
+     * getLeftPulseCount: get current left motor pulse count
+     * @return: current pulse count for left motor
+     */
+    long getLeftPulseCount() const;
+
+    /**
+     * getRightPulseCount: get current right motor pulse count
+     * @return: current pulse count for right motor
+     */
+    long getRightPulseCount() const;
+
+    /**
+     * getLeftTargetPulses: get target pulse count for left motor
+     * @return: target pulse count for left motor
+     */
+    uint32_t getLeftTargetPulses() const;
+
+    /**
+     * getRightTargetPulses: get target pulse count for right motor
+     * @return: target pulse count for right motor
+     */
+    uint32_t getRightTargetPulses() const;
+
 public:
     MotorControl &_motorControl;
 
 private:
-    IMUOrientation imu;
+    // IMUOrientation imu;
     bool imuOk = false;
     double yawSetpoint, currentYaw, motorOffsetOutput;
     double Kp = 2.0, Ki = 0.01, Kd = 0.01;
-    PID &pid;
+    // PID &pid;
     float targetYaw = 0.0f;
     bool straightDriving = false;
     bool turningInPlace = false;
@@ -75,6 +119,10 @@ private:
     float pidError = 0.0f; // Current PID error for telemetry
 
     unsigned long straightStartMs = 0;
+
+    // Target pulse counts for motors
+    uint32_t leftTargetPulses = 0;
+    uint32_t rightTargetPulses = 0;
 };
 
 #endif /* MOVEMENT_CONTROLLER_H */

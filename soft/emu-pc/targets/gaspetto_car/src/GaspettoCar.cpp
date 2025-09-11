@@ -49,18 +49,7 @@ void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
 
 bool GaspettoCar::isTargetReached()
 {
-    bool right_reached = _ctx.movementController->getRightPulseCount() >=
-                         _ctx.movementController->getRightTargetPulses();
-    bool left_reached = _ctx.movementController->getLeftPulseCount() >=
-                        _ctx.movementController->getLeftTargetPulses();
-
     if (currentStateId == StateId::IDLE)
-        return true;
-    if (left_reached)
-        _ctx.movementController->stopMotorLeft();
-    if (right_reached)
-        _ctx.movementController->stopMotorRight();
-    if (right_reached && left_reached)
         return true;
     return false;
 }

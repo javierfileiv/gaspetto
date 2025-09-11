@@ -27,11 +27,13 @@ public:
      */
     MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB);
 
+    virtual ~MotorControl() = default;
+
     /** init():
      * Initialize the motor pins.
      * @pwm_freq: Frequency for the PWM signal.
      */
-    void init(uint32_t pwm_freq);
+    virtual void init(uint32_t pwm_freq);
 
     /** setMotorSpeeds():
      * Set the motor speeds and directions.
@@ -40,15 +42,15 @@ public:
      * @leftForward: Direction for the left motor (true for forward, false for backward).
      * @rightForward: Direction for the right motor (true for forward, false for backward).
      */
-    void setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, bool leftForward,
-                        bool rightForward);
+    virtual void setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, bool leftForward,
+                                bool rightForward);
 
     /* setPWMfrequency():
      * Set the PWM frequency for the motors.
      * @side: Motor side (LEFT or RIGHT).
      * @frequency: Frequency in Hz.
      */
-    void setPWMfrequency(MotorSide side, uint32_t frequency);
+    virtual void setPWMfrequency(MotorSide side, uint32_t frequency);
 
     /* setPWMdutyCycle():
      * Set the PWM duty cycle for a specific motor pin.
@@ -56,25 +58,25 @@ public:
      * @pin: Pin on the motor side (A or B).
      * @percent_duty: Duty cycle percentage (0-100).
      */
-    void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
+    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
 
     /** stopRightMotor():
      * Stop the right motor.
      * Set speed of the right motor to zero and stops it.
      */
-    void stopRightMotor();
+    virtual void stopRightMotor();
 
     /** stopLeftMotor():
      * Stop the left motor.
      * Set speed of the left motor to zero and stops it.
      */
-    void stopLeftMotor();
+    virtual void stopLeftMotor();
 
     /** stopBothMotors():
      * Stop both motors.
      * Set speed of both motors to zero and stops them.
      */
-    void stopBothMotors();
+    virtual void stopBothMotors();
 
 public:
     struct MotorConfig motor[MAX_SIDES];

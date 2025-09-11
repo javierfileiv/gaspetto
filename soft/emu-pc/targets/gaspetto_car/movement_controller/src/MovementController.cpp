@@ -56,3 +56,13 @@ void MovementController::stopMotorRight()
 {
     _motorControl.stopRightMotor();
 }
+
+uint32_t MovementController::getLeftTargetPulses() const
+{
+    return leftTargetPulses;
+}
+
+uint32_t MovementController::getRightTargetPulses() const
+{
+    return rightTargetPulses;
+}
