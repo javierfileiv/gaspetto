@@ -20,22 +20,6 @@ public:
                 (uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle));
     MOCK_METHOD(void, hw_timer_pause, ());
 
-    void execute_irq_left(int n_times = 0)
-    {
-        if (irq_cb_left) {
-            for (int i = 0; i < n_times; ++i)
-                irq_cb_left();
-        }
-    }
-
-    void execute_irq_right(int n_times = 0)
-    {
-        if (irq_cb_right) {
-            for (int i = 0; i < n_times; ++i)
-                irq_cb_right();
-        }
-    }
-
 public:
     MockArduino();
     virtual ~MockArduino();

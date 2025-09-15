@@ -37,13 +37,12 @@ void GaspettoCar::init(StateId initialStateId)
 }
 
 void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
-                           uint32_t distance_cm_left, bool forward_motor_right,
-                           uint32_t motor_right_speed, uint32_t distance_cm_right)
+                           bool forward_motor_right, uint32_t motor_right_speed,
+                           uint32_t timeout_ms)
 {
     if (_ctx.movementController) {
-        _ctx.movementController->setMotor(forward_motor_left, motor_left_speed, distance_cm_left,
-                                          forward_motor_right, motor_right_speed,
-                                          distance_cm_right);
+        _ctx.movementController->setMotor(forward_motor_left, motor_left_speed, forward_motor_right,
+                                          motor_right_speed, timeout_ms);
     }
 }
 

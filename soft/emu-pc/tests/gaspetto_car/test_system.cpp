@@ -29,10 +29,6 @@ TEST_F(CarSystemBehaviorTest, ForwardEvent)
     expect_move_forward(INITIAL_MOTOR_FREQ, INITIAL_MOTOR_FREQ);
     SimulateCarMainLoop([&]() { return gaspettoCar.getCurrentState() == &idleState; });
     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
-    target_pulses_left = ctx.movementController->getLeftTargetPulses();
-    ASSERT_GT(target_pulses_left, 0) << "Movement target pulses not set or is zero.";
-    target_pulses_right = ctx.movementController->getRightTargetPulses();
-    ASSERT_GT(target_pulses_right, 0) << "Movement target pulses not set or is zero.";
     /* No packet received in between. May be called several times in the loop. */
     expect_motors_set_speed();
     expect_both_motors_stop();

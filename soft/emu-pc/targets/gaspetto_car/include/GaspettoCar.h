@@ -19,12 +19,6 @@ const uint32_t MOTOR_LEFT_BWD = PB_14; /* Example PWM pin for motor left. D4 on 
 const uint32_t MOTOR_LEFT_FWD = PB_15; /* Direction pin for motor left.  D5 on salaea. */
 const uint32_t MOTOR_RIGHT_FWD = PB_11; /* PWM pin for motor right. D1 on salaea. */
 const uint32_t MOTOR_RIGHT_BWD = PB_10; /* Direction pin for motor right. D2 on salaea. */
-const uint32_t SPEED_SENSOR_LEFT_PIN = PA_1; /* Pin for left speed/distance sensor. D0 on salaea. */
-const uint32_t SPEED_SENSOR_RIGHT_PIN = PA_0; /* Pin for right speed/distance sensor. D3 on
-                                                 salaea.*/
-const uint32_t DISTANCE_CM_FWD_BWD = 50;
-const uint32_t DISTANCE_CM_TURN_RIGHT = 15;
-const uint32_t DISTANCE_CM_TURN_LEFT = 20;
 
 class GaspettoCar : public ActiveObject {
 public:
@@ -42,14 +36,13 @@ public:
      * @forward_motor_left: Direction for the left motor.
      * (true for forward, false for backward).
      * @motor_left_speed: Speed for the left motor.
-     * @distance_cm_left: Distance in centimeters for the left motor.
      * @forward_motor_right: Direction for the right motor.
      * (true for forward, false for backward).
      * @motor_right_speed: Speed for the right motor.
-     * @distance_cm_right: Distance in centimeters for the right motor.
+     * @timeout_ms: Optional timeout in milliseconds to stop the motors after. If 0, no timeout.
      */
-    void setMotor(bool forward_motor_left, uint32_t motor_left_speed, uint32_t distance_cm_left,
-                  bool forward_motor_right, uint32_t motor_right_speed, uint32_t distance_cm_right);
+    void setMotor(bool forward_motor_left, uint32_t motor_left_speed, bool forward_motor_right,
+                  uint32_t motor_right_speed, uint32_t timeout_ms = 0);
 
     /** postEvent(): Post an event to the event queue.
      * @evt: The event to be posted.

@@ -30,11 +30,6 @@ void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode)
 {
     auto mock = MockArduino::get_instance();
 
-    if (interruptNum == SPEED_SENSOR_LEFT_PIN) {
-        mock->irq_cb_left = userFunc;
-    } else if (interruptNum == SPEED_SENSOR_RIGHT_PIN) {
-        mock->irq_cb_right = userFunc;
-    }
     mock->attachInterrupt(interruptNum, userFunc, mode);
 }
 

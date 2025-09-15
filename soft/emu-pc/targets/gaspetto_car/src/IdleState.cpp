@@ -21,26 +21,22 @@ void IdleState::processEvent(Event &evt)
     case EventId::ACTION: {
         switch (evt.getCommand()) {
         case CommandId::MOTOR_FORWARD:
-            car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, FORWARD,
-                          INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD);
+            car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, FORWARD, INITIAL_MOTOR_SPEED);
             active_object->transitionTo(StateId::PROCESSING);
             logln("Transition to PROCESSING (Move Forward)");
             break;
         case CommandId::MOTOR_BACKWARD:
-            car->setMotor(BACKWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, BACKWARD,
-                          INITIAL_MOTOR_SPEED, 20);
+            car->setMotor(BACKWARD, INITIAL_MOTOR_SPEED, BACKWARD, INITIAL_MOTOR_SPEED);
             active_object->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Move Backward)"));
             break;
         case CommandId::MOTOR_LEFT:
-            car->setMotor(BACKWARD, TURN_MOTOR_SPEED, DISTANCE_CM_TURN_LEFT, FORWARD,
-                          INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD);
+            car->setMotor(BACKWARD, TURN_MOTOR_SPEED, FORWARD, INITIAL_MOTOR_SPEED);
             active_object->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Turn Left)"));
             break;
         case CommandId::MOTOR_RIGHT:
-            car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, DISTANCE_CM_FWD_BWD, BACKWARD,
-                          TURN_MOTOR_SPEED, DISTANCE_CM_TURN_RIGHT);
+            car->setMotor(FORWARD, INITIAL_MOTOR_SPEED, BACKWARD, TURN_MOTOR_SPEED);
 
             active_object->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Turn Right)"));
