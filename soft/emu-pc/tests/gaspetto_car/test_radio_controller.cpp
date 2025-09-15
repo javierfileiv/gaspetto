@@ -26,7 +26,6 @@ TEST_F(RadioControllerTest_CarInit, ForwardEvent)
     expect_process_radio_no_event();
     expect_stop_motor_left();
     expect_stop_motor_right();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
 }
 
@@ -42,7 +41,6 @@ TEST_F(RadioControllerTest_CarInit, BackwardEvent)
     expect_process_radio_no_event();
     expect_stop_motor_left();
     expect_stop_motor_right();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
 }
 
@@ -59,13 +57,8 @@ TEST_F(RadioControllerTest_CarInit, DISABLED_TurnRightEvent)
     ASSERT_EQ(car.getCurrentState(), &processingState);
     /* Expect stop motor right.*/
     expect_stop_motor_right();
-    execute_irq(ctx.movementController->getRightTargetPulses());
     car.processNextEvent();
-    /* Expect stop motor left.*/
-    diff = ctx.movementController->getLeftTargetPulses() -
-           ctx.movementController->getRightTargetPulses();
     expect_both_motors_stop();
-    execute_irq(diff);
     car.processNextEvent();
     /* Receive nothing. */
     radio_receive_event(nullptr);
@@ -84,13 +77,9 @@ TEST_F(RadioControllerTest_CarInit, DISABLED_TurnLeftEvent)
     ASSERT_EQ(car.getCurrentState(), &processingState);
     /* Expect stop motor left.*/
     expect_stop_motor_left();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
     /* Expect stop motor right.*/
-    diff = ctx.movementController->getRightTargetPulses() -
-           ctx.movementController->getLeftTargetPulses();
     expect_both_motors_stop();
-    execute_irq(diff);
     car.processNextEvent();
     /* Receive nothing. */
     radio_receive_event(nullptr);

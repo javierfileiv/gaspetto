@@ -45,21 +45,6 @@ public:
     virtual void setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, bool leftForward,
                                 bool rightForward);
 
-    /* setPWMfrequency():
-     * Set the PWM frequency for the motors.
-     * @side: Motor side (LEFT or RIGHT).
-     * @frequency: Frequency in Hz.
-     */
-    virtual void setPWMfrequency(MotorSide side, uint32_t frequency);
-
-    /* setPWMdutyCycle():
-     * Set the PWM duty cycle for a specific motor pin.
-     * @side: Motor side (LEFT or RIGHT).
-     * @pin: Pin on the motor side (A or B).
-     * @percent_duty: Duty cycle percentage (0-100).
-     */
-    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
-
     /** stopRightMotor():
      * Stop the right motor.
      * Set speed of the right motor to zero and stops it.
@@ -95,6 +80,21 @@ private:
      * @forward: true for forward, false for backward.
      */
     void setMotorRight(uint8_t speed_percent, bool forward);
+
+    /* setPWMfrequency():
+     * Set the PWM frequency for the motors.
+     * @side: Motor side (LEFT or RIGHT).
+     * @frequency: Frequency in Hz.
+     */
+    virtual void setPWMfrequency(MotorSide side, uint32_t frequency);
+
+    /* setPWMdutyCycle():
+     * Set the PWM duty cycle for a specific motor pin.
+     * @side: Motor side (LEFT or RIGHT).
+     * @pin: Pin on the motor side (A or B).
+     * @percent_duty: Duty cycle percentage (0-100).
+     */
+    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
 };
 
 #endif // MOTOR_CONTROLLER_H

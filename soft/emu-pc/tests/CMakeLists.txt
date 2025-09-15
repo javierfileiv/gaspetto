@@ -22,6 +22,7 @@ add_executable(
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
+  mocks/mock_MotorControl.cpp
   fixture.cpp
 )
 target_include_directories(utest PRIVATE ./ mocks)

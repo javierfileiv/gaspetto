@@ -54,14 +54,10 @@ TEST_F(MovementController_CarInit, DISABLED_TurnRightEvent)
     /* Expect stop motor right.*/
     expect_process_radio_no_event();
     expect_stop_motor_right();
-    execute_irq(ctx.movementController->getRightTargetPulses());
     car.processNextEvent();
     /* Expect stop motor left.*/
-    diff = ctx.movementController->getLeftTargetPulses() -
-           ctx.movementController->getRightTargetPulses();
     expect_process_radio_no_event();
     expect_both_motors_stop();
-    execute_irq(diff);
     car.processNextEvent();
 }
 
@@ -79,14 +75,10 @@ TEST_F(MovementController_CarInit, DISABLED_TurnLeftEvent)
     /* Expect stop motor left.*/
     expect_process_radio_no_event();
     expect_stop_motor_left();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
     car.processNextEvent();
     /* Expect stop motor right.*/
-    diff = ctx.movementController->getRightTargetPulses() -
-           ctx.movementController->getLeftTargetPulses();
     expect_process_radio_no_event();
     expect_both_motors_stop();
-    execute_irq(diff);
     car.processNextEvent();
 }
 
