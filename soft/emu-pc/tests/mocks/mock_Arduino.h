@@ -6,6 +6,8 @@
 
 class MockArduino : public MockBase<MockArduino> {
 public:
+    MOCK_METHOD(unsigned long, millis, ());
+    MOCK_METHOD(unsigned long, micros, ());
     MOCK_METHOD(void, pinMode, (int pin, int mode));
     MOCK_METHOD(void, attachInterrupt, (int interruptNum, void (*userFunc)(void), int mode));
     MOCK_METHOD(void, digitalWrite, (int pin, int value));

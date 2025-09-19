@@ -36,13 +36,12 @@ void GaspettoCar::init(StateId initialStateId)
     ActiveObject::init(initialStateId);
 }
 
-void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
-                           bool forward_motor_right, uint32_t motor_right_speed,
-                           uint32_t timeout_ms)
+void GaspettoCar::setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed,
+                           bool forward_motor_left, bool forward_motor_right, uint32_t timeout_ms)
 {
     if (_ctx.movementController) {
-        _ctx.movementController->setMotor(forward_motor_left, motor_left_speed, forward_motor_right,
-                                          motor_right_speed, timeout_ms);
+        _ctx.movementController->setMotor(motor_left_speed, motor_right_speed, forward_motor_left,
+                                          forward_motor_right, timeout_ms);
     }
 }
 
@@ -64,13 +63,11 @@ int GaspettoCar::postEvent(Event evt)
 
 void GaspettoCar::stopMotorRight()
 {
-    logln(F("GaspettoCar::stopMotorRight() - Delegating to MovementController."));
     _ctx.movementController->stopMotorRight();
 }
 
 void GaspettoCar::stopMotorLeft()
 {
-    logln(F("GaspettoCar::stopMotorLeft() - Delegating to MovementController."));
     _ctx.movementController->stopMotorLeft();
 }
 

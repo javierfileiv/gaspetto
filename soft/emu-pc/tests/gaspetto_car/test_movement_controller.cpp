@@ -51,13 +51,6 @@ TEST_F(MovementController_CarInit, DISABLED_TurnRightEvent)
     expect_turn_right(INITIAL_MOTOR_SPEED, TURN_MOTOR_SPEED);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
-    /* Expect stop motor right.*/
-    expect_process_radio_no_event();
-    expect_stop_motor_right();
-    car.processNextEvent();
-    /* Expect stop motor left.*/
-    expect_process_radio_no_event();
-    expect_both_motors_stop();
     car.processNextEvent();
 }
 

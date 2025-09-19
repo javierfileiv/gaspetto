@@ -24,8 +24,6 @@ TEST_F(RadioControllerTest_CarInit, ForwardEvent)
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
     expect_process_radio_no_event();
-    expect_stop_motor_left();
-    expect_stop_motor_right();
     car.processNextEvent();
 }
 
@@ -39,47 +37,32 @@ TEST_F(RadioControllerTest_CarInit, BackwardEvent)
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
     expect_process_radio_no_event();
-    expect_stop_motor_left();
-    expect_stop_motor_right();
     car.processNextEvent();
 }
 
-TEST_F(RadioControllerTest_CarInit, DISABLED_TurnRightEvent)
+TEST_F(RadioControllerTest_CarInit, DISABLED_TurnLeftEvent)
 {
-    uint32_t diff = 0;
-
-    /* Radio receive TURN RIGHT event. */
+    /* Radio receive TURN LEFT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    radio_receive_event(&rightEvent);
-    /* Motor TURNS RIGHT. */
-    expect_turn_right(MOTOR_FREQ, MOTOR_FREQ);
+    radio_receive_event(&leftEvent);
+    /* Motor TURNS LEFT. */
+    expect_turn_left(TURN_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
-    /* Expect stop motor right.*/
-    expect_stop_motor_right();
-    car.processNextEvent();
-    expect_both_motors_stop();
     car.processNextEvent();
     /* Receive nothing. */
     radio_receive_event(nullptr);
 }
 
-TEST_F(RadioControllerTest_CarInit, DISABLED_TurnLeftEvent)
+TEST_F(RadioControllerTest_CarInit, DISABLED_TurnRightEvent)
 {
-    uint32_t diff = 0;
-
-    /* Radio receive TURN LEFT event. */
+    /* Radio receive TURN RIGHT event. */
     ASSERT_EQ(car.getCurrentState(), &idleState);
-    radio_receive_event(&leftEvent);
-    /* Motor TURNS LEFT. */
-    expect_turn_left(MOTOR_FREQ, MOTOR_FREQ);
+    radio_receive_event(&rightEvent);
+    /* Motor TURNS RIGHT. */
+    expect_turn_right(INITIAL_MOTOR_SPEED, TURN_MOTOR_SPEED);
     car.processNextEvent();
     ASSERT_EQ(car.getCurrentState(), &processingState);
-    /* Expect stop motor left.*/
-    expect_stop_motor_left();
-    car.processNextEvent();
-    /* Expect stop motor right.*/
-    expect_both_motors_stop();
     car.processNextEvent();
     /* Receive nothing. */
     radio_receive_event(nullptr);

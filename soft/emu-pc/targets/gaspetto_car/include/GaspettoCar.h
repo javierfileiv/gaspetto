@@ -33,16 +33,16 @@ public:
     void init(StateId initialStateId = StateId::IDLE);
 
     /** setMotor(): Set the motor speeds and directions.
+     * @motor_left_speed: Speed for the left motor.
+     * @motor_right_speed: Speed for the right motor.
      * @forward_motor_left: Direction for the left motor.
      * (true for forward, false for backward).
-     * @motor_left_speed: Speed for the left motor.
      * @forward_motor_right: Direction for the right motor.
      * (true for forward, false for backward).
-     * @motor_right_speed: Speed for the right motor.
      * @timeout_ms: Optional timeout in milliseconds to stop the motors after. If 0, no timeout.
      */
-    void setMotor(bool forward_motor_left, uint32_t motor_left_speed, bool forward_motor_right,
-                  uint32_t motor_right_speed, uint32_t timeout_ms = 0);
+    void setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed, bool forward_motor_left,
+                  bool forward_motor_right, uint32_t timeout_ms = 0);
 
     /** postEvent(): Post an event to the event queue.
      * @evt: The event to be posted.

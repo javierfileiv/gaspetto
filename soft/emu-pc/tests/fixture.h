@@ -12,6 +12,7 @@
 #include "config_event.h"
 #include "config_radio.h"
 #include "mock_Arduino.h"
+#include "mock_IMUOrientation.h"
 #include "mock_MotorControl.h"
 #include "mock_RF24.h"
 
@@ -29,8 +30,9 @@ class Fixture : public ::testing::Test {
 public:
     Fixture()
             : radioController(_mock_RF24, &eventQueue, test_writing_addr, test_reading_addr)
-            , _mock_motorControl(MOTOR_LEFT_FWD, MOTOR_LEFT_BWD, MOTOR_RIGHT_FWD, MOTOR_RIGHT_BWD)
-            , carMovementController(_mock_motorControl)
+            , _mock_motorControl()
+            , _mock_imu()
+            , carMovementController(_mock_motorControl, _mock_imu)
             , eventQueue()
             , ctx{ &eventQueue, &carMovementController, &radioController, nullptr,
                    &idleState,  &processingState,       MOTOR_FREQ }
@@ -60,8 +62,6 @@ public:
     void expect_both_motors_stop();
 
 private:
-    void expect_set_motor_left(bool forward, uint8_t speed_percent);
-    void expect_set_motor_right(bool forward, uint8_t speed_percent);
     void stop_car();
 
 public:
@@ -87,11 +87,12 @@ protected:
 
 private:
     EventQueue eventQueue;
-    RadioController radioController;
-    MovementController carMovementController;
     testing::StrictMock<MockMotorControl> _mock_motorControl;
+    MockIMUOrientation _mock_imu;
     testing::StrictMock<MockArduino> _mock_arduino;
     testing::StrictMock<MockRF24> _mock_RF24;
+    RadioController radioController;
+    MovementController carMovementController;
     ::testing::InSequence seq;
 };
 

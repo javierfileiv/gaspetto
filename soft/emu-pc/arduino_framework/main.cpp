@@ -13,16 +13,6 @@ Event event;
 Event evt_copy;
 EventPacket pkt;
 
-/*  Millis simulation thread. */
-static void emu_millisThread()
-{
-    while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1)); /*  Increment every
-                                                                      millisecond. */
-        millisCounter.fetch_add(1);
-    }
-}
-
 Event getEvent(void)
 {
     evt_copy = event;
@@ -54,7 +44,6 @@ int main()
 {
     Serial.println("Starting simulation...\n");
     /*  Start the simulation threads. */
-    std::thread millisSim(emu_millisThread);
     std::thread keyboardSim(keyboardInput);
     /*  Setuo the system. */
     setup();
@@ -68,7 +57,6 @@ int main()
 
     /*  Stop the threads. */
     running = false;
-    millisSim.join();
     keyboardSim.join();
     return 0;
 }

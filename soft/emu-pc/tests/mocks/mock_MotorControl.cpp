@@ -1,8 +1,7 @@
 #include "mock_MotorControl.h"
 
-MockMotorControl::MockMotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB)
+MockMotorControl::MockMotorControl()
         : MockBase<MockMotorControl>()
-        , MotorControl(lA, lB, rA, rB)
 {
     set_instance(this);
 }

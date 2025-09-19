@@ -73,6 +73,20 @@ void analogWriteFrequency(int freq)
     mock->analogWriteFrequency(freq);
 }
 
+unsigned long millis(void)
+{
+    auto mock = MockArduino::get_instance();
+
+    return mock->millis();
+}
+
+unsigned long micros(void)
+{
+    auto mock = MockArduino::get_instance();
+
+    return mock->micros();
+}
+
 HardwareTimer::HardwareTimer()
 {
 }

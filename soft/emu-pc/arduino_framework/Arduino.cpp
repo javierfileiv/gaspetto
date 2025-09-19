@@ -1,17 +1,29 @@
-#include "Serial.h"
+#include "Arduino.h"
 
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-std::atomic<unsigned long> millisCounter{ 0 };
 std::atomic<bool> lowPowerMode;
 
 /*  Simulated millis function. */
 extern "C" {
 unsigned long millis(void)
 {
-    return millisCounter.load();
+    static auto start_time = std::chrono::steady_clock::now();
+
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time);
+    return static_cast<unsigned long>(duration.count());
+}
+
+unsigned long micros(void)
+{
+    static auto start_time = std::chrono::steady_clock::now();
+
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time);
+    return static_cast<unsigned long>(duration.count());
 }
 
 long map(long x, long in_min, long in_max, long out_min, long out_max)

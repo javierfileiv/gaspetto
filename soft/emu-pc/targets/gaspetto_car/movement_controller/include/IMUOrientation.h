@@ -1,51 +1,48 @@
 #pragma once
+#include "IMUOrientationInterface.h"
+
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Wire.h>
 
-class IMUOrientation {
+class IMUOrientation : public IMUOrientationInterface {
 public:
-    struct Offsets {
-        float accX{ 0 }, accY{ 0 }, accZ{ 0 };
-        float gyroX{ 0 }, gyroY{ 0 }, gyroZ{ 0 };
-    };
+    bool begin(uint8_t addr = 0x68, TwoWire *theWire = &Wire) override;
+    void calibrate(bool print = true) override;
+    void update() override;
 
-    bool begin(uint8_t addr = 0x68, TwoWire *theWire = &Wire);
-    void calibrate(bool print = true);
-    void update();
-
-    float roll() const
+    float roll() const override
     {
         return rollDeg;
     }
-    float pitch() const
+    float pitch() const override
     {
         return pitchDeg;
     }
-    float yaw() const
+    float yaw() const override
     {
         return yawDeg;
     }
-    float gyroZDeg() const
+    float gyroZDeg() const override
     {
         return lastGyroZDeg;
     }
-    const Offsets &getOffsets() const
+    const Offsets &getOffsets() const override
     {
         return offsets;
     }
 
-    void zeroYaw()
+    void zeroYaw() override
     {
         yawDeg = 0.0f;
     }
 
     // Apply gentle yaw decay toward zero while stationary (call from loop when idle)
-    void idleYawDampen(float dt);
+    void idleYawDampen(float dt) override;
 
     // Expose current estimated gyro Z bias (for diagnostics)
-    float gyroZBiasValue() const
+    float gyroZBiasValue() const override
     {
         return gyroZBias;
     }

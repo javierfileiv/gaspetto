@@ -24,14 +24,14 @@ void Fixture::expect_car_init()
 
 void Fixture::expect_movement_controller_init()
 {
+    EXPECT_CALL(_mock_imu, _begin(_, _)).WillOnce(Return(true));
     expect_motor_control_init();
-    // expect IMU init
 }
 
 void Fixture::expect_motor_control_init()
 {
     /* Init motor controller. */
-    EXPECT_CALL(_mock_motorControl, init(MOTOR_FREQ));
+    EXPECT_CALL(_mock_motorControl, _init(MOTOR_FREQ));
 }
 
 void Fixture::expect_enter_low_power_mode()
@@ -39,37 +39,12 @@ void Fixture::expect_enter_low_power_mode()
     EXPECT_CALL(_mock_arduino, SwitchToLowPowerMode);
 }
 
-void Fixture::expect_set_motor_left(bool forward, uint8_t speed_percent)
-{
-    expect_stop_motor_left();
-    if (forward) {
-    } else {
-    }
-}
-
-void Fixture::expect_set_motor_right(bool forward, uint8_t speed_percent)
-{
-    expect_stop_motor_right();
-    //     if (forward) {
-    //         EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[BWD], speed_percent,
-    //                                                      PERCENT_COMPARE_FORMAT));
-    //         EXPECT_CALL(_mock_arduino,
-    //                     setCaptureCompare(motor[RIGHT].pin[FWD], 0, PERCENT_COMPARE_FORMAT));
-    //     } else {
-    //         EXPECT_CALL(_mock_arduino,
-    //                     setCaptureCompare(motor[RIGHT].pin[BWD], 0, PERCENT_COMPARE_FORMAT));
-    //         EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[FWD], speed_percent,
-    //                                                      PERCENT_COMPARE_FORMAT));
-    //     }
-}
-
 void Fixture::expect_move_forward(uint32_t leftSpeed, uint32_t rightSpeed)
 {
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    expect_set_motor_left(true, _leftPercent);
-    expect_set_motor_right(true, _rightPercent);
+    EXPECT_CALL(_mock_motorControl, _setMotorSpeeds(_leftPercent, _rightPercent, true, true));
 }
 
 void Fixture::expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -77,8 +52,7 @@ void Fixture::expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    expect_set_motor_left(false, _leftPercent);
-    expect_set_motor_right(false, _rightPercent);
+    EXPECT_CALL(_mock_motorControl, _setMotorSpeeds(_leftPercent, _rightPercent, false, false));
 }
 
 void Fixture::expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -86,8 +60,7 @@ void Fixture::expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    expect_set_motor_left(false, _leftPercent);
-    expect_set_motor_right(true, _rightPercent);
+    EXPECT_CALL(_mock_motorControl, _setMotorSpeeds(_leftPercent, _rightPercent, true, false));
 }
 
 void Fixture::expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed)
@@ -95,18 +68,17 @@ void Fixture::expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed)
     uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
     uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
 
-    expect_set_motor_left(true, _leftPercent);
-    expect_set_motor_right(false, _rightPercent);
+    EXPECT_CALL(_mock_motorControl, _setMotorSpeeds(_leftPercent, _rightPercent, false, true));
 }
 
 void Fixture::expect_stop_motor_left()
 {
-    EXPECT_CALL(_mock_motorControl, stopLeftMotor);
+    EXPECT_CALL(_mock_motorControl, _stopLeftMotor);
 }
 
 void Fixture::expect_stop_motor_right()
 {
-    EXPECT_CALL(_mock_motorControl, stopRightMotor);
+    EXPECT_CALL(_mock_motorControl, _stopRightMotor);
 }
 
 void Fixture::expect_both_motors_stop()

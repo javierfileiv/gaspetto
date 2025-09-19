@@ -7,6 +7,8 @@
 #include <atomic>
 #include <thread>
 
+#define constrain(amt, low, high) ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
+
 extern std::atomic<bool> lowPowerMode;
 extern std::atomic<unsigned long> millisCounter;
 extern SerialEmulator Serial;
@@ -21,6 +23,7 @@ Event getEvent(void);
 extern "C" {
 
 unsigned long millis(void);
+unsigned long micros(void);
 void SwitchToLowPowerMode(void);
 long map(long x, long in_min, long in_max, long out_min, long out_max);
 void pinMode(int pin, int mode);

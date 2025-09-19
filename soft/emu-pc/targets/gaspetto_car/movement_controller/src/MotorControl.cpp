@@ -14,6 +14,10 @@ MotorControl::MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB)
     motor[RIGHT].pin[FWD] = rB;
 }
 
+MotorControl::~MotorControl()
+{
+}
+
 void MotorControl::init(uint32_t pwm_freq)
 {
     pinMode(motor[LEFT].pin[BWD], OUTPUT);

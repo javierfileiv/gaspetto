@@ -4,13 +4,13 @@
 #ifndef MOCK_MOTOR_CONTROL_H
 #define MOCK_MOTOR_CONTROL_H
 
-#include "MotorControl.h"
+#include "MotorControlInterface.h"
 
 #include <gmock/gmock.h>
 
-class MockMotorControl : public MockBase<MockMotorControl>, public MotorControl {
+class MockMotorControl : public MockBase<MockMotorControl>, public MotorControlInterface {
 public:
-    MockMotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB);
+    MockMotorControl();
     ~MockMotorControl();
 
     MOCK_METHOD(void, _init, (uint32_t pwm_freq));
@@ -21,6 +21,15 @@ public:
     MOCK_METHOD(void, _stopRightMotor, ());
     MOCK_METHOD(void, _stopLeftMotor, ());
     MOCK_METHOD(void, _stopBothMotors, ());
+
+    virtual void init(uint32_t pwm_freq) override;
+    virtual void setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, bool leftForward,
+                                bool rightForward) override;
+    virtual void setPWMfrequency(MotorSide side, uint32_t frequency) override;
+    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty) override;
+    virtual void stopRightMotor() override;
+    virtual void stopLeftMotor() override;
+    virtual void stopBothMotors() override;
 
 private:
     static MockMotorControl *instance_;

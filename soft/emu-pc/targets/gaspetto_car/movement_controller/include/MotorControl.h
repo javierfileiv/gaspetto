@@ -1,12 +1,12 @@
-#ifndef MOTOR_CONTROLLER_H
-#define MOTOR_CONTROLLER_H
+#ifndef MOTOR_CONTROL_H
+#define MOTOR_CONTROL_H
 
 #include "Log.h"
+#include "MotorControlInterface.h"
 
+#ifndef ARDUINO
 #include <cstdint>
-
-enum MotorSide { LEFT, RIGHT, MAX_SIDES };
-enum PinPerSide { BWD, FWD, MAX_PIN };
+#endif
 
 class HardwareTimer;
 
@@ -16,7 +16,7 @@ struct MotorConfig {
     HardwareTimer *timer;
 };
 
-class MotorControl : public Log {
+class MotorControl : public MotorControlInterface, public Log {
 public:
     /** setPins():
      * Set the pins for the motor controller.
@@ -27,7 +27,7 @@ public:
      */
     MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB);
 
-    virtual ~MotorControl() = default;
+    virtual ~MotorControl();
 
     /** init():
      * Initialize the motor pins.
