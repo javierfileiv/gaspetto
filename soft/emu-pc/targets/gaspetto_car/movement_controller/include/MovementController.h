@@ -3,9 +3,13 @@
 
 #include "IMUOrientationInterface.h"
 #include "MotorControlInterface.h"
+#include "PID_v1.h"
 
+#ifdef ARDUINO
+#include <Arduino.h>
+#else
 #include <cstdint>
-
+#endif
 class MovementController {
 public:
     /**
@@ -94,28 +98,47 @@ public:
     IMUOrientationInterface &_imu;
 
 private:
+    // PID library variables (Input, Output, Setpoint)
+    double g_yawInput = 0.0;
+    double g_yawOutput = 0.0;
+    double g_yawSetpoint = 0.0;
+
+    double g_Kp = 2.0;
+    double g_Ki = 0.01;
+    double g_Kd = 0.01;
+    PID g_yawPID;
+
     bool imuOk = false;
-    double yawSetpoint, currentYaw, motorOffsetOutput;
-    double Kp = 2.0, Ki = 0.01, Kd = 0.01;
+    double yawSetpoint;
+    double currentYaw;
+    double motorOffsetOutput;
+    double Kp = 2.0;
+    double Ki = 0.01;
+    double Kd = 0.01;
     float targetYaw = 0.0f;
     bool straightDriving = false;
     bool turningInPlace = false;
     float baseSpeed = 0.0f;
     float currentPwmFreq = 17.0f;
-    float pidError = 0.0f; // Current PID error for telemetry
+    float pidError = 0.0f;
+    // Turn completion / anti-oscillation helpers
+    int g_stableCount = 0;
+    const int STABLE_REQUIRED = 4; // Need N consecutive cycles inside deadband
+    const float TURN_DEADBAND_DEG = 3.0f; // Final acceptance window
+    const float TURN_DECEL_ANGLE_DEG = 35.0f; // Start reducing speed under this error
+    const float TURN_MIN_SPEED_RATIO = 0.28f; // Minimum fraction of base speed
 
-    unsigned long straightStartMs = 0;
+    // Output smoothing to reduce motor jitter
+    double g_prevFilteredOutput = 0.0;
+    const double OUTPUT_FILTER_ALPHA = 0.25; // 0..1 (higher = more weight to new sample)
 
     // Timed movement variables
     unsigned long movementDurationMs = 0;
     unsigned long movementStartMs = 0;
     bool timedMovement = false;
 
-    // Target pulse counts for motors
     uint32_t leftTargetPulses = 0;
     uint32_t rightTargetPulses = 0;
-
-    // PID helper methods
     float yawDiff(float target, float current);
     void applyPidOutput();
     void checkMovementTimeout();

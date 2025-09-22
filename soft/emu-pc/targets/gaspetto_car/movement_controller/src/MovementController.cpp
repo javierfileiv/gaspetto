@@ -1,5 +1,4 @@
-#include "../include/MovementController.h"
-
+#include "MovementController.h"
 #ifdef ARDUINO
 #include <Arduino.h>
 #else
@@ -8,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+
 // Arduino compatibility shims (very minimal for linting/off-target build)
 static inline unsigned long millis()
 {
@@ -23,80 +23,13 @@ static inline long map(long x, long in_min, long in_max, long out_min, long out_
 {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
-// Minimal PID stub replicating interface used (always computes immediately)
-class PID {
-public:
-    PID(double *in, double *out, double *sp, double Kp, double Ki, double Kd, int)
-    {
-        _in = in;
-        _out = out;
-        _sp = sp;
-        _Kp = Kp;
-        _Ki = Ki;
-        _Kd = Kd;
-    }
-    void SetSampleTime(int)
-    {
-    }
-    void SetOutputLimits(double, double)
-    {
-    }
-    void SetTunings(double Kp, double Ki, double Kd)
-    {
-        _Kp = Kp;
-        _Ki = Ki;
-        _Kd = Kd;
-    }
-    void SetMode(int)
-    {
-    }
-    bool Compute()
-    {
-        *_out = (*_sp - *_in) * _Kp;
-        return true;
-    }
-
-private:
-    double *_in, *_out, *_sp;
-    double _Kp, _Ki, _Kd;
-};
 #endif
-
-#ifdef ARDUINO
-#include <PID_v1.h>
-#endif
-
-// Anonymous namespace for internal PID state (no header changes needed)
-namespace
-{
-// PID library variables (Input, Output, Setpoint)
-double g_yawInput = 0.0;
-double g_yawOutput = 0.0;
-double g_yawSetpoint = 0.0;
-
-// Tunable gains (start with same as original manual PID)
-double g_Kp = 2.0;
-double g_Ki = 0.01;
-double g_Kd = 0.01;
-
-PID g_yawPID(&g_yawInput, &g_yawOutput, &g_yawSetpoint, g_Kp, g_Ki, g_Kd, 0); // DIRECT mode
-
-// Turn completion / anti-oscillation helpers
-int g_stableCount = 0;
-const int STABLE_REQUIRED = 4; // Need N consecutive cycles inside deadband
-const float TURN_DEADBAND_DEG = 3.0f; // Final acceptance window
-const float TURN_DECEL_ANGLE_DEG = 35.0f; // Start reducing speed under this error
-const float TURN_MIN_SPEED_RATIO = 0.28f; // Minimum fraction of base speed
-
-// Output smoothing to reduce motor jitter
-double g_prevFilteredOutput = 0.0;
-const double OUTPUT_FILTER_ALPHA = 0.25; // 0..1 (higher = more weight to new sample)
-}
 
 MovementController::MovementController(MotorControlInterface &motorControl,
                                        IMUOrientationInterface &imu)
         : _motorControl(motorControl)
         , _imu(imu)
+        , g_yawPID(&g_yawInput, &g_yawOutput, &g_yawSetpoint, g_Kp, g_Ki, g_Kd, 0)
 {
 }
 
@@ -162,7 +95,6 @@ void MovementController::startStraightDriving(float speed, uint32_t duration_ms)
 
     straightDriving = true;
     turningInPlace = false;
-    straightStartMs = millis();
 
     // Initialize timer if set
     if (duration_ms > 0) {
@@ -197,7 +129,6 @@ void MovementController::startTurningInPlace(float target_yaw, float speed, uint
 
     straightDriving = false;
     turningInPlace = true;
-    straightStartMs = millis();
 
     // Initialize timer if set
     if (duration_ms > 0) {

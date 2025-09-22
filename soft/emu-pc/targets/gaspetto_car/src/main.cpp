@@ -14,7 +14,6 @@
 
 #include <cstdint>
 
-// const int NRF_IRQ_PIN = PB0;
 RF24 radio(CE_PIN, CSN_PIN);
 EventQueue eventQueue;
 IdleState idleState;

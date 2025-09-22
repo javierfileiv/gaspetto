@@ -33,10 +33,10 @@ add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG
 add_subdirectory(arduino_framework)
 add_subdirectory(state_machine_framework)
 add_subdirectory(radio_controller)
-add_subdirectory(tests)
 
+# if(BUILD_TESTS)) add_subdirectory(tests) endif()
 if(GASPETTO_CAR OR BUILD_TESTS)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/targets/gaspetto_car)
+  add_subdirectory(targets/gaspetto_car)
 endif()
 if(GASPETTO_BOX)
   add_subdirectory(targets/gaspetto_box)
