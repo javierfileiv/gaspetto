@@ -1,7 +1,16 @@
 {
 	"folders": [
-		{
-			"path": "soft/emu-pc"
-		}
-	]
+        {
+            "path": "soft/emu-pc"
+        },
+        {
+            "path": "soft/pio"
+        },
+        {
+            "path": "soft/sender_test"
+        },
+        {
+            "path": "soft/Tests"
+        }
+    ]
 }

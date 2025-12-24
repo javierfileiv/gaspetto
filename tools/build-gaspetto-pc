@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# This script builds the GaspettoBox and GaspettoCar firmware for the emu-pc.
-# It now uses the CMake build system and cleans up after itself.
+# This script builds all non-test presets for the emu-pc using CMake presets.
+# Presets: car_debug, car_release, box_debug, box_release, nrf_sender
+
+set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -12,69 +14,34 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
-BUILD_DIR="$EMU_PC_DIR/build-pc"
 
-echo -e "${BLUE}Building Gaspetto firmware for emu-pc...${NC}"
+echo -e "${BLUE}Building Gaspetto firmware for emu-pc (all presets)...${NC}"
 echo -e "Project root: $PROJECT_ROOT"
 echo -e "EMU PC directory: $EMU_PC_DIR"
 
-# Create build directory if it doesn't exist
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
+cd "$EMU_PC_DIR"
 
 # Detect number of CPU cores
 NUM_CORES=$(nproc)
 echo "Using $NUM_CORES cores for compilation"
 
-# Build each target separately
-echo -e "${YELLOW}Building GaspettoBox...${NC}"
-cmake -DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
-	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-	-DGASPETTO_BOX=ON \
-	..
+# List of non-test presets to build
+PRESETS=("car_debug" "car_release" "box_debug" "box_release" "nrf_sender")
 
-cmake --build . --parallel $NUM_CORES --target gaspetto_box
+cleanup() {
+	echo -e "${YELLOW}Cleaning up build directories...${NC}"
+	for preset in "${PRESETS[@]}"; do
+		rm -rf "$EMU_PC_DIR/build-$preset"
+	done
+}
 
-if [ $? -ne 0 ]; then
-	echo -e "${RED}GaspettoBox build failed!${NC}" >&2
-	echo "Cleaning up build directory..."
-	rm -rf "$BUILD_DIR"
-	exit 1
-fi
+trap cleanup EXIT
 
-echo -e "${YELLOW}Building GaspettoCar...${NC}"
-cmake -DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
-	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-	-DGASPETTO_CAR=ON \
-	..
-cmake --build . --parallel $NUM_CORES --target gaspetto_car
+for preset in "${PRESETS[@]}"; do
+	echo -e "${YELLOW}Building preset: $preset...${NC}"
+	cmake --preset="$preset"
+	cmake --build --preset="$preset" --parallel "$NUM_CORES"
+	echo -e "${GREEN}Preset $preset built successfully.${NC}"
+done
 
-if [ $? -ne 0 ]; then
-	echo -e "${RED}GaspettoCar build failed!${NC}" >&2
-	echo "Cleaning up build directory..."
-	rm -rf "$BUILD_DIR"
-	exit 1
-fi
-
-echo -e "${YELLOW}Building NRF Sender...${NC}"
-cmake -DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="-O2 -pipe -march=native -flto" \
-	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-	-DNRF_SENDER=ON \
-	..
-cmake --build . --parallel $NUM_CORES --target nrf_sender
-
-if [ $? -ne 0 ]; then
-	echo -e "${RED}Send NRF Event build failed!${NC}" >&2
-	echo "Cleaning up build directory..."
-	rm -rf "$BUILD_DIR"
-	exit 1
-fi
-
-echo -e "${GREEN}All targets built successfully.${NC}"
-
-# Clean up everything
-echo -e "${YELLOW}Removing all build outputs and directories...${NC}"
-rm -rf "$BUILD_DIR"
+echo -e "${GREEN}All presets built successfully.${NC}"

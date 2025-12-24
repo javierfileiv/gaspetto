@@ -62,3 +62,87 @@ jobs:
 
       - name: Run Gaspetto Arduino build script with Platform IO
         run: ./tools/build-gaspetto-pio
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake lcov
+
+      - name: Build and generate coverage report
+        run: ./tools/build-gaspetto-coverage
+        shell: bash
+
+      - name: Convert lcov to Cobertura XML
+        run: |
+          pip install lcov_cobertura
+          lcov_cobertura soft/emu-pc/build-coverage/coverage.info -o soft/emu-pc/build-coverage/coverage.xml
+
+      - name: Code Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: soft/emu-pc/build-coverage/coverage.xml
+          badge: true
+          format: markdown
+          output: both
+          thresholds: '60 80'
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: soft/emu-pc/build-coverage/coverage/
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake clang-tidy
+
+      - name: Run clang-tidy
+        run: ./tools/run-clang-tidy
+        shell: bash
+
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake cppcheck
+
+      - name: Run cppcheck
+        run: ./tools/run-cppcheck
+        shell: bash

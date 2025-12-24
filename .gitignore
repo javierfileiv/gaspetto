@@ -1,4 +1,5 @@
 *.lck
+**/.pio
 pulseview-NIGHTLY-x86_64-debug.AppImage
 *#auto_saved_files#*
 kicad/**/*autosave*

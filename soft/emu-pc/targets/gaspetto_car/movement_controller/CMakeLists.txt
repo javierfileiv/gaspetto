@@ -5,5 +5,11 @@ add_library(movement_controller_impl STATIC src/MotorControl.cpp src/MovementCon
 target_link_libraries(
   movement_controller_impl
   PUBLIC movement_controller_itf
-  PRIVATE arduino_framework_itf state_machine_framework_itf
+  PRIVATE arduino_framework_itf state_machine_framework_itf project_options project_warnings
 )
+
+# Apply optimizations
+set_optimization_flags(movement_controller_impl)
+
+# Precompiled headers
+add_project_pch(movement_controller_impl)

@@ -1,0 +1,145 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENABLE_CACHE": "ON",
+        "ENABLE_WARNINGS": "ON"
+      }
+    },
+    {
+      "name": "car_debug",
+      "displayName": "Gaspetto Car PC Debug Build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_GASPETTO_CAR": "ON",
+        "ENABLE_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "car_release",
+      "displayName": "Gaspetto Car PC Release Build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_GASPETTO_CAR": "ON",
+        "ENABLE_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "box_debug",
+      "displayName": "Gaspetto Box PC Debug Build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_GASPETTO_BOX": "ON",
+        "ENABLE_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "box_release",
+      "displayName": "Gaspetto Box PC Release Build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_GASPETTO_BOX": "ON",
+        "ENABLE_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "nrf_sender",
+      "displayName": "NRF Sender",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_NRF_SENDER": "ON",
+        "ENABLE_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "tests",
+      "displayName": "Unit Tests",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_GASPETTO_CAR": "OFF",
+        "BUILD_GASPETTO_BOX": "OFF",
+        "BUILD_NRF_SENDER": "OFF",
+        "BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "tests-sanitizers",
+      "displayName": "Tests + Sanitizers",
+      "inherits": "tests",
+      "binaryDir": "${sourceDir}/build-sanitizers",
+      "cacheVariables": {
+        "ENABLE_SANITIZER_ADDRESS": "ON",
+        "ENABLE_SANITIZER_UNDEFINED": "ON"
+      }
+    },
+    {
+      "name": "tests-coverage",
+      "displayName": "Tests + Coverage",
+      "inherits": "tests",
+      "binaryDir": "${sourceDir}/build-coverage",
+      "cacheVariables": {
+        "ENABLE_COVERAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "car_debug",
+      "configurePreset": "car_debug",
+      "targets": ["gaspetto_car"]
+    },
+    {
+      "name": "car_release",
+      "configurePreset": "car_release",
+      "targets": ["gaspetto_car"]
+    },
+    {
+      "name": "box_debug",
+      "configurePreset": "box_debug",
+      "targets": ["gaspetto_box"]
+    },
+    {
+      "name": "box_release",
+      "configurePreset": "box_release",
+      "targets": ["gaspetto_box"]
+    },
+    {
+      "name": "nrf_sender",
+      "configurePreset": "nrf_sender",
+      "targets": ["nrf_sender"]
+    },
+    {
+      "name": "tests",
+      "configurePreset": "tests",
+      "targets": ["utest"]
+    },
+    {
+      "name": "tests-sanitizers",
+      "configurePreset": "tests-sanitizers",
+      "targets": ["utest"]
+    },
+    {
+      "name": "tests-coverage",
+      "configurePreset": "tests-coverage",
+      "targets": ["utest"]
+    }
+  ]
+}

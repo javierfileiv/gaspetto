@@ -1,0 +1,23 @@
+---
+# Gaspetto clang-tidy Configuration
+# Focused on catching critical bugs only
+# This configuration creates a clean baseline for future warnings
+
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-signed-char-misuse,
+  -bugprone-reserved-identifier,
+  -clang-analyzer-deadcode.DeadStores
+
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+FormatStyle: file
+
+CheckOptions:
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: true
