@@ -32,6 +32,7 @@ public:
     /** init(): Initialize the GaspettoCar instance.
      *  @initialStateId: The initial state ID to start the state machine.
      */
+    // cppcheck-suppress duplInheritedMember
     void init(StateId initialStateId = StateId::IDLE);
 
     /** setMotor(): Set the motor speeds and directions.

@@ -1,4 +1,4 @@
-#include "Serial.h"
+#include "Arduino.h"
 
 #include <atomic>
 #include <chrono>
@@ -21,14 +21,21 @@ long map(long x, long in_min, long in_max, long out_min, long out_max)
 
 void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode)
 {
+    (void)interruptNum;
+    (void)userFunc;
+    (void)mode;
 }
 
 void pinMode(int pin, int mode)
 {
+    (void)pin;
+    (void)mode;
 }
 
 void analogWrite(int pin, int value)
 {
+    (void)pin;
+    (void)value;
 }
 
 int digitalPinToInterrupt(int pin)
@@ -38,7 +45,7 @@ int digitalPinToInterrupt(int pin)
 
 void analogWriteFrequency(int freq)
 {
-    /* Empty implementation. */
+    (void)freq;
 }
 
 void printf_begin()
@@ -48,6 +55,7 @@ void printf_begin()
 
 int digitalRead(int pin)
 {
+    (void)pin;
     return 1;
 }
 
@@ -58,6 +66,8 @@ void delay(int ms)
 
 void digitalWrite(int pin, int value)
 {
+    (void)pin;
+    (void)value;
 }
 
 void SwitchToLowPowerMode(void)

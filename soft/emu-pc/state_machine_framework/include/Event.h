@@ -32,17 +32,17 @@ struct __attribute__((packed)) EventPacket {
 
 class Event {
 public:
-    Event(EventId eventId = EventId::NONE, CommandId command = CommandId::NONE)
-            : eventId(eventId)
-            , command(command)
+    Event(EventId evtId = EventId::NONE, CommandId cmd = CommandId::NONE)
+            : eventId(evtId)
+            , command(cmd)
     {
     }
     virtual ~Event() = default;
-    EventId getEventId() const
+    [[nodiscard]] EventId getEventId() const
     {
         return eventId;
     }
-    CommandId getCommand() const
+    [[nodiscard]] CommandId getCommand() const
     {
         return command;
     }
@@ -110,7 +110,7 @@ public:
         }
     }
 
-protected:
+private:
     EventId eventId;
     CommandId command;
 };

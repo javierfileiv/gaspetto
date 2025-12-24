@@ -27,6 +27,11 @@ public:
      */
     MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB);
 
+    /** ~MotorControl():
+     * Destructor. Cleans up HardwareTimer allocations.
+     */
+    ~MotorControl();
+
     /** init():
      * Initialize the motor pins.
      * @pwm_freq: Frequency for the PWM signal.

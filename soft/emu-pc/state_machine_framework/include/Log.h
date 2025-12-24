@@ -22,9 +22,9 @@ public:
     template <typename T> void print(const T &data, int base)
     {
         if (base == HEX)
-            std::cout << std::hex << std::uppercase << (int)data << std::dec;
+            std::cout << std::hex << std::uppercase << static_cast<int>(data) << std::dec;
         else if (base == OCT)
-            std::cout << std::oct << (int)data << std::dec;
+            std::cout << std::oct << static_cast<int>(data) << std::dec;
         else if (base == BIN) {
             unsigned int v = static_cast<unsigned int>(data);
             std::string s;
@@ -34,14 +34,14 @@ public:
             } while (v);
             std::cout << s;
         } else
-            std::cout << (int)data;
+            std::cout << static_cast<int>(data);
     }
 
     /* Print new line without arguments. */
     void logln()
     {
 #ifdef GASPETTO_LOG
-        std::cout << std::endl;
+        std::cout << '\n';
 #endif
     }
 

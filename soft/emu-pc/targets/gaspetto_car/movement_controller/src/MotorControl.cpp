@@ -12,6 +12,14 @@ MotorControl::MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB)
     motor[LEFT].pin[B] = lB;
     motor[RIGHT].pin[A] = rA;
     motor[RIGHT].pin[B] = rB;
+    motor[LEFT].timer = nullptr;
+    motor[RIGHT].timer = nullptr;
+}
+
+MotorControl::~MotorControl()
+{
+    delete motor[LEFT].timer;
+    delete motor[RIGHT].timer;
 }
 
 void MotorControl::init(uint32_t pwm_freq)

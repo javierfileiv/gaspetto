@@ -86,8 +86,7 @@ HardwareTimer::HardwareTimer(TIM_TypeDef *instance)
 {
 }
 
-void HardwareTimer::setCaptureCompare(uint32_t channel, uint32_t compare,
-                                      TimerCompareFormat_t format)
+void HardwareTimer::setCaptureCompare(uint32_t channel, uint32_t compare, TimerCompareFormat format)
 {
     auto mock = MockArduino::get_instance();
 

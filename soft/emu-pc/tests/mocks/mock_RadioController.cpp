@@ -6,9 +6,9 @@
 #include <cstring>
 #include <gmock/gmock.h>
 
-using testing::Return;
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 void MockRadioController::expect_radio_initialization()
 {

@@ -34,6 +34,7 @@ static void keyboardInput(void)
     while (true) {
         if (Serial.available()) {
             char ch = Serial.read();
+            (void)ch;
 #ifdef GASPETTO_CAR
             gaspetto_car_input_switch(ch);
 #endif

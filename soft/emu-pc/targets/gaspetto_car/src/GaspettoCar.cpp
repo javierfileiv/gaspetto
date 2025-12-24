@@ -11,14 +11,15 @@
 class State;
 
 GaspettoCar::GaspettoCar(Context &ctx)
-        : _ctx(ctx)
-        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
-
+        : ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
+        , _ctx(ctx)
+        , enter_low_power_mode(nullptr)
 {
     initMachine(StateId::IDLE, ctx.idleState);
     initMachine(StateId::PROCESSING, ctx.processingState);
 }
 
+// cppcheck-suppress duplInheritedMember
 void GaspettoCar::init(StateId initialStateId)
 {
     _ctx.movementController->init(_ctx.pwm_freq);

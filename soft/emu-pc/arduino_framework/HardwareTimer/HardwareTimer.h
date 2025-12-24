@@ -5,18 +5,17 @@
 #include <functional>
 #include <stdint.h>
 
-typedef struct {
-    uint32_t __;
-
-} TIM_TypeDef;
+struct TIM_TypeDef {
+    uint32_t unused;
+};
 
 #define PinName int
 typedef std::function<void(void)> callback_function_t;
 #define PinMap_PWM 0
 
-typedef enum {
+enum TimerCompareFormat : uint8_t {
     PERCENT_COMPARE_FORMAT,
-} TimerCompareFormat_t;
+};
 
 class HardwareTimer {
 public:
@@ -24,7 +23,7 @@ public:
     HardwareTimer(TIM_TypeDef *instance);
 
     void setPWM(uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle);
-    void setCaptureCompare(uint32_t channel, uint32_t compare, TimerCompareFormat_t format);
+    void setCaptureCompare(uint32_t channel, uint32_t compare, TimerCompareFormat format);
 };
 
 #endif /* HARDWARETIMER_H */

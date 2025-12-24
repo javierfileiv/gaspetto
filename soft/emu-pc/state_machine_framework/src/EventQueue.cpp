@@ -2,6 +2,8 @@
 
 #include "Event.h"
 
+#include <cstdint>
+
 bool EventQueue::enqueue(Event &evt)
 {
     if (count == capacity) {
@@ -9,7 +11,7 @@ bool EventQueue::enqueue(Event &evt)
         return false;
     }
     events[tail] = evt;
-    tail = (tail + 1) % capacity; /*  Wrap around if necessary. */
+    tail = static_cast<uint8_t>((tail + 1) % capacity); /*  Wrap around if necessary. */
     ++count;
     return true;
 }
@@ -22,7 +24,7 @@ bool EventQueue::dequeue(Event &evt)
         return false;
     }
     evt = events[head];
-    head = (head + 1) % capacity; /*  Wrap around if necessary. */
+    head = static_cast<uint8_t>((head + 1) % capacity); /*  Wrap around if necessary. */
     --count;
     return true;
 }

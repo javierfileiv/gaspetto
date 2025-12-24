@@ -1,20 +1,23 @@
 #include "TimeredEventQueue.h"
 
+#include "ActiveObject.h"
 #include "Arduino.h"
 
+#include <cstdint>
+
 TimeredEventQueue::TimeredEventQueue()
-        : headIndex_(-1)
+        : lastProcessTime_(millis())
+        , headIndex_(-1)
         , freeListHead_(0)
-        , lastProcessTime_(millis())
 {
     /*  Initialize the free list. */
     for (uint8_t i = 0; i < MAX_TIMED_EVENT_NODES - 1; ++i) {
-        eventNodes_[i].nextIndex = i + 1;
+        eventNodes_[i].nextIndex = static_cast<int8_t>(i + 1);
     }
     eventNodes_[MAX_TIMED_EVENT_NODES - 1].nextIndex = -1;
 }
 
-bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
+bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, const Event &evt)
 {
     int8_t newNodeIndex = allocateNode();
     if (newNodeIndex == -1)
@@ -50,14 +53,14 @@ bool TimeredEventQueue::scheduleAbsoluteTimeEvent(uint32_t timeMs, Event evt)
     return true;
 }
 
-bool TimeredEventQueue::scheduleEventDelayed(uint32_t delayMs, Event event)
+bool TimeredEventQueue::scheduleEventDelayed(uint32_t delayMs, const Event &event)
 {
-    return scheduleAbsoluteTimeEvent(millis() + delayMs, event);
+    return scheduleAbsoluteTimeEvent(static_cast<uint32_t>(millis()) + delayMs, event);
 }
 
 void TimeredEventQueue::processEvents(ActiveObject &ao)
 {
-    uint32_t currentTime = millis();
+    uint32_t currentTime = static_cast<uint32_t>(millis());
     uint32_t elapsedTime = currentTime - lastProcessTime_;
     int8_t current = headIndex_;
 
@@ -85,7 +88,7 @@ void TimeredEventQueue::clear()
     headIndex_ = -1;
     freeListHead_ = 0;
     for (uint8_t i = 0; i < MAX_TIMED_EVENT_NODES - 1; ++i)
-        eventNodes_[i].nextIndex = i + 1;
+        eventNodes_[i].nextIndex = static_cast<int8_t>(i + 1);
     eventNodes_[MAX_TIMED_EVENT_NODES - 1].nextIndex = -1;
 }
 
@@ -102,5 +105,5 @@ int8_t TimeredEventQueue::allocateNode()
 void TimeredEventQueue::freeNode(uint8_t index)
 {
     eventNodes_[index].nextIndex = freeListHead_;
-    freeListHead_ = index;
+    freeListHead_ = static_cast<int8_t>(index);
 }

@@ -17,13 +17,13 @@ public:
     bool dequeue(Event &evt);
 
     /*  Check if the queue is empty. */
-    bool IsEmpty() const;
+    [[nodiscard]] bool IsEmpty() const;
 
     /*  Check if the queue is full. */
-    bool IsFull() const;
+    [[nodiscard]] bool IsFull() const;
 
     /*  Get the current size of the queue. */
-    uint8_t GetSize() const;
+    [[nodiscard]] uint8_t GetSize() const;
 
     /*  Stringify EventId for debugging. */
     static const char *eventIdToString(EventId id)

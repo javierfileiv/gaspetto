@@ -13,11 +13,10 @@ public:
     /**
      * MovementController: constructor for the movement controller
      * @motorControl: reference to the MotorControl instance
-     * @speed_sensor_left_pin: pin number for the left speed sensor
-     * @speed_sensor_right_pin: pin number for the right speed sensor
+     * @leftPin: pin number for the left speed sensor
+     * @rightPin: pin number for the right speed sensor
      */
-    MovementController(MotorControl &motorControl, uint32_t speed_sensor_left_pin,
-                       uint32_t speed_sensor_right_pin);
+    MovementController(MotorControl &motorControl, uint32_t leftPin, uint32_t rightPin);
 
     /**
      * init(): initialize the movement controller and configure sensors

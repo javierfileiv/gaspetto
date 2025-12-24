@@ -7,14 +7,14 @@
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
 
-RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
-                                 const uint8_t writing_addr[5], const uint8_t reading_addr[5])
-        : gaspettoQueue(gaspettoQueue)
-        , _radio(radio)
+RadioController::RadioController(RF24 &radio, EventQueue *queue, const uint8_t writingAddr[5],
+                                 const uint8_t readingAddr[5])
+        : _radio(radio)
+        , gaspettoQueue(queue)
 {
     for (int i = 0; i < 5; i++) {
-        this->writing_addr[i] = writing_addr[i];
-        this->reading_addr[i] = reading_addr[i];
+        this->writing_addr[i] = writingAddr[i];
+        this->reading_addr[i] = readingAddr[i];
     }
 }
 

@@ -4,15 +4,15 @@
 
 MovementController *MovementController::isr_instance = nullptr;
 
-MovementController::MovementController(MotorControl &motorControl, uint32_t speed_sensor_left_pin,
-                                       uint32_t speed_sensor_right_pin)
+MovementController::MovementController(MotorControl &motorControl, uint32_t leftPin,
+                                       uint32_t rightPin)
         : _motorControl(motorControl)
-        , speed_sensor_left_pin(speed_sensor_left_pin)
-        , speed_sensor_right_pin(speed_sensor_right_pin)
         , motor_left_pulse_count(0)
         , motor_right_pulse_count(0)
         , target_pulses_left(0)
         , target_pulses_right(0)
+        , speed_sensor_left_pin(leftPin)
+        , speed_sensor_right_pin(rightPin)
 {
     if (isr_instance == nullptr) {
         isr_instance = this;

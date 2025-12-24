@@ -1,9 +1,9 @@
 #include "fixture.h"
 
+using testing::DoAll;
+using testing::Invoke;
 using testing::NotNull;
 using testing::Return;
-using testing::Invoke;
-using testing::DoAll;
 
 void enter_low_power_mode(void)
 {

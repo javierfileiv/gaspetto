@@ -27,11 +27,12 @@ typedef enum { RF24_CRC_DISABLED = 0, RF24_CRC_8, RF24_CRC_16 } rf24_crclength_e
 typedef int rf24_gpio_pin_t;
 
 class RF24 {
-    uint8_t addr_width;
+    uint8_t addr_width = 5; /* Default address width. */
 
 public:
     RF24(rf24_gpio_pin_t _cepin, rf24_gpio_pin_t _cspin, uint32_t _spi_speed = 10000000);
     RF24(uint32_t _spi_speed = 10000000);
+    virtual ~RF24() = default;
 
     /* Core functionality */
     virtual bool begin(void);

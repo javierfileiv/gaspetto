@@ -14,10 +14,13 @@ class Log;
 
 class ActiveObject : public Log {
 public:
+    virtual ~ActiveObject() = default;
+
     ActiveObject(EventQueue *queue, TimeredEventQueue *timeredQueue)
             : eventQueue(queue)
             , timeredEventQueue(timeredQueue)
             , states{}
+            , currentStateId(StateId::IDLE)
     {
     }
 

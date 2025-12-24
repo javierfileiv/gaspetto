@@ -98,10 +98,11 @@ public:
     }
 
 protected:
-    Context ctx;
-    GaspettoCar car;
+    /* States must be declared before ctx since ctx holds pointers to them. */
     IdleState idleState;
     ProcessingState processingState;
+    Context ctx;
+    GaspettoCar car;
     Event forwardEvent{ EventId::ACTION, CommandId::MOTOR_FORWARD };
     Event backwardEvent{ EventId::ACTION, CommandId::MOTOR_BACKWARD };
     Event stopEvent{ EventId::ACTION, CommandId::MOTOR_STOP };

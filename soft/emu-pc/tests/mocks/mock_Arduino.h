@@ -15,7 +15,7 @@ public:
     MOCK_METHOD(void, SwitchToLowPowerMode, ());
     MOCK_METHOD(void, analogWriteFrequency, (int freq));
     MOCK_METHOD(void, setCaptureCompare,
-                (uint32_t channel, uint32_t compare, TimerCompareFormat_t format));
+                (uint32_t channel, uint32_t compare, TimerCompareFormat format));
     MOCK_METHOD(void, setPWM,
                 (uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle));
 

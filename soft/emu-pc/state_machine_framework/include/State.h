@@ -10,6 +10,8 @@ class ActiveObject;
 enum class StateId : uint8_t { IDLE, PROCESSING, PAUSED, MAX_STATE_ID };
 class State : public Log {
 public:
+    virtual ~State() = default;
+
     virtual void enter()
     {
     }
@@ -18,7 +20,7 @@ public:
     {
     }
 
-    virtual void processEvent(Event &evt)
+    virtual void processEvent(Event & /*evt*/)
     {
     }
 

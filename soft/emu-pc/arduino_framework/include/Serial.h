@@ -23,9 +23,9 @@ public:
     template <typename T> void print(const T &data, int base)
     {
         if (base == HEX)
-            std::cout << std::hex << std::uppercase << (int)data << std::dec;
+            std::cout << std::hex << std::uppercase << static_cast<int>(data) << std::dec;
         else if (base == OCT)
-            std::cout << std::oct << (int)data << std::dec;
+            std::cout << std::oct << static_cast<int>(data) << std::dec;
         else if (base == BIN) {
             unsigned int v = static_cast<unsigned int>(data);
             std::string s;
@@ -35,30 +35,30 @@ public:
             } while (v);
             std::cout << s;
         } else
-            std::cout << (int)data;
+            std::cout << static_cast<int>(data);
     }
 
     /*  Mimics Serial.println. */
     template <typename T> void println(const T &data)
     {
-        std::cout << data << std::endl;
+        std::cout << data << '\n';
     }
 
     template <typename T> void println(const T &data, int base)
     {
         print(data, base);
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     /*  Overload for no-argument println (just a newline). */
     void println()
     {
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     void begin(unsigned long baud)
     {
-        std::cout << "Serial started at baud rate: " << baud << std::endl;
+        std::cout << "Serial started at baud rate: " << baud << '\n';
     }
 
     int available();

@@ -21,8 +21,9 @@ struct TimedEventNode {
 class TimeredEventQueue : public Log {
 public:
     TimeredEventQueue();
-    bool scheduleAbsoluteTimeEvent(uint32_t timeMs, Event event); /*  Schedule on absolute time. */
-    bool scheduleEventDelayed(uint32_t delayMs, Event event); /*  Schedule on delay. */
+    bool scheduleAbsoluteTimeEvent(uint32_t timeMs, const Event &event); /*  Schedule on absolute
+                                                                            time. */
+    bool scheduleEventDelayed(uint32_t delayMs, const Event &event); /*  Schedule on delay. */
     void processEvents(ActiveObject &ao);
     void clear();
 
