@@ -1,4 +1,4 @@
-#include "Event.h"
+#include "CarEvents.h"
 #include "GaspettoCar_ino.h"
 
 extern Event event;
@@ -17,11 +17,11 @@ void nrf_sender_input_switch(char ch)
         break;
     case 'A':
     case 'a':
-        event = Event(EventId::ACTION, CommandId::MOTOR_LEFT);
+        event = Event(EventId::ACTION, CommandId::MOTOR_TURN_LEFT);
         break;
     case 'D':
     case 'd':
-        event = Event(EventId::ACTION, CommandId::MOTOR_RIGHT);
+        event = Event(EventId::ACTION, CommandId::MOTOR_TURN_RIGHT);
         break;
     case 'X':
     case 'x':

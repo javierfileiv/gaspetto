@@ -12,37 +12,36 @@
 void ProcessingState::processEvent(Event &evt)
 {
     log(F("ProcessingState: Processing EventId: "));
-    log(Event::eventIdToString(evt.getEventId()));
+    log(eventIdToString(evt.getEventId()));
     log(F(", CommandId: "));
-    log(Event::commandIdToString(evt.getCommand()));
+    log(commandIdToString(evt.getPayload()));
     logln(F("."));
 
-    GaspettoCar *ao = static_cast<GaspettoCar *>(active_object);
+    GaspettoCar *ao = static_cast<GaspettoCar *>(active_object_);
 
     switch (evt.getEventId()) {
     case EventId::ACTION: {
-        switch (evt.getCommand()) {
+        switch (evt.getPayload()) {
         case CommandId::MOTOR_STOP:
-            ao->stopMotorLeft();
-            ao->stopMotorRight();
-            ao->transitionTo(StateId::IDLE);
+            ao->stopBothMotors();
             logln(F("ProcessingState: -> Transition to IDLE (Explicit Stop Command)"));
+            ao->transitionTo(StateId::IDLE);
             break;
         case CommandId::MOTOR_FORWARD:
         case CommandId::MOTOR_BACKWARD:
-        case CommandId::MOTOR_LEFT:
-        case CommandId::MOTOR_RIGHT:
+        case CommandId::MOTOR_TURN_LEFT:
+        case CommandId::MOTOR_TURN_RIGHT:
             logln(F("ProcessingState: Ignoring new motor command while already processing a movement."));
             break;
         default:
             log(F("ProcessingState: Unhandled ACTION command: "));
-            logln(Event::commandIdToString(evt.getCommand()));
+            logln(commandIdToString(evt.getPayload()));
             break;
         }
     } break;
     default: {
         log(F("ProcessingState: Unhandled EventId: "));
-        logln(Event::eventIdToString(evt.getEventId()));
+        logln(eventIdToString(evt.getEventId()));
         break;
     }
     }

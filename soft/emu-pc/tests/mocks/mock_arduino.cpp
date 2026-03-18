@@ -2,11 +2,11 @@
 
 #include "Arduino.h"
 #include "GaspettoCar.h" /* Need for pin definitions. */
+#include "fixture.h"
 
 #include <atomic>
 #include <gmock/gmock.h>
 
-extern std::atomic<unsigned long> millisCounter;
 extern std::atomic<bool> lowPowerMode;
 
 MockArduino::MockArduino()
@@ -30,11 +30,6 @@ void attachInterrupt(int interruptNum, void (*userFunc)(void), int mode)
 {
     auto mock = MockArduino::get_instance();
 
-    if (interruptNum == SPEED_SENSOR_LEFT_PIN) {
-        mock->irq_cb_left = userFunc;
-    } else if (interruptNum == SPEED_SENSOR_RIGHT_PIN) {
-        mock->irq_cb_right = userFunc;
-    }
     mock->attachInterrupt(interruptNum, userFunc, mode);
 }
 
@@ -69,6 +64,7 @@ void SwitchToLowPowerMode(void)
     auto mock = MockArduino::get_instance();
 
     mock->SwitchToLowPowerMode();
+    low_power_mode = true;
 }
 
 void analogWriteFrequency(int freq)
@@ -76,6 +72,20 @@ void analogWriteFrequency(int freq)
     auto mock = MockArduino::get_instance();
 
     mock->analogWriteFrequency(freq);
+}
+
+unsigned long millis(void)
+{
+    auto mock = MockArduino::get_instance();
+
+    return mock->millis();
+}
+
+unsigned long micros(void)
+{
+    auto mock = MockArduino::get_instance();
+
+    return mock->micros();
 }
 
 HardwareTimer::HardwareTimer()

@@ -7,112 +7,81 @@
 #include "Arduino.h"
 #endif
 
-enum class EventId : uint8_t {
-    NONE,
-    TIMER_ELAPSED,
-    ACTION,
-    BUTTON_PRESSED,
-    RADIO_TX,
-    MAX_EVENT_ID
-};
-enum class CommandId : uint8_t {
-    NONE,
-    MOTOR_FORWARD,
-    MOTOR_BACKWARD,
-    MOTOR_RIGHT,
-    MOTOR_LEFT,
-    MOTOR_STOP,
-    MAX_COMMAND_ID
-};
-
+/**
+ * @brief Packed event structure for radio transmission (2 bytes).
+ *
+ * Generic packet format - interpretation of fields depends on application.
+ */
 struct __attribute__((packed)) EventPacket {
     uint8_t eventId;
-    uint8_t commandId;
+    uint8_t payload;
 };
 
-class Event {
+/**
+ * @brief Generic event class for state machine communication.
+ *
+ * Lightweight event object (no vtable) suitable for embedded use.
+ * Template parameters allow application-specific event and payload types.
+ * Can be serialized for radio transmission via toPacket()/fromPacket().
+ *
+ * @tparam EventIdT   Enum type for event identifiers (e.g., EventId)
+ * @tparam PayloadT   Enum type for event payload (e.g., CommandId)
+ */
+template <typename EventIdT, typename PayloadT> class GenericEvent {
 public:
-    Event(EventId eventId = EventId::NONE, CommandId command = CommandId::NONE)
-            : eventId(eventId)
-            , command(command)
+    GenericEvent(EventIdT id = EventIdT{}, PayloadT payload = PayloadT{})
+            : eventId_(id)
+            , payload_(payload)
     {
     }
-    virtual ~Event() = default;
-    EventId getEventId() const
+
+    ~GenericEvent() = default;
+
+    EventIdT getEventId() const
     {
-        return eventId;
+        return eventId_;
     }
-    CommandId getCommand() const
+    PayloadT getPayload() const
     {
-        return command;
+        return payload_;
     }
-    void setEventId(EventId id)
+
+    void setEventId(EventIdT id)
     {
-        eventId = id;
+        eventId_ = id;
     }
-    void setCommand(CommandId cmd)
+    void setPayload(PayloadT payload)
     {
-        command = cmd;
+        payload_ = payload;
     }
+
+    /**
+     * @brief Serialize to packet for transmission.
+     */
     void toPacket(EventPacket &packet) const
     {
-        packet.eventId = static_cast<uint8_t>(eventId);
-        packet.commandId = static_cast<uint8_t>(command);
+        packet.eventId = static_cast<uint8_t>(eventId_);
+        packet.payload = static_cast<uint8_t>(payload_);
     }
-    static Event fromPacket(const EventPacket &packet)
+
+    /**
+     * @brief Deserialize from received packet.
+     */
+    static GenericEvent fromPacket(const EventPacket &packet)
     {
-        return Event(static_cast<EventId>(packet.eventId),
-                     static_cast<CommandId>(packet.commandId));
+        return GenericEvent(static_cast<EventIdT>(packet.eventId),
+                            static_cast<PayloadT>(packet.payload));
     }
+
+    /** @brief Get serialized packet size. */
     static constexpr uint8_t packetSize()
     {
         return sizeof(EventPacket);
     }
 
-    /* Stringify helpers for EventId and CommandId */
-    static const char *eventIdToString(EventId id)
-    {
-        switch (id) {
-        case EventId::NONE:
-            return "NONE";
-        case EventId::TIMER_ELAPSED:
-            return "TIMER_ELAPSED";
-        case EventId::ACTION:
-            return "ACTION";
-        case EventId::BUTTON_PRESSED:
-            return "BUTTON_PRESSED";
-        case EventId::MAX_EVENT_ID:
-            return "MAX_EVENT_ID";
-        default:
-            return "UNKNOWN_EVENT_ID";
-        }
-    }
-
-    static const char *commandIdToString(CommandId id)
-    {
-        switch (id) {
-        case CommandId::NONE:
-            return "NONE";
-        case CommandId::MOTOR_FORWARD:
-            return "MOTOR_FORWARD";
-        case CommandId::MOTOR_BACKWARD:
-            return "MOTOR_BACKWARD";
-        case CommandId::MOTOR_RIGHT:
-            return "MOTOR_RIGHT";
-        case CommandId::MOTOR_LEFT:
-            return "MOTOR_LEFT";
-        case CommandId::MOTOR_STOP:
-            return "MOTOR_STOP";
-        case CommandId::MAX_COMMAND_ID:
-            return "MAX_COMMAND_ID";
-        default:
-            return "UNKNOWN_COMMAND_ID";
-        }
-    }
-
-protected:
-    EventId eventId;
-    CommandId command;
+private:
+    EventIdT eventId_;
+    PayloadT payload_;
 };
 
 #endif /* EVENT_H */

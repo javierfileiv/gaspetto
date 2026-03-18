@@ -1,8 +1,11 @@
 #include "RadioController.h"
 
 #include "Arduino.h"
-#include "Event.h"
+#include "CarEvents.h"
+#include "RadioProtocol.h"
 #include "config_radio.h"
+
+#include <cstring>
 
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
@@ -65,9 +68,9 @@ void RadioController::processRadio()
         logln(F("ProcessRadio():"));
         _radio.read(&packet, sizeof(packet)); /* Fetch payload from FIFO. */
         log(F("Received EventId:"));
-        log(Event::eventIdToString(static_cast<EventId>(packet.eventId)));
+        log(eventIdToString(static_cast<EventId>(packet.eventId)));
         log(F(" CommandId:"));
-        log(Event::commandIdToString(static_cast<CommandId>(packet.commandId)));
+        log(commandIdToString(static_cast<CommandId>(packet.payload)));
         logln(F("."));
         Event evt = Event::fromPacket(packet);
         if (radioQueue.IsFull()) {
@@ -84,17 +87,17 @@ void RadioController::processRadio()
 
         radioQueue.dequeue(evt);
         log(F("RadioController::ProcessRadio: "));
-        log(Event::eventIdToString(evt.getEventId()));
+        log(eventIdToString(evt.getEventId()));
         log(F(" - "));
-        logln(Event::commandIdToString(evt.getCommand()));
+        logln(commandIdToString(evt.getPayload()));
         evt.toPacket(packet);
         /* Stop listening. */
         _radio.stopListening();
         _radio.write(&packet, sizeof(packet));
         log(F("RadioController::ProcessRadio: Sent EventId:"));
-        log(Event::eventIdToString(static_cast<EventId>(packet.eventId)));
+        log(eventIdToString(static_cast<EventId>(packet.eventId)));
         log(F(" CommandId:"));
-        log(Event::commandIdToString(static_cast<CommandId>(packet.commandId)));
+        log(commandIdToString(static_cast<CommandId>(packet.payload)));
         logln(F("."));
         _radio.startListening();
     }
@@ -112,4 +115,25 @@ void RadioController::sendEvent(Event evt)
 EventQueue *RadioController::getRadioQueue()
 {
     return &radioQueue;
+}
+
+bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
+{
+    /* Stop listening to transmit. */
+    _radio.stopListening();
+
+    /* Switch to telemetry address for transmission. */
+    _radio.openWritingPipe(RADIO_ADDR_TLM);
+
+    bool result = _radio.write(&telemetry, sizeof(telemetry));
+
+    /* Restore command pipe and resume listening. */
+    _radio.openWritingPipe(writing_addr);
+    _radio.startListening();
+
+    if (!result) {
+        logln(F("Telemetry send failed"));
+    }
+
+    return result;
 }

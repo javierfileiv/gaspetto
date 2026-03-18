@@ -1,5 +1,4 @@
-#ifndef CONFIG_RADIO_H
-#define CONFIG_RADIO_H
+#pragma once
 
 #include "Arduino.h"
 #include "RF24.h"
@@ -11,5 +10,3 @@ const uint32_t CE_PIN = PB_15; /* Chip enable RF24 pin*/
 const uint32_t CSN_PIN = PA_4; /* Chip select RF24 pin*/
 const uint32_t PA_LEVEL = RF24_PA_LOW; /* Power Amplifier level */
 const rf24_datarate_e DATA_RATE = RF24_1MBPS; /* Data rate for RF24 communication */
-
-#endif /* CONFIG_RADIO_H */

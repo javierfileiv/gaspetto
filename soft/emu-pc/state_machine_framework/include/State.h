@@ -4,30 +4,54 @@
 #include "Arduino.h"
 #include "Log.h"
 
-class Event;
-class ActiveObject;
+class ActiveObjectBase;
 
-enum class StateId : uint8_t { IDLE, PROCESSING, PAUSED, MAX_STATE_ID };
-class State : public Log {
+/**
+ * @brief Abstract base class for FSM states.
+ *
+ * Implements the State pattern. Concrete states override enter(), exit(),
+ * and processEvent() to define state-specific behavior.
+ *
+ * @tparam EventT The event type used by the state machine.
+ */
+template <typename EventT> class GenericState : public Log {
 public:
+    virtual ~GenericState() = default;
+
+    /**
+     * @brief Called when entering this state.
+     */
     virtual void enter()
     {
     }
 
+    /**
+     * @brief Called when exiting this state.
+     */
     virtual void exit()
     {
     }
 
-    virtual void processEvent(Event &evt)
+    /**
+     * @brief Handle an event in this state.
+     * @param evt The event to process.
+     */
+    virtual void processEvent(EventT &evt)
     {
+        (void)evt;
     }
 
-    void setMachine(ActiveObject *m)
+    /**
+     * @brief Set the owning state machine.
+     * @param machine The ActiveObject that owns this state.
+     */
+    void setMachine(ActiveObjectBase *machine)
     {
-        active_object = m;
+        active_object_ = machine;
     }
 
 protected:
-    ActiveObject *active_object;
+    ActiveObjectBase *active_object_ = nullptr;
 };
+
 #endif /* STATE_H */

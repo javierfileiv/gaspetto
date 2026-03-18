@@ -1,15 +1,15 @@
 #include "Arduino.h"
-#include "Event.h"
+#include "CarEvents.h"
 #include "GaspettoCar_ino.h"
 #include "Serial.h"
 #include "implementations.h"
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 static std::atomic<bool> running(true);
 
-Event event;
 Event evt_copy;
 EventPacket pkt;
 
@@ -17,9 +17,9 @@ EventPacket pkt;
 static void emu_millisThread()
 {
     while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1)); /*  Increment every
-                                                                      millisecond. */
-        millisCounter.fetch_add(1);
+        std::this_thread::sleep_for(std::chrono::microseconds(1)); /*  Increment every
+                                                                      microsecond. */
+        microsCounter.fetch_add(1);
     }
 }
 
@@ -29,6 +29,15 @@ Event getEvent(void)
     return evt_copy;
 }
 
+#ifndef ARDUINO
+extern "C" Event getEmulatedEvent(void);
+
+extern "C" Event getEmulatedEvent(void)
+{
+    return getEvent();
+}
+#endif
+
 static void keyboardInput(void)
 {
     while (true) {
@@ -36,6 +45,9 @@ static void keyboardInput(void)
             char ch = Serial.read();
 #ifdef GASPETTO_CAR
             gaspetto_car_input_switch(ch);
+#ifndef USE_RADIO_CONTROLLER
+            ISR();
+#endif
 #endif
 #ifdef GASPETTO_BOX
             gaspetto_box_input_switch(ch);
@@ -44,6 +56,7 @@ static void keyboardInput(void)
 #if NRF_SENDER
             nrf_sender_input_switch(ch);
 #endif
+            std::cout << "Exiting low-power mode due to keyboard input.\n";
             lowPowerMode.store(false);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20)); /*  Polling delay. */

@@ -30,13 +30,19 @@ option(BUILD_TESTS "Build unit tests" OFF)
 # Define global compile definitions before adding subdirectories
 add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG)
 
-add_subdirectory(arduino_framework)
+# Dependencies must be added in order: state_machine_framework first (provides generic templates)
+# shared_types next (provides application-specific Event, StateId) then radio_controller and
+# arduino_framework
 add_subdirectory(state_machine_framework)
+add_subdirectory(shared_types)
 add_subdirectory(radio_controller)
-add_subdirectory(tests)
+add_subdirectory(arduino_framework)
 
 if(GASPETTO_CAR OR BUILD_TESTS)
   add_subdirectory(${CMAKE_SOURCE_DIR}/targets/gaspetto_car)
+endif()
+if(BUILD_TESTS)
+  add_subdirectory(tests)
 endif()
 if(GASPETTO_BOX)
   add_subdirectory(targets/gaspetto_box)

@@ -1,10 +1,10 @@
 #ifndef IDLE_STATE_H
 #define IDLE_STATE_H
 
-#include "Event.h"
+#include "CarEvents.h"
 #include "State.h"
 
-class IdleState : public State {
+class IdleState : public GenericState<Event> {
 public:
     void enter() override;
     void processEvent(Event &evt) override;

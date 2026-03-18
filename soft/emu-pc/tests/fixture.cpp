@@ -5,17 +5,12 @@ using testing::Return;
 using testing::Invoke;
 using testing::DoAll;
 
+bool low_power_mode = false;
+
 void enter_low_power_mode(void)
 {
     SwitchToLowPowerMode();
 }
-
-long map(long x, long in_min, long in_max, long out_min, long out_max)
-{
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-#define motor carMovementController._motorControl.motor
 
 void Fixture::expect_car_init()
 {
@@ -26,31 +21,7 @@ void Fixture::expect_car_init()
 
 void Fixture::expect_movement_controller_init()
 {
-    expect_motor_control_init();
-    /* Configure IRQ pins and set ISR. */
-    EXPECT_CALL(_mock_arduino, pinMode(SPEED_SENSOR_LEFT_PIN, INPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(SPEED_SENSOR_RIGHT_PIN, INPUT));
-    EXPECT_CALL(_mock_arduino, attachInterrupt(SPEED_SENSOR_LEFT_PIN, NotNull(), RISING));
-    EXPECT_CALL(_mock_arduino, attachInterrupt(SPEED_SENSOR_RIGHT_PIN, NotNull(), RISING));
-}
-
-void Fixture::expect_motor_control_init()
-{
-    /* Configure pins and set PWM freq. */
-    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[BWD], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[LEFT].pin[FWD], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[BWD], OUTPUT));
-    EXPECT_CALL(_mock_arduino, pinMode(motor[RIGHT].pin[FWD], OUTPUT));
-    EXPECT_CALL(_mock_arduino, hw_timer_pause());
-    EXPECT_CALL(_mock_arduino, hw_timer_pause());
-    EXPECT_CALL(_mock_arduino, setPWM);
-    EXPECT_CALL(_mock_arduino, setPWM);
-    EXPECT_CALL(_mock_arduino, setPWM);
-    EXPECT_CALL(_mock_arduino, setPWM);
-    EXPECT_CALL(_mock_arduino, setCaptureCompare);
-    EXPECT_CALL(_mock_arduino, setCaptureCompare);
-    EXPECT_CALL(_mock_arduino, setCaptureCompare);
-    EXPECT_CALL(_mock_arduino, setCaptureCompare);
+    EXPECT_CALL(_mock_movementController, init(MOTOR_FREQ));
 }
 
 void Fixture::expect_enter_low_power_mode()
@@ -58,90 +29,50 @@ void Fixture::expect_enter_low_power_mode()
     EXPECT_CALL(_mock_arduino, SwitchToLowPowerMode);
 }
 
-void Fixture::expect_set_motor_left(bool forward, uint8_t speed_percent)
+void Fixture::set_exit_low_power_mode()
 {
-    expect_stop_motor_left();
-    if (forward) {
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[LEFT].pin[BWD], speed_percent, PERCENT_COMPARE_FORMAT));
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[LEFT].pin[FWD], 0, PERCENT_COMPARE_FORMAT));
-    } else {
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[LEFT].pin[BWD], 0, PERCENT_COMPARE_FORMAT));
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[LEFT].pin[FWD], speed_percent, PERCENT_COMPARE_FORMAT));
-    }
+    low_power_mode = false;
 }
 
-void Fixture::expect_set_motor_right(bool forward, uint8_t speed_percent)
+void Fixture::expect_move_forward(float speed, uint32_t timeout_ms)
 {
-    expect_stop_motor_right();
-    if (forward) {
-        EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[BWD], speed_percent,
-                                                     PERCENT_COMPARE_FORMAT));
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[RIGHT].pin[FWD], 0, PERCENT_COMPARE_FORMAT));
-    } else {
-        EXPECT_CALL(_mock_arduino,
-                    setCaptureCompare(motor[RIGHT].pin[BWD], 0, PERCENT_COMPARE_FORMAT));
-        EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[FWD], speed_percent,
-                                                     PERCENT_COMPARE_FORMAT));
-    }
+    EXPECT_CALL(_mock_movementController, startStraightDriving(speed, timeout_ms));
 }
 
-void Fixture::expect_move_forward(uint32_t leftSpeed, uint32_t rightSpeed)
+void Fixture::expect_move_backward(float speed, uint32_t timeout_ms)
 {
-    uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
-    uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
-
-    expect_set_motor_left(true, _leftPercent);
-    expect_set_motor_right(true, _rightPercent);
+    EXPECT_CALL(_mock_movementController, startStraightDriving(-speed, timeout_ms));
 }
 
-void Fixture::expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed)
+void Fixture::expect_turn_left(float target_yaw, float speed, uint32_t timeout_ms)
 {
-    uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
-    uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
-
-    expect_set_motor_left(false, _leftPercent);
-    expect_set_motor_right(false, _rightPercent);
+    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
 }
 
-void Fixture::expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed)
+void Fixture::expect_turn_right(float target_yaw, float speed, uint32_t timeout_ms)
 {
-    uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
-    uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
-
-    expect_set_motor_left(false, _leftPercent);
-    expect_set_motor_right(true, _rightPercent);
+    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
 }
 
-void Fixture::expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed)
+void Fixture::expect_stop_both_motors()
 {
-    uint32_t _leftPercent = map(leftSpeed, 0, 100, 0, 255);
-    uint32_t _rightPercent = map(rightSpeed, 0, 100, 0, 255);
-
-    expect_set_motor_left(true, _leftPercent);
-    expect_set_motor_right(false, _rightPercent);
+    EXPECT_CALL(_mock_movementController, stopBothMotors());
 }
 
-void Fixture::expect_stop_motor_left()
+void Fixture::expect_update_movement()
 {
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[BWD], 0, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[LEFT].pin[FWD], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_movementController, updateMovement());
 }
 
-void Fixture::expect_stop_motor_right()
+void Fixture::expect_target_reached()
 {
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[BWD], 0, PERCENT_COMPARE_FORMAT));
-    EXPECT_CALL(_mock_arduino, setCaptureCompare(motor[RIGHT].pin[FWD], 0, PERCENT_COMPARE_FORMAT));
+    EXPECT_CALL(_mock_movementController, isMoving()).WillOnce(Return(false));
+    expect_enter_low_power_mode();
 }
 
-void Fixture::expect_both_motors_stop()
+void Fixture::expect_target_not_reached()
 {
-    expect_stop_motor_left();
-    expect_stop_motor_right();
+    EXPECT_CALL(_mock_movementController, isMoving()).WillOnce(Return(true));
 }
 
 void Fixture::expect_radio_initialization()
@@ -209,14 +140,4 @@ void Fixture::RxRadioEvent(Event evt)
         return;
     }
     eventQueue.enqueue(evt);
-}
-
-/* Actions on Active Object. */
-void Fixture::stop_car()
-{
-    /* Post STOP event. */
-    car.postEvent(stopEvent);
-    expect_both_motors_stop();
-    expect_enter_low_power_mode();
-    car.processNextEvent();
 }
