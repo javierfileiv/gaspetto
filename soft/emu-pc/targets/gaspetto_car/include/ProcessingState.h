@@ -1,13 +1,14 @@
-#ifndef PROCESSING_STATE_H
-#define PROCESSING_STATE_H
+#pragma once
 
-#include "Event.h"
+#include "CarEvents.h"
 #include "State.h"
 
-class Event;
-
-class ProcessingState : public State {
+/**
+ * @brief Processing state for GaspettoCar.
+ *
+ * Handles motor commands and transitions back to idle on stop.
+ */
+class ProcessingState : public GenericState<Event> {
 public:
     void processEvent(Event &evt) override;
 };
-#endif /* PROCESSING_STATE_H */

@@ -10,100 +10,102 @@ class RadioControllerTest : public Fixture {};
 
 TEST_F(RadioControllerTest, InitOnly)
 {
+    ASSERT_EQ(get_low_power_mode(), true);
 }
 
 class RadioControllerTest_CarInit : public RadioControllerTest {};
 
 TEST_F(RadioControllerTest_CarInit, ForwardEvent)
 {
-    ASSERT_EQ(car.getCurrentState(), &idleState);
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
     /* Radio receive FWD event. */
     radio_receive_event(&forwardEvent);
+    set_exit_low_power_mode();
     /* Motor moves FWD. */
-    expect_move_forward(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
-    car.processNextEvent();
-    ASSERT_EQ(car.getCurrentState(), &processingState);
+    expect_update_movement();
+    expect_move_forward(INITIAL_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_target_not_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
     expect_process_radio_no_event();
-    expect_stop_motor_left();
-    expect_stop_motor_right();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
-    car.processNextEvent();
+    expect_update_movement();
+    expect_target_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    ASSERT_EQ(get_low_power_mode(), true);
 }
 
 TEST_F(RadioControllerTest_CarInit, BackwardEvent)
 {
-    ASSERT_EQ(car.getCurrentState(), &idleState);
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
     /* Radio receive BWD event. */
     radio_receive_event(&backwardEvent);
     /* Motor moves BWD. */
-    expect_move_backward(INITIAL_MOTOR_SPEED, INITIAL_MOTOR_SPEED);
-    car.processNextEvent();
-    ASSERT_EQ(car.getCurrentState(), &processingState);
+    set_exit_low_power_mode();
+    expect_update_movement();
+    expect_move_backward(INITIAL_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_target_not_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
     expect_process_radio_no_event();
-    expect_stop_motor_left();
-    expect_stop_motor_right();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
-    car.processNextEvent();
+    expect_update_movement();
+    expect_target_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    ASSERT_EQ(get_low_power_mode(), true);
 }
 
-TEST_F(RadioControllerTest_CarInit, DISABLED_TurnRightEvent)
+TEST_F(RadioControllerTest_CarInit, TurnLeftEvent)
 {
-    uint32_t diff = 0;
-
-    /* Radio receive TURN RIGHT event. */
-    ASSERT_EQ(car.getCurrentState(), &idleState);
-    radio_receive_event(&rightEvent);
-    /* Motor TURNS RIGHT. */
-    expect_turn_right(MOTOR_FREQ, MOTOR_FREQ);
-    car.processNextEvent();
-    ASSERT_EQ(car.getCurrentState(), &processingState);
-    /* Expect stop motor right.*/
-    expect_stop_motor_right();
-    execute_irq(ctx.movementController->getRightTargetPulses());
-    car.processNextEvent();
-    /* Expect stop motor left.*/
-    diff = ctx.movementController->getLeftTargetPulses() -
-           ctx.movementController->getRightTargetPulses();
-    expect_both_motors_stop();
-    execute_irq(diff);
-    car.processNextEvent();
-    /* Receive nothing. */
-    radio_receive_event(nullptr);
-}
-
-TEST_F(RadioControllerTest_CarInit, DISABLED_TurnLeftEvent)
-{
-    uint32_t diff = 0;
-
     /* Radio receive TURN LEFT event. */
-    ASSERT_EQ(car.getCurrentState(), &idleState);
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
     radio_receive_event(&leftEvent);
     /* Motor TURNS LEFT. */
-    expect_turn_left(MOTOR_FREQ, MOTOR_FREQ);
-    car.processNextEvent();
-    ASSERT_EQ(car.getCurrentState(), &processingState);
-    /* Expect stop motor left.*/
-    expect_stop_motor_left();
-    execute_irq(ctx.movementController->getLeftTargetPulses());
-    car.processNextEvent();
-    /* Expect stop motor right.*/
-    diff = ctx.movementController->getRightTargetPulses() -
-           ctx.movementController->getLeftTargetPulses();
-    expect_both_motors_stop();
-    execute_irq(diff);
-    car.processNextEvent();
-    /* Receive nothing. */
-    radio_receive_event(nullptr);
+    set_exit_low_power_mode();
+    expect_update_movement();
+    expect_turn_left(-90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_target_not_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
+    expect_process_radio_no_event();
+    expect_update_movement();
+    expect_target_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    ASSERT_EQ(get_low_power_mode(), true);
+}
+
+TEST_F(RadioControllerTest_CarInit, TurnRightEvent)
+{
+    /* Radio receive TURN RIGHT event. */
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    radio_receive_event(&rightEvent);
+    /* Motor TURNS RIGHT. */
+    set_exit_low_power_mode();
+    expect_update_movement();
+    expect_turn_right(90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_target_not_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
+    expect_process_radio_no_event();
+    expect_update_movement();
+    expect_target_reached();
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    ASSERT_EQ(get_low_power_mode(), true);
 }
 
 TEST_F(RadioControllerTest_CarInit, StopEvent)
 {
     /* Radio receive STOP event. */
-    ASSERT_EQ(car.getCurrentState(), &idleState);
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
     radio_receive_event(&stopEvent);
     /* Motor receives STOP. */
-    expect_both_motors_stop();
+    set_exit_low_power_mode();
+    expect_update_movement();
+    expect_stop_both_motors();
     expect_enter_low_power_mode();
-    car.processNextEvent();
-    ASSERT_EQ(car.getCurrentState(), &idleState);
+    gaspettoCar.work();
+    ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
+    ASSERT_EQ(get_low_power_mode(), true);
 }

@@ -2,6 +2,8 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
+#include "CarEvents.h"
+#include "CarStates.h"
 #include "Context.h"
 #include "Log.h"
 
@@ -10,23 +12,26 @@
 #endif
 #include <stdint.h>
 
-typedef void (*LowPowerModeCallback)();
 const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
-const uint32_t INITIAL_MOTOR_SPEED = 50;
-const uint32_t TURN_MOTOR_SPEED = 30;
 
 const uint32_t MOTOR_LEFT_BWD = PB_14; /* Example PWM pin for motor left. D4 on salaea. */
 const uint32_t MOTOR_LEFT_FWD = PB_15; /* Direction pin for motor left.  D5 on salaea. */
 const uint32_t MOTOR_RIGHT_FWD = PB_11; /* PWM pin for motor right. D1 on salaea. */
 const uint32_t MOTOR_RIGHT_BWD = PB_10; /* Direction pin for motor right. D2 on salaea. */
-const uint32_t SPEED_SENSOR_LEFT_PIN = PA_1; /* Pin for left speed/distance sensor. D0 on salaea. */
-const uint32_t SPEED_SENSOR_RIGHT_PIN = PA_0; /* Pin for right speed/distance sensor. D3 on
-                                                 salaea.*/
-const uint32_t DISTANCE_CM_FWD_BWD = 50;
-const uint32_t DISTANCE_CM_TURN_RIGHT = 15;
-const uint32_t DISTANCE_CM_TURN_LEFT = 20;
 
-class GaspettoCar : public ActiveObject {
+/** @brief Number of states for GaspettoCar. */
+constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
+
+const float INITIAL_MOTOR_SPEED = 50;
+const uint32_t TURN_MOTOR_SPEED = 30;
+const uint32_t MOTOR_TIMEOUT_MS = 5000; /* Default timeout for motor commands. */
+
+/**
+ * @brief Active object base type for GaspettoCar.
+ */
+using CarActiveObject = GenericActiveObject<StateId, Event, CAR_MAX_STATES>;
+
+class GaspettoCar : public CarActiveObject {
 public:
     /** GaspettoCar(): Constructor for the GaspettoCar class.
      *  @ctx: Reference to the Context instance containing dependencies.
@@ -38,18 +43,21 @@ public:
      */
     void init(StateId initialStateId = StateId::IDLE);
 
-    /** setMotor(): Set the motor speeds and directions.
-     * @forward_motor_left: Direction for the left motor.
-     * (true for forward, false for backward).
-     * @motor_left_speed: Speed for the left motor.
-     * @distance_cm_left: Distance in centimeters for the left motor.
-     * @forward_motor_right: Direction for the right motor.
-     * (true for forward, false for backward).
-     * @motor_right_speed: Speed for the right motor.
-     * @distance_cm_right: Distance in centimeters for the right motor.
+    /** * startStraightDriving: begin straight driving with PID control
+     * @speed: PWM speed value
+     * @timeout_ms: optional duration in milliseconds to drive before stopping (0 for unlimited)
      */
-    void setMotor(bool forward_motor_left, uint32_t motor_left_speed, uint32_t distance_cm_left,
-                  bool forward_motor_right, uint32_t motor_right_speed, uint32_t distance_cm_right);
+    void setMotorStraightDrive(float speed, uint32_t timeout_ms);
+
+    /** * startTurningInPlace: begin turning in place to a target yaw
+     * @final_yaw_angle: target yaw angle in degrees
+     * @speed: base speed for turning
+     * @duration_ms: optional duration in milliseconds (0 for unlimited)
+     */
+    void setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms);
+
+    /* stopBothMotors: stop all motor movement immediately */
+    void stopBothMotors(void);
 
     /** postEvent(): Post an event to the event queue.
      * @evt: The event to be posted.
@@ -57,47 +65,22 @@ public:
      */
     int postEvent(Event evt) override;
 
-    /** processNextEvent(): Processe the next event in the event queue.
+    /** work(): Perform work for the active object.
      *  Delegates to the current state.
      */
-    void processNextEvent() override;
-
-    /**
-     * setLowPowerModeCallback(): Get the MovementController instance from the context.
-     * @cb: Pointer to the low power callback function.
-     */
-    void setLowPowerModeCallback(void (*cb)(void))
-    {
-        enter_low_power_mode = cb;
-    }
+    void work(void) override;
 
     /** enterLowPowerMode(): Enter low power mode.
      */
-    void enterLowPowerMode() override;
+    void enterLowPowerMode(void) override;
+
+    bool isTargetReached(void);
 
     /**
-     *  stopMotorRight(): Stop the right motor.
-     *  Delegates to MovementController in the context.
+     * transitionTo(): Transition to a new state (expose base class method).
+     * @param newStateId Target state.
      */
-    void stopMotorRight();
-
-    /**
-     *  stopMotorLeft(): Stop the left motor.
-     *  Delegates to MovementController in the context.
-     */
-    void stopMotorLeft();
-
-    /**
-     * resetCounterMotorRight(): Stop both motors and resets the pulse counters.
-     * Delegates to MovementController in the context.
-     */
-    void resetCounterMotorRight();
-
-    /**
-     * resetCounterMotorLeft(): Stop both motors and resets the pulse counters.
-     * Delegates to MovementController in the context.
-     */
-    void resetCounterMotorLeft();
+    using CarActiveObject::transitionTo;
 
 private:
     /**
@@ -106,14 +89,6 @@ private:
      */
     void InitMotorPins();
 
-    /**
-     * isTargetReached(): Check if the current movement command's target has been reached.
-     * Delegates to MovementController in the context.
-     * @return True if the target is reached or if in IDLE state, false otherwise.
-     */
-    bool isTargetReached();
-
 private:
     Context &_ctx;
-    void (*enter_low_power_mode)(void);
 };

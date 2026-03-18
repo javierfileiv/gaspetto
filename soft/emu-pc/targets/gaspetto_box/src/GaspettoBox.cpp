@@ -2,14 +2,15 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
+#include "CarEvents.h"
 #include "Context.h"
 #include "RadioController.h"
 
 #include <cstdint>
 
 GaspettoBox::GaspettoBox(Context &ctx)
-        : _ctx(ctx)
-        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
+        : GenericActiveObject()
+        , _ctx(ctx)
 {
     initMachine(StateId::IDLE, ctx.idleState);
     initMachine(StateId::PROCESSING, ctx.processingState);
@@ -17,25 +18,25 @@ GaspettoBox::GaspettoBox(Context &ctx)
 
 void GaspettoBox::init(StateId initialStateId)
 {
-    ActiveObject::init(initialStateId);
+    GenericActiveObject::init(initialStateId);
 }
 
 int GaspettoBox::postEvent(Event evt)
 {
-    if (eventQueue) {
-        eventQueue->enqueue(evt);
+    if (_ctx.mainEventQueue) {
+        _ctx.mainEventQueue->enqueue(evt);
         return 0;
     }
     return -1;
 }
 
-void GaspettoBox::processNextEvent()
+void GaspettoBox::work()
 {
-    if (eventQueue && !eventQueue->IsEmpty()) {
+    if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
 
-        State *currentState = states[static_cast<uint8_t>(currentStateId)];
-        eventQueue->dequeue(evt);
+        StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
+        _ctx.mainEventQueue->dequeue(evt);
         currentState->processEvent(evt);
     }
 }
@@ -45,7 +46,9 @@ void GaspettoBox::enterLowPowerMode()
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
     logln("Entering low-power mode...\n");
-    SwitchToLowPowerMode();
+    if (lowPowerCallback_) {
+        lowPowerCallback_();
+    }
 #else
     /*  Implement low-power mode for Arduino here. */
     /*  STM32 sleep modes or power-saving features. */
@@ -59,8 +62,8 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
 #ifdef ARDUINO
     if (currentTime - lastDebounceTime > debounceDelay) {
         lastDebounceTime = currentTime;
-        if (!eventQueue->full()) {
-            eventQueue->enqueue(evt);
+        if (!_ctx.mainEventQueue->IsFull()) {
+            _ctx.mainEventQueue->enqueue(evt);
             logln("Exiting low-power mode...\n");
             lowPowerMode = false; /*  Wake the system up. */
         } else {
@@ -68,7 +71,7 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         }
     }
 #else
-    if (!eventQueue->IsFull()) {
+    if (!_ctx.mainEventQueue->IsFull()) {
         postEvent(evt);
     } else {
         logln("Event queue is full! Unable to enqueue event.\n");

@@ -1,10 +1,11 @@
 #include "ProcessingState.h"
 
 #include "GaspettoBox.h"
-#include "State.h"
 
 void ProcessingState::enter()
 {
+    GaspettoBox *box = static_cast<GaspettoBox *>(active_object_);
+
     for (int row = 0; row < 3; ++row) {
         log("Scanning row ");
         log(row);
@@ -34,5 +35,5 @@ void ProcessingState::enter()
         delay(1000); /*  Simulate some processing work. */
 #endif
     }
-    active_object->transitionTo(StateId::IDLE);
+    box->transitionTo(StateId::IDLE);
 }

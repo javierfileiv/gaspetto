@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "CarEvents.h"
 #include "EventQueue.h"
 #include "GaspettoBox.h"
 #include "IdleState.h"
@@ -10,13 +11,8 @@
 
 #include <atomic>
 
-// Pin Definitions
-// const uint8_t adcPins[4] = {PB0, PB1, PB10, PB11}; // ADC Channels
-// const uint8_t groupPins[20] = {PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7, PB12,
-// PB13,
-//                                PB14, PB15, PC13, PC14, PC15, PA8, PA9, PA10,
-//                                PA11, PA12}; // GPIO Pins for GND control
-// const int NRF_IRQ_PIN = PB0;
+/* External functions defined in arduino_framework/main.cpp. */
+extern Event getEmulatedEvent(void);
 
 RF24 radio(CE_PIN, CSN_PIN);
 IdleState idleState;
@@ -33,7 +29,7 @@ GaspettoBox gaspetto_box(context);
 void ISR(void)
 {
 #ifndef ARDUINO
-    Event evt = getEvent();
+    Event evt = getEmulatedEvent();
     gaspetto_box.debounceAndEnqueue(evt, millis());
 #endif
 }
@@ -66,5 +62,5 @@ void setup()
 
 void loop()
 {
-    gaspetto_box.processNextEvent();
+    gaspetto_box.work();
 }

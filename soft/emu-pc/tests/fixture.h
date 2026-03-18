@@ -1,15 +1,18 @@
 #ifndef GASPETTO_CAR_FIXTURE_H
 #define GASPETTO_CAR_FIXTURE_H
 
+#include "CarEvents.h"
+#include "CarStates.h"
 #include "Context.h"
 #include "EventQueue.h"
 #include "GaspettoCar.h"
-#include "MovementController.h"
 #include "ProcessingState.h"
 #include "RadioController.h"
 #include "State.h"
+#include "config_event.h"
 #include "config_radio.h"
 #include "mock_Arduino.h"
+#include "mock_MovementController.h"
 #include "mock_RF24.h"
 
 #include <gtest/gtest.h>
@@ -20,49 +23,46 @@ using testing::Eq;
 static const uint8_t *test_writing_addr = gaspetto_box_pipe_name;
 static const uint8_t *test_reading_addr = gaspetto_car_pipe_name;
 
+extern bool low_power_mode;
 void enter_low_power_mode(void);
 
 class Fixture : public ::testing::Test {
 public:
     Fixture()
             : radioController(_mock_RF24, &eventQueue, test_writing_addr, test_reading_addr)
-            , motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD)
-            , carMovementController(motorControl, SPEED_SENSOR_LEFT_PIN, SPEED_SENSOR_RIGHT_PIN)
-            , ctx({ &eventQueue, &carMovementController, &radioController, nullptr, &idleState,
-                    &processingState, MOTOR_FREQ })
-            , car(ctx)
+            , _mock_movementController()
+            , eventQueue()
+            , ctx{ &eventQueue, &_mock_movementController, &radioController, nullptr,
+                   &idleState,  &processingState,          MOTOR_FREQ }
+            , gaspettoCar(ctx)
     {
-    }
-    void SetUp() override
-    {
-        car.setLowPowerModeCallback(enter_low_power_mode);
-        expect_car_init();
-        car.init(StateId::IDLE);
-        ASSERT_EQ(car.getCurrentState(), &idleState);
     }
 
-    void TearDown() override
+    void SetUp() override
     {
-        /* Clean ISR instance. */
-        MovementController::isr_instance = nullptr;
+        gaspettoCar.setLowPowerModeCallback(enter_low_power_mode);
+        expect_car_init();
+        gaspettoCar.init(StateId::IDLE);
+        ASSERT_EQ(gaspettoCar.getCurrentState(), &idleState);
     }
 
     void expect_car_init();
-    /* Movement/Motor. */
+    /* Movement. */
     void expect_movement_controller_init();
-    void expect_motor_control_init();
     void expect_enter_low_power_mode();
-    void expect_move_forward(uint32_t leftSpeed, uint32_t rightSpeed);
-    void expect_move_backward(uint32_t leftSpeed, uint32_t rightSpeed);
-    void expect_turn_left(uint32_t leftSpeed, uint32_t rightSpeed);
-    void expect_turn_right(uint32_t leftSpeed, uint32_t rightSpeed);
-    void expect_stop_motor_left();
-    void expect_stop_motor_right();
-    void expect_both_motors_stop();
-
-protected:
-    void expect_set_motor_left(bool forward, uint8_t speed_percent);
-    void expect_set_motor_right(bool forward, uint8_t speed_percent);
+    void set_exit_low_power_mode();
+    bool get_low_power_mode() const
+    {
+        return low_power_mode;
+    }
+    void expect_move_forward(float speed, uint32_t timeout_ms);
+    void expect_move_backward(float speed, uint32_t timeout_ms);
+    void expect_turn_left(float target_yaw, float speed, uint32_t timeout_ms);
+    void expect_turn_right(float target_yaw, float speed, uint32_t timeout_ms);
+    void expect_stop_both_motors();
+    void expect_update_movement();
+    void expect_target_reached();
+    void expect_target_not_reached();
 
 public:
     /* Radio. */
@@ -72,54 +72,26 @@ public:
     void expect_process_radio_no_event();
     void RxRadioEvent(Event evt);
     void expect_send_event(Event *evt = nullptr);
-
-    void execute_irq_left(int n_times = 0)
-    {
-        _mock_arduino.execute_irq_left(n_times);
-    }
-
-    void execute_irq_right(int n_times = 0)
-    {
-        _mock_arduino.execute_irq_right(n_times);
-    }
-
     void expect_radio_process_event(Event *evt = nullptr);
 
-    /* ACTIONS ON ActiveObject. */
-    void stop_car();
-    void execute_irq_left_only(int n_times = 0)
-    {
-        _mock_arduino.execute_irq_left(n_times);
-    }
-    void execute_irq_right_only(int n_times = 0)
-    {
-        _mock_arduino.execute_irq_right(n_times);
-    }
-
-    void execute_irq(int n_times = 0)
-    {
-        _mock_arduino.execute_irq_left(n_times);
-        _mock_arduino.execute_irq_right(n_times);
-    }
-
 protected:
-    Context ctx;
-    GaspettoCar car;
+    /* States must be declared before car since car's Context references them. */
     IdleState idleState;
     ProcessingState processingState;
+    Context ctx;
+    GaspettoCar gaspettoCar;
     Event forwardEvent{ EventId::ACTION, CommandId::MOTOR_FORWARD };
     Event backwardEvent{ EventId::ACTION, CommandId::MOTOR_BACKWARD };
     Event stopEvent{ EventId::ACTION, CommandId::MOTOR_STOP };
-    Event leftEvent{ EventId::ACTION, CommandId::MOTOR_LEFT };
-    Event rightEvent{ EventId::ACTION, CommandId::MOTOR_RIGHT };
+    Event leftEvent{ EventId::ACTION, CommandId::MOTOR_TURN_LEFT };
+    Event rightEvent{ EventId::ACTION, CommandId::MOTOR_TURN_RIGHT };
 
 private:
     EventQueue eventQueue;
-    RadioController radioController;
-    MovementController carMovementController;
-    MotorControl motorControl;
+    testing::StrictMock<MockMovementController> _mock_movementController;
     testing::StrictMock<MockArduino> _mock_arduino;
     testing::StrictMock<MockRF24> _mock_RF24;
+    RadioController radioController;
     ::testing::InSequence seq;
 };
 

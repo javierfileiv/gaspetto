@@ -5,6 +5,6 @@ target_include_directories(radio_controller_itf INTERFACE include)
 
 target_link_libraries(
   radio_controller_impl
-  PUBLIC radio_controller_itf arduino_framework_itf
+  PUBLIC radio_controller_itf arduino_framework_itf shared_types
   PRIVATE state_machine_framework_itf
 )

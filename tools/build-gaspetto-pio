@@ -37,12 +37,26 @@ build_step() {
     echo -e "${GREEN}✔ $label OK${NC}"
 }
 
+ensure_dir() {
+    local path="$1"
+    if [[ ! -d "$path" ]]; then
+        echo -e "${RED}Missing directory: $path${NC}" >&2
+        exit 1
+    fi
+}
+
 # List of builds (path label [extra pio args...])
-build_step "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"      "GaspettoCar"
-build_step "$PROJECT_ROOT/soft/pio/NrfSender_pio"        "NrfSender"
+ensure_dir "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"
+ensure_dir "$PROJECT_ROOT/soft/pio/NrfSender_pio"
+ensure_dir "$PROJECT_ROOT/soft/pio/arduino_straight_drive"
+ensure_dir "$PROJECT_ROOT/soft/pio/arduino_hw_test"
+ensure_dir "$PROJECT_ROOT/soft/pio/mpu_plot"
+
+build_step "$PROJECT_ROOT/soft/pio/GaspettoCar_pio" "GaspettoCar"
+build_step "$PROJECT_ROOT/soft/pio/NrfSender_pio" "NrfSender"
 build_step "$PROJECT_ROOT/soft/pio/arduino_straight_drive" "Arduino Straight Drive"
-build_step "$PROJECT_ROOT/soft/pio/arduino_hw_test"      "Arduino HW Test"
-build_step "$PROJECT_ROOT/soft/pio/mpu_plot"             "MPU Plot"
+build_step "$PROJECT_ROOT/soft/pio/arduino_hw_test" "Arduino HW Test"
+build_step "$PROJECT_ROOT/soft/pio/mpu_plot" "MPU Plot"
 
 END_TS=$(date +%s)
 ELAPSED=$((END_TS-START_TS))

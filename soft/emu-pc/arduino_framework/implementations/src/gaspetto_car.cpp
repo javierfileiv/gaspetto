@@ -1,8 +1,12 @@
-#include "Event.h"
+#include "CarEvents.h"
 #include "GaspettoCar_ino.h"
 #include "Serial.h"
 
+#ifdef USE_RADIO_CONTROLLER
 extern EventPacket pkt;
+#else
+extern Event event;
+#endif
 
 void gaspetto_car_input_switch(char ch)
 {
@@ -11,39 +15,31 @@ void gaspetto_car_input_switch(char ch)
     case 'W':
     case 'w':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
+        pkt.payload = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
         radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
         break;
     case 'S':
     case 's':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_BACKWARD);
+        pkt.payload = static_cast<uint8_t>(CommandId::MOTOR_BACKWARD);
         radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
         break;
     case 'A':
     case 'a':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_LEFT);
-        radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-        break;
-        pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_LEFT);
+        pkt.payload = static_cast<uint8_t>(CommandId::MOTOR_TURN_LEFT);
         radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
         break;
     case 'D':
     case 'd':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_RIGHT);
-        radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
-        break;
-        pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_RIGHT);
+        pkt.payload = static_cast<uint8_t>(CommandId::MOTOR_TURN_RIGHT);
         radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
         break;
     case 'X':
     case 'x':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
-        pkt.commandId = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+        pkt.payload = static_cast<uint8_t>(CommandId::MOTOR_STOP);
         radio.simulateReceivedPacket(0, &pkt, sizeof(pkt));
         break;
 #else
@@ -57,11 +53,11 @@ void gaspetto_car_input_switch(char ch)
         break;
     case 'l':
     case 'L':
-        event = Event(EventId::ACTION, CommandId::MOTOR_LEFT);
+        event = Event(EventId::ACTION, CommandId::MOTOR_TURN_LEFT);
         break;
     case 'r':
     case 'R':
-        event = Event(EventId::ACTION, CommandId::MOTOR_RIGHT);
+        event = Event(EventId::ACTION, CommandId::MOTOR_TURN_RIGHT);
         break;
     case 's':
     case 'S':

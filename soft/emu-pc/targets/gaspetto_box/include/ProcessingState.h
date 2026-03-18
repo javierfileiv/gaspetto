@@ -1,11 +1,9 @@
 #pragma once
 
-#include "Event.h"
+#include "CarEvents.h"
 #include "State.h"
 
-class Event;
-
-class ProcessingState : public State {
+class ProcessingState : public GenericState<Event> {
 public:
     void enter() override;
 };

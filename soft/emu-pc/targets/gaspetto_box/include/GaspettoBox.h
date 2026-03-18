@@ -1,5 +1,7 @@
 #include "ActiveObject.h"
 #include "Arduino.h"
+#include "CarEvents.h"
+#include "CarStates.h"
 #include "Context.h"
 #include "Log.h"
 
@@ -7,7 +9,9 @@
 extern std::atomic<bool> lowPowerMode;
 #endif
 
-class GaspettoBox : public ActiveObject {
+constexpr uint8_t BOX_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
+
+class GaspettoBox : public GenericActiveObject<StateId, Event, BOX_MAX_STATES> {
 public:
     /** GaspettoBox(): Constructor for the GaspettoBox class.
      *  @ctx: Reference to the Context instance containing dependencies.
@@ -24,19 +28,10 @@ public:
      */
     int postEvent(Event evt) override;
 
-    /** processNextEvent(): Processe the next event in the event queue.
+    /** work(): Process the next event in the event queue.
      *  Delegates to the current state.
      */
-    void processNextEvent() override;
-
-    /**
-     * setLowPowerModeCallback(): Get the MovementController instance from the context.
-     * @cb: Pointer to the low power callback function.
-     */
-    void setLowPowerModeCallback(void (*cb)(void))
-    {
-        enter_low_power_mode = cb;
-    }
+    void work() override;
 
     /** enterLowPowerMode(): Enter low power mode.
      */
@@ -50,5 +45,4 @@ public:
 
 private:
     Context &_ctx;
-    void (*enter_low_power_mode)(void);
 };

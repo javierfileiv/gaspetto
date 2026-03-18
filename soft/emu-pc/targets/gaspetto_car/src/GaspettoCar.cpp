@@ -2,9 +2,12 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
+#include "CarEvents.h"
 #include "Context.h"
 #include "EventQueue.h"
-#include "MovementController.h"
+#include "MovementControllerInterface.h"
+
+#include <cassert>
 #ifdef USE_RADIO_CONTROLLER
 #include "RadioController.h"
 #else
@@ -16,9 +19,8 @@
 class State;
 
 GaspettoCar::GaspettoCar(Context &ctx)
-        : _ctx(ctx)
-        , ActiveObject(ctx.mainEventQueue, ctx.timeredEventQueue)
-
+        : CarActiveObject()
+        , _ctx(ctx)
 {
     initMachine(StateId::IDLE, ctx.idleState);
     initMachine(StateId::PROCESSING, ctx.processingState);
@@ -26,43 +28,36 @@ GaspettoCar::GaspettoCar(Context &ctx)
 
 void GaspettoCar::init(StateId initialStateId)
 {
-    if (_ctx.movementController) {
-        _ctx.movementController->init(_ctx.pwm_freq);
-    }
+    assert(_ctx.movementController);
+    _ctx.movementController->init(_ctx.pwm_freq);
 #ifdef USE_RADIO_CONTROLLER
-    if (_ctx.radioController)
-        _ctx.radioController->init();
+    assert(_ctx.radioController);
+    _ctx.radioController->init();
+#else
+    assert(_ctx.timeredEventQueue);
 #endif
-    ActiveObject::init(initialStateId);
+
+    CarActiveObject::init(initialStateId);
 }
 
-void GaspettoCar::setMotor(bool forward_motor_left, uint32_t motor_left_speed,
-                           uint32_t distance_cm_left, bool forward_motor_right,
-                           uint32_t motor_right_speed, uint32_t distance_cm_right)
+void GaspettoCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
 {
-    if (_ctx.movementController) {
-        _ctx.movementController->setMotor(forward_motor_left, motor_left_speed, distance_cm_left,
-                                          forward_motor_right, motor_right_speed,
-                                          distance_cm_right);
-    }
+    _ctx.movementController->startStraightDriving(speed, timeout_ms);
 }
 
-bool GaspettoCar::isTargetReached()
+void GaspettoCar::setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms)
 {
-    bool right_reached = _ctx.movementController->getRightPulseCount() >=
-                         _ctx.movementController->getRightTargetPulses();
-    bool left_reached = _ctx.movementController->getLeftPulseCount() >=
-                        _ctx.movementController->getLeftTargetPulses();
+    _ctx.movementController->startTurningInPlace(final_yaw_angle, speed, timeout_ms);
+}
 
-    if (currentStateId == StateId::IDLE)
-        return true;
-    if (left_reached)
-        _ctx.movementController->stopMotorLeft();
-    if (right_reached)
-        _ctx.movementController->stopMotorRight();
-    if (right_reached && left_reached)
-        return true;
-    return false;
+void GaspettoCar::stopBothMotors(void)
+{
+    _ctx.movementController->stopBothMotors();
+}
+
+bool GaspettoCar::isTargetReached(void)
+{
+    return !_ctx.movementController->isMoving();
 }
 
 int GaspettoCar::postEvent(Event evt)
@@ -74,44 +69,42 @@ int GaspettoCar::postEvent(Event evt)
     return -1;
 }
 
-void GaspettoCar::stopMotorRight()
-{
-    logln(F("GaspettoCar::stopMotorRight() - Delegating to MovementController."));
-    _ctx.movementController->stopMotorRight();
-}
-
-void GaspettoCar::stopMotorLeft()
-{
-    logln(F("GaspettoCar::stopMotorLeft() - Delegating to MovementController."));
-    _ctx.movementController->stopMotorLeft();
-}
-
-void GaspettoCar::processNextEvent()
+void GaspettoCar::work(void)
 {
 #ifdef USE_RADIO_CONTROLLER
-    if (_ctx.radioController) {
-        _ctx.radioController->processRadio();
-    }
+    _ctx.radioController->processRadio();
 #else
-    if (_ctx.timeredEventQueue) {
-        _ctx.timeredEventQueue->processEvents(*this);
-    }
+    _ctx.timeredEventQueue->process(*this);
 #endif
-    if (isTargetReached()) {
-        if (eventQueue && !eventQueue->IsEmpty()) {
-            Event evt;
 
-            State *currentState = states[static_cast<uint8_t>(currentStateId)];
-            eventQueue->dequeue(evt);
-            currentState->processEvent(evt);
-        }
+    /* Update movement controller (PID, telemetry) - handles its own timing. */
+    _ctx.movementController->updateMovement();
+
+    if (!_ctx.mainEventQueue->IsEmpty()) {
+        Event evt;
+
+        StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
+        _ctx.mainEventQueue->dequeue(evt);
+        currentState->processEvent(evt);
+    }
+    if (getCurrentStateId() != StateId::IDLE && isTargetReached()) {
+        logln(F("Target reached. Transitioning to IDLE state."));
+        transitionTo(StateId::IDLE);
     }
 }
 
 void GaspettoCar::enterLowPowerMode()
 {
-    if (enter_low_power_mode) {
-        enter_low_power_mode();
-        return;
+#ifdef LOW_POWER_MODE
+#ifndef ARDUINO
+    logln("Entering low-power mode...\n");
+    if (lowPowerCallback_) {
+        lowPowerCallback_();
     }
+#else
+    /*  Implement low-power mode for Arduino here. */
+    /*  STM32 sleep modes or power-saving features. */
+    delay(100); /*  Simulate low-power sleep. */
+#endif
+#endif
 }

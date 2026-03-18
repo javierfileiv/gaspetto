@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "Event.h"
+#include "CarEvents.h"
 #include "RF24.h"
 
 #include <Arduino.h>
@@ -50,7 +50,7 @@ void sendEvent(CommandId cmd)
     radio.stopListening();
     radio.write(&pkt, sizeof(pkt));
     Serial.print("Sent command: ");
-    Serial.println(Event::commandIdToString(cmd));
+    Serial.println(commandIdToString(cmd));
     radio.startListening();
 }
 
@@ -69,11 +69,11 @@ void loop()
             break;
         case 'a':
         case 'A':
-            sendEvent(CommandId::MOTOR_LEFT);
+            sendEvent(CommandId::MOTOR_TURN_LEFT);
             break;
         case 'd':
         case 'D':
-            sendEvent(CommandId::MOTOR_RIGHT);
+            sendEvent(CommandId::MOTOR_TURN_RIGHT);
             break;
         case 'x':
         case 'X':

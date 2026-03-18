@@ -1,52 +1,42 @@
-#ifndef MOVEMENT_CONTROLLER_H
-#define MOVEMENT_CONTROLLER_H
+#pragma once
 
-#include "Log.h"
-#include "MotorControl.h"
+#include "IMUOrientationInterface.h"
+#include "MotorControlInterface.h"
+#include "MovementControllerInterface.h"
+#include "RadioProtocol.h"
 
-#include <cstdint>
-
-class MovementController : public Log {
+class MovementController : public MovementControllerInterface {
 public:
-    static MovementController *isr_instance;
-
+    enum class MovementState { IDLE, STRAIGHT_DRIVING, TURNING_IN_PLACE };
     /**
      * MovementController: constructor for the movement controller
-     * @motorControl: reference to the MotorControl instance
-     * @speed_sensor_left_pin: pin number for the left speed sensor
-     * @speed_sensor_right_pin: pin number for the right speed sensor
+     * @motorControl: reference to the MotorControlInterface instance
+     * @imu: reference to the IMUOrientationInterface instance
      */
-    MovementController(MotorControl &motorControl, uint32_t speed_sensor_left_pin,
-                       uint32_t speed_sensor_right_pin);
+    MovementController(MotorControlInterface &motorControl, IMUOrientationInterface &imu);
 
     /**
      * init(): initialize the movement controller and configure sensors
      * @pwm_freq: PWM frequency for motor control
      */
-    void init(uint32_t pwm_freq);
+    void init(uint32_t pwm_freq) override;
 
     /**
      * setMotor: set motor speeds and directions for a specified distance
-     * @forward_motor_left: true for left motor forward, false for backward
      * @motor_left_speed: PWM duty cycle (0-100) for left motor
-     * @distance_cm_left: target distance in centimeters for left motor
-     * @forward_motor_right: true for right motor forward, false for backward
      * @motor_right_speed: PWM duty cycle (0-100) for right motor
-     * @distance_cm_right: target distance in centimeters for right motor
+     * @forward_motor_left: true for left motor forward, false for backward
+     * @forward_motor_right: true for right motor forward, false for backward
+     * @timeout_ms: optional timeout in milliseconds to stop motors after this duration. If 0, no
+     * timeout.
      */
-    void setMotor(bool forward_motor_left, uint32_t motor_left_speed, uint32_t distance_cm_left,
-                  bool forward_motor_right, uint32_t motor_right_speed, uint32_t distance_cm_right);
-
-    /**
-     * isTargetReached: check if both motors have reached their target pulse counts
-     * @return: true if both motors have reached or exceeded their targets, false otherwise
-     */
-    bool isTargetReached();
+    void setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed, bool forward_motor_left,
+                  bool forward_motor_right, uint32_t timeout_ms = 0) override;
 
     /**
      * stopBothMotors: stop both motors and reset counters and targets
      */
-    void stopBothMotors();
+    void stopBothMotors() override;
 
     /**
      * stopMotorLeft: stop the left motor only
@@ -59,70 +49,87 @@ public:
     void stopMotorRight();
 
     /**
-     * resetCounterMotorLeft: reset the left motor's pulse counter and target
+     * startStraightDriving: begin straight driving with PID control
+     * @speed: PWM speed value (positive for forward, negative for backward)
+     * @duration_ms: optional duration in milliseconds (0 for unlimited)
      */
-    void resetCounterMotorLeft();
+    void startStraightDriving(float speed, uint32_t duration_ms = 0) override;
 
     /**
-     * resetCounterMotorRight: reset the right motor's pulse counter and target
+     * startTurningInPlace: begin turning in place to a target yaw
+     * @target_yaw: target yaw angle in degrees
+     * @speed: base speed for turning
+     * @duration_ms: optional duration in milliseconds (0 for unlimited)
      */
-    void resetCounterMotorRight();
+    void startTurningInPlace(float target_yaw, float speed, uint32_t duration_ms = 0) override;
 
     /**
-     * incrementLeftPulseCount: increment the left motor's pulse count (for ISR use)
+     * updateMovement: update PID control and motor outputs (call from main loop)
      */
-    void incrementLeftPulseCount();
+    void updateMovement() override;
 
     /**
-     * incrementRightPulseCount: increment the right motor's pulse count (for ISR use)
+     * stopMovement: stop all PID-controlled movement
      */
-    void incrementRightPulseCount();
+    void stopMovement();
 
     /**
-     * getLeftPulseCount: get the current left motor pulse count
-     * returns the current left motor pulse count
+     * isMoving: check if currently performing PID-controlled movement
      */
-    long getLeftPulseCount() const;
+    bool isMoving() const override;
 
     /**
-     * getRightPulseCount: get the current right motor pulse count
-     * returns the current right motor pulse count
+     * setTelemetryCallback: set callback for sending telemetry
+     * @param callback: function to call when telemetry should be sent
      */
-    long getRightPulseCount() const;
+    void setTelemetryCallback(void (*callback)(const TelemetryPacket &));
 
     /**
-     * getLeftTargetPulses: get the target left motor pulse count
-     * returns the target left motor pulse count
+     * buildTelemetryPacket: fill a telemetry packet with current state
      */
-    uint32_t getLeftTargetPulses() const;
+    TelemetryPacket buildTelemetryPacket() const;
 
     /**
-     * getRightTargetPulses: get the target right motor pulse count
-     * returns the target right motor pulse count
+     * isImuOk: check if IMU is initialized correctly
      */
-    uint32_t getRightTargetPulses() const;
-
-private:
-    /**
-     * CentimetersToCount: convert centimeters to pulse counts based on wheel circumference
-     * @cm: distance in centimeters
-     * @return: equivalent pulse count for the specified distance
-     */
-    uint32_t CentimetersToCount(float cm);
+    bool isImuOk() const
+    {
+        return imuOk;
+    }
 
 public:
-    MotorControl &_motorControl;
+    MotorControlInterface &_motorControl;
+    IMUOrientationInterface &_imu;
 
 private:
-    volatile long motor_left_pulse_count;
-    volatile long motor_right_pulse_count;
-    uint32_t target_pulses_left;
-    uint32_t target_pulses_right;
-    uint32_t speed_sensor_left_pin;
-    uint32_t speed_sensor_right_pin;
+    bool imuOk = false;
+    double yawSetpoint, currentYaw, motorOffsetOutput;
+    double Kp = 2.0, Ki = 0.01, Kd = 0.01;
+    float telemTargetYaw = 0.0f;
+    MovementState currentState = MovementState::IDLE;
+    float baseSpeed = 0.0f;
+    float telemPwmFreq = 17.0f;
+    float pidError = 0.0f; /* Current PID error for telemetry. */
+
+    unsigned long straightStartMs = 0;
+
+    /* Timed movement variables. */
+    unsigned long movementDurationMs = 0;
+    unsigned long movementStartMs = 0;
+    bool timedMovement = false;
+
+    /* Target pulse counts for motors. */
+    uint32_t leftTargetPulses = 0;
+    uint32_t rightTargetPulses = 0;
+
+    /* Telemetry callback and timing. */
+    void (*telemetryCallback)(const TelemetryPacket &) = nullptr;
+    unsigned long lastTelemetryMs = 0;
+    static constexpr unsigned long telemetryIntervalMs = 500; /* Send telemetry every 500ms. */
+
+    /* PID helper methods. */
+    float yawDiff(float target, float current);
+    void applyPidOutput();
+    void checkMovementTimeout();
+    void checkTelemetry();
 };
-
-void left_motor_speed_sensor_irq();
-void right_motor_speed_sensor_irq();
-
-#endif /* MOVEMENT_CONTROLLER_H */

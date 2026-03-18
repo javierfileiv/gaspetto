@@ -1,17 +1,25 @@
-#include "Serial.h"
+#include "Arduino.h"
+
+#include "CarEvents.h"
 
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-std::atomic<unsigned long> millisCounter{ 0 };
-std::atomic<bool> lowPowerMode;
+std::atomic<unsigned long> microsCounter{ 0 };
+std::atomic<bool> lowPowerMode{ false };
+Event event;
 
 /*  Simulated millis function. */
 extern "C" {
 unsigned long millis(void)
 {
-    return millisCounter.load();
+    return (unsigned long)(microsCounter.load() / 1000);
+}
+
+unsigned long micros(void)
+{
+    return microsCounter.load();
 }
 
 long map(long x, long in_min, long in_max, long out_min, long out_max)

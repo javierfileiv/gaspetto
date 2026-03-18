@@ -1,11 +1,15 @@
-#ifndef RADIO_CONTROLLER_H
-#define RADIO_CONTROLLER_H
+#pragma once
 
 #include "Arduino.h"
+#include "CarEvents.h"
 #include "EventQueue.h"
 #include "Log.h"
+#include "RadioProtocol.h"
 
 #include <stdint.h>
+
+/** @brief Application-specific event queue type for RadioController. */
+using EventQueue = GenericEventQueue<Event>;
 
 /* Enum for radio-specific events. */
 enum class RadioEventId : uint8_t { RADIO_RX, RADIO_TX };
@@ -21,6 +25,13 @@ public:
     void sendEvent(Event evt);
     EventQueue *getRadioQueue();
 
+    /**
+     * sendTelemetry(): Send telemetry packet via radio
+     * @param telemetry: The telemetry data to send
+     * @return true if successfully sent, false otherwise
+     */
+    bool sendTelemetry(const TelemetryPacket &telemetry);
+
 private:
     RF24 &_radio;
     uint8_t writing_addr[5];
@@ -28,5 +39,3 @@ private:
     EventQueue radioQueue;
     EventQueue *gaspettoQueue;
 };
-
-#endif /* RADIO_CONTROLLER_H. */

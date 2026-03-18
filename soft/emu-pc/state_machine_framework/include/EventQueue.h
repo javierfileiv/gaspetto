@@ -1,77 +1,67 @@
 #ifndef EVENT_QUEUE_H
 #define EVENT_QUEUE_H
 
-#include "Event.h"
 #include "config_event.h"
 
 #ifndef ARDUINO
 #include <cstdint>
 #endif
 
-class EventQueue {
+/**
+ * @brief Generic event queue for state machine events.
+ *
+ * @tparam EventT The event type to store.
+ * @tparam Capacity Maximum number of events in the queue.
+ */
+template <typename EventT, uint8_t Capacity = QUEUE_SIZE> class GenericEventQueue {
 public:
-    /*  Enqueue an event. */
-    bool enqueue(Event &evt);
-
-    /*  Dequeue an event. */
-    bool dequeue(Event &evt);
-
-    /*  Check if the queue is empty. */
-    bool IsEmpty() const;
-
-    /*  Check if the queue is full. */
-    bool IsFull() const;
-
-    /*  Get the current size of the queue. */
-    uint8_t GetSize() const;
-
-    /*  Stringify EventId for debugging. */
-    static const char *eventIdToString(EventId id)
+    /** Enqueue an event. */
+    bool enqueue(EventT &evt)
     {
-        switch (id) {
-        case EventId::NONE:
-            return "NONE";
-        case EventId::TIMER_ELAPSED:
-            return "TIMER_ELAPSED";
-        case EventId::ACTION:
-            return "ACTION";
-        case EventId::BUTTON_PRESSED:
-            return "BUTTON_PRESSED";
-        case EventId::MAX_EVENT_ID:
-            return "MAX_EVENT_ID";
-        default:
-            return "UNKNOWN_EVENT_ID";
+        if (count_ == Capacity) {
+            return false;
         }
+        events_[tail_] = evt;
+        tail_ = (tail_ + 1) % Capacity;
+        ++count_;
+        return true;
     }
 
-    /*  Stringify CommandId for debugging. */
-    static const char *commandIdToString(CommandId id)
+    /** Dequeue an event. */
+    bool dequeue(EventT &evt)
     {
-        switch (id) {
-        case CommandId::NONE:
-            return "NONE";
-        case CommandId::MOTOR_FORWARD:
-            return "MOTOR_FORWARD";
-        case CommandId::MOTOR_BACKWARD:
-            return "MOTOR_BACKWARD";
-        case CommandId::MOTOR_RIGHT:
-            return "MOTOR_RIGHT";
-        case CommandId::MOTOR_LEFT:
-            return "MOTOR_LEFT";
-        case CommandId::MOTOR_STOP:
-            return "MOTOR_STOP";
-        case CommandId::MAX_COMMAND_ID:
-            return "MAX_COMMAND_ID";
-        default:
-            return "UNKNOWN_COMMAND_ID";
+        if (count_ == 0) {
+            return false;
         }
+        evt = events_[head_];
+        head_ = (head_ + 1) % Capacity;
+        --count_;
+        return true;
+    }
+
+    /** Check if the queue is empty. */
+    bool IsEmpty() const
+    {
+        return count_ == 0;
+    }
+
+    /** Check if the queue is full. */
+    bool IsFull() const
+    {
+        return count_ == Capacity;
+    }
+
+    /** Get the current size of the queue. */
+    uint8_t GetSize() const
+    {
+        return count_;
     }
 
 private:
-    const int capacity = QUEUE_SIZE;
-    Event events[QUEUE_SIZE];
-    uint8_t head = 0;
-    uint8_t tail = 0;
-    uint8_t count = 0;
+    EventT events_[Capacity];
+    uint8_t head_ = 0;
+    uint8_t tail_ = 0;
+    uint8_t count_ = 0;
 };
+
 #endif /* EVENT_QUEUE_H */

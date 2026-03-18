@@ -1,0 +1,21 @@
+#ifndef CAR_STATES_H
+#define CAR_STATES_H
+
+#ifndef ARDUINO
+#include <cstdint>
+#else
+#include "Arduino.h"
+#endif
+
+/**
+ * @brief State identifiers for GaspettoCar FSM.
+ * @note Add new states before MAX_STATE_ID.
+ */
+enum class StateId : uint8_t {
+    IDLE, /**< Idle state - low power, waiting for events. */
+    PROCESSING, /**< Processing state - handling motor commands. */
+    PAUSED, /**< Paused state (reserved). */
+    MAX_STATE_ID /**< Sentinel - must be last. */
+};
+
+#endif /* CAR_STATES_H */

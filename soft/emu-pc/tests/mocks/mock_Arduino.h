@@ -6,6 +6,8 @@
 
 class MockArduino : public MockBase<MockArduino> {
 public:
+    MOCK_METHOD(unsigned long, millis, ());
+    MOCK_METHOD(unsigned long, micros, ());
     MOCK_METHOD(void, pinMode, (int pin, int mode));
     MOCK_METHOD(void, attachInterrupt, (int interruptNum, void (*userFunc)(void), int mode));
     MOCK_METHOD(void, digitalWrite, (int pin, int value));
@@ -19,22 +21,6 @@ public:
     MOCK_METHOD(void, setPWM,
                 (uint32_t channel, PinName pin, uint32_t frequency, uint32_t dutycycle));
     MOCK_METHOD(void, hw_timer_pause, ());
-
-    void execute_irq_left(int n_times = 0)
-    {
-        if (irq_cb_left) {
-            for (int i = 0; i < n_times; ++i)
-                irq_cb_left();
-        }
-    }
-
-    void execute_irq_right(int n_times = 0)
-    {
-        if (irq_cb_right) {
-            for (int i = 0; i < n_times; ++i)
-                irq_cb_right();
-        }
-    }
 
 public:
     MockArduino();
