@@ -36,18 +36,6 @@ void MockMotorControl::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t 
     mock->_setPWMdutyCycle(side, pin, percent_duty);
 }
 
-void MockMotorControl::stopRightMotor()
-{
-    auto mock = MockMotorControl::get_instance();
-    mock->_stopRightMotor();
-}
-
-void MockMotorControl::stopLeftMotor()
-{
-    auto mock = MockMotorControl::get_instance();
-    mock->_stopLeftMotor();
-}
-
 void MockMotorControl::stopBothMotors()
 {
     auto mock = MockMotorControl::get_instance();

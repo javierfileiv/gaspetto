@@ -26,11 +26,6 @@ public:
     virtual void setPWMfrequency(MotorSide side, uint32_t frequency) override;
     virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty) override;
     virtual void stopBothMotors() override;
-
-private:
-    virtual void stopRightMotor();
-    virtual void stopLeftMotor();
-    static MockMotorControl *instance_;
 };
 
 #endif // MOCK_MOTOR_CONTROL_H

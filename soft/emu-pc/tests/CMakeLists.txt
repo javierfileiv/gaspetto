@@ -14,10 +14,14 @@ add_executable(
   main.cpp
   gaspetto_car/test_movement_controller.cpp
   gaspetto_car/test_radio_controller.cpp
+  gaspetto_car/test_pid_movement.cpp
+  gaspetto_car/test_system_pid.cpp
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
   mocks/mock_MovementController.cpp
+  mocks/mock_IMUOrientation.cpp
+  mocks/mock_MotorControl.cpp
   fixture.cpp
 )
 target_include_directories(utest PRIVATE ./ mocks)
@@ -33,6 +37,7 @@ target_link_libraries(
   arduino_framework_impl
   state_machine_framework_itf
   movement_controller_itf
+  movement_controller_impl
   radio_controller_impl
   shared_types
 )
