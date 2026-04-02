@@ -176,6 +176,35 @@ cd build-tests
 GMOCK_VERBOSE=info ./tests/utest
 ```
 
+## IMU CSV Playback In PC Emulation
+
+The emulated `Adafruit_MPU6050` can replay raw IMU samples from a CSV file.
+This is useful for deterministic debugging and regression tests.
+
+Enable it with environment variables before launching `gaspetto_car`:
+
+```bash
+IMU_CSV=/absolute/path/to/imu_samples.csv IMU_LOOP=1 ./build-car/targets/gaspetto_car/gaspetto_car
+```
+
+- `IMU_CSV`: CSV file path. If missing or unreadable, the default built-in stub values are used.
+- `IMU_LOOP`: Optional. `1` (default) loops when the end of file is reached. `0` holds the last sample.
+
+Supported row formats:
+
+```text
+ax,ay,az,gx,gy,gz
+ax,ay,az,gx,gy,gz,tempC
+t,ax,ay,az,gx,gy,gz
+t,ax,ay,az,gx,gy,gz,tempC
+```
+
+Notes:
+
+- Lines starting with `#` are ignored.
+- A single header line (for example `ax,ay,az,gx,gy,gz,tempC`) is allowed.
+- Units are expected to match the Adafruit API: acceleration in m/s^2 and gyro in rad/s.
+
 ## Event System
 
 Events drive the state machine:
