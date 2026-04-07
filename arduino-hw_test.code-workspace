@@ -1,8 +1,8 @@
 {
 	"folders": [
-		{
-			"path": "soft/pio/arduino_hw_test"
-		}
+        {
+            "path": "soft/pio/arduino_car_hw_test"
+        }
     ],
     "settings": {}
 }
