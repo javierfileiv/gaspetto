@@ -4,7 +4,13 @@
 #include <Arduino.h>
 #include <IMUOrientation.h>
 
-enum class Mode { Idle, Forward, Backward, Turn };
+enum class Mode
+{
+    Idle,
+    Forward,
+    Backward,
+    Turn
+};
 
 // Global state (defined in car_main.cpp)
 extern IMUOrientation imu;

@@ -1,12 +1,14 @@
 #pragma once
-#include <Arduino.h>
-#include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <Arduino.h>
+#include <Wire.h>
 
-class IMUOrientation {
+class IMUOrientation
+{
 public:
-    struct Offsets {
+    struct Offsets
+    {
         float accX{0}, accY{0}, accZ{0};
         float gyroX{0}, gyroY{0}, gyroZ{0};
     };
@@ -15,19 +17,40 @@ public:
     void calibrate(bool print = true);
     void update();
 
-    float roll()  const { return rollDeg; }
-    float pitch() const { return pitchDeg; }
-    float yaw()   const { return yawDeg; }
-    float gyroZDeg() const { return lastGyroZDeg; }
-    const Offsets &getOffsets() const { return offsets; }
+    float roll() const
+    {
+        return rollDeg;
+    }
+    float pitch() const
+    {
+        return pitchDeg;
+    }
+    float yaw() const
+    {
+        return yawDeg;
+    }
+    float gyroZDeg() const
+    {
+        return lastGyroZDeg;
+    }
+    const Offsets &getOffsets() const
+    {
+        return offsets;
+    }
 
-    void zeroYaw() { yawDeg = 0.0f; }
+    void zeroYaw()
+    {
+        yawDeg = 0.0f;
+    }
 
     // Apply gentle yaw decay toward zero while stationary (call from loop when idle)
     void idleYawDampen(float dt);
 
     // Expose current estimated gyro Z bias (for diagnostics)
-    float gyroZBiasValue() const { return gyroZBias; }
+    float gyroZBiasValue() const
+    {
+        return gyroZBias;
+    }
 
 private:
     Adafruit_MPU6050 mpu;

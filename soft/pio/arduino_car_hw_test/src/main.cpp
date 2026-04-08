@@ -1,19 +1,19 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <stdint.h>  // For uint8_t type
 #include "pin_definitions.h"
 
+#include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <stdint.h> // For uint8_t type
 
 // nRF24L01 registers
-#define NRF24_REG_CONFIG      0x00
-#define NRF24_REG_STATUS      0x07
-#define NRF24_CMD_READ_REG    0x00
-#define NRF24_CMD_WRITE_REG   0x20
+#define NRF24_REG_CONFIG    0x00
+#define NRF24_REG_STATUS    0x07
+#define NRF24_CMD_READ_REG  0x00
+#define NRF24_CMD_WRITE_REG 0x20
 
 // MPU6050 registers
-#define MPU6050_WHO_AM_I 0x75
-#define MPU6050_PWR_MGMT_1 0x6B
+#define MPU6050_WHO_AM_I     0x75
+#define MPU6050_PWR_MGMT_1   0x6B
 #define MPU6050_ACCEL_XOUT_H 0x3B
 
 // Function prototypes
@@ -26,12 +26,12 @@ void writeNRF24Register(uint8_t reg, uint8_t value);
 
 // Global variables
 unsigned long lastToggleTime = 0;
-unsigned long lastI2CTime = 0;
-unsigned long lastSPITime = 0;
-const int toggleInterval = 500; // Toggle every 500ms
-const int i2cReadInterval = 1000; // Read I2C every 1000ms
-const int spiReadInterval = 2000; // Read SPI every 2000ms
-bool pinState = false;
+unsigned long lastI2CTime    = 0;
+unsigned long lastSPITime    = 0;
+const int toggleInterval     = 500;  // Toggle every 500ms
+const int i2cReadInterval    = 1000; // Read I2C every 1000ms
+const int spiReadInterval    = 2000; // Read SPI every 2000ms
+bool pinState                = false;
 
 void setup()
 {
@@ -50,9 +50,7 @@ void setup()
     pinMode(NRF24_CE, OUTPUT);
     pinMode(NRF24_CSN, OUTPUT);
 
-    //toggling gpios for some loops
-
-
+    // toggling gpios for some loops
 
     // Initialize all pins to LOW/inactive state
     digitalWrite(PIN_A_MOTOR_RIGHT, LOW);
@@ -61,9 +59,8 @@ void setup()
     digitalWrite(PIN_B_MOTOR_LEFT, LOW);
     digitalWrite(PIN_LED, HIGH); // disable LED on PC13
 
-
     digitalWrite(NRF24_CE, LOW);
-    digitalWrite(NRF24_CSN, HIGH);  // CSN is active LOW
+    digitalWrite(NRF24_CSN, HIGH); // CSN is active LOW
 
     // Initialize I2C communication
     Wire.begin();
@@ -71,15 +68,19 @@ void setup()
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
-    SPI.setClockDivider(SPI_CLOCK_DIV8);  // 2MHz SPI clock (assuming 16MHz MCU clock)
+    SPI.setClockDivider(SPI_CLOCK_DIV8); // 2MHz SPI clock (assuming 16MHz MCU clock)
 
     // Test MPU6050 connection
-    if (testMPU6050()) {
+    if (testMPU6050())
+    {
         Serial.println("MPU6050 found and initialized successfully!");
-    } else {
+    }
+    else
+    {
         Serial.println("Failed to connect to MPU6050!");
         // Blink rapidly to indicate error
-        while (1) {
+        while (1)
+        {
             digitalWrite(PIN_LED, HIGH);
             delay(500);
             digitalWrite(PIN_LED, LOW);
@@ -88,12 +89,16 @@ void setup()
     }
 
     // Test nRF24L01 connection
-    if (testNRF24L01()) {
+    if (testNRF24L01())
+    {
         Serial.println("nRF24L01 found and initialized successfully!");
-    } else {
+    }
+    else
+    {
         Serial.println("Failed to connect to nRF24L01!");
         // Blink slowly on PB11 to indicate error
-        while (1) {
+        while (1)
+        {
             digitalWrite(PIN_LED, HIGH);
             delay(2000);
             digitalWrite(PIN_LED, LOW);
@@ -107,19 +112,22 @@ void loop()
     unsigned long currentMillis = millis();
 
     // Toggle GPIO pins at defined interval
-    if (currentMillis - lastToggleTime >= toggleInterval) {
+    if (currentMillis - lastToggleTime >= toggleInterval)
+    {
         lastToggleTime = currentMillis;
         togglePins();
     }
 
     // Read MPU6050 data at defined interval
-    if (currentMillis - lastI2CTime >= i2cReadInterval) {
+    if (currentMillis - lastI2CTime >= i2cReadInterval)
+    {
         lastI2CTime = currentMillis;
         readMPU6050Data();
     }
 
     // Check nRF24L01 status at defined interval
-    if (currentMillis - lastSPITime >= spiReadInterval) {
+    if (currentMillis - lastSPITime >= spiReadInterval)
+    {
         lastSPITime = currentMillis;
         // Read the STATUS register from nRF24L01
         uint8_t status = readNRF24Register(NRF24_REG_STATUS);
@@ -143,11 +151,12 @@ void togglePins()
 
     // PB14 - toggle only every other time (double frequency)
     static bool pb14State = false;
-    pb14State = !pb14State;
+    pb14State             = !pb14State;
     digitalWrite(PIN_A_MOTOR_LEFT, pb14State);
 
     // PB15 - pulse pattern (short HIGH pulse then LOW)
-    if (pinState) {
+    if (pinState)
+    {
         digitalWrite(PIN_B_MOTOR_LEFT, HIGH);
         delay(200); // 50ms pulse
         digitalWrite(PIN_B_MOTOR_LEFT, LOW);
@@ -162,13 +171,15 @@ bool testMPU6050()
     Wire.endTransmission(false);
     Wire.requestFrom(MPU6050_ADDR, 1, true);
 
-    if (Wire.available()) {
+    if (Wire.available())
+    {
         uint8_t whoAmI = Wire.read();
         Serial.print("WHO_AM_I register: 0x");
         Serial.println(whoAmI, HEX);
 
         // WHO_AM_I should return 0x68 for MPU6050
-        if (whoAmI == 0x68) {
+        if (whoAmI == 0x68)
+        {
             // Initialize MPU6050
             Wire.beginTransmission(MPU6050_ADDR);
             Wire.write(MPU6050_PWR_MGMT_1);
@@ -215,7 +226,7 @@ uint8_t readNRF24Register(uint8_t reg)
 {
     digitalWrite(NRF24_CSN, LOW);
     SPI.transfer(NRF24_CMD_READ_REG | reg);
-    uint8_t value = SPI.transfer(0xFF);  // Send dummy byte to read value
+    uint8_t value = SPI.transfer(0xFF); // Send dummy byte to read value
     digitalWrite(NRF24_CSN, HIGH);
     return value;
 }
@@ -248,9 +259,10 @@ bool testNRF24L01()
     // previously configured differently
     bool isValid = (config != 0xFF && config != 0x00);
 
-    if (isValid) {
+    if (isValid)
+    {
         // If we got a valid response, try writing to the CONFIG register and read it back
-        uint8_t testValue = config ^ 0x02;  // Toggle one bit
+        uint8_t testValue = config ^ 0x02; // Toggle one bit
         writeNRF24Register(NRF24_REG_CONFIG, testValue);
 
         // Read it back

@@ -10,7 +10,6 @@ typedef void (*RadioCmdCallback)(const String &tok);
 bool radioInit(RadioCmdCallback cb);
 // Poll/service radio receive (call each loop)
 void radioService();
-// Send telemetry packet (handles stop/start listening). Returns true if (ack or noAck fallback) accepted.
 bool radioSendTelemetry(const TelemetryPacket &tp);
 // Try re-initialize radio (after failure); returns success
 bool radioTryReinit();
