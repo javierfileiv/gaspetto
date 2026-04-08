@@ -87,11 +87,14 @@ void displayTelemetry(const TelemetryPacket &t)
     if (t.imuOk)
     {
         // Validate yaw is within reasonable range
-        if (t.yaw >= -180.0 && t.yaw <= 180.0) {
+        if (t.yaw >= -180.0 && t.yaw <= 180.0)
+        {
             Serial.print(F("Y="));
             Serial.print(t.yaw, 1);
             Serial.print(F("°"));
-        } else {
+        }
+        else
+        {
             Serial.print(F("Y=INVALID"));
         }
     }
@@ -115,15 +118,20 @@ void displayTelemetry(const TelemetryPacket &t)
         Serial.print(t.ki, 3);
         Serial.print(F(" kd="));
         Serial.print(t.kd, 3);
-    } else {
+    }
+    else
+    {
         Serial.print(F("CORRUPTED"));
     }
 
     Serial.print(F(" PWM_freq:"));
-    if (t.pwmFreq >= 0.0 && t.pwmFreq <= 1000.0) {
+    if (t.pwmFreq >= 0.0 && t.pwmFreq <= 1000.0)
+    {
         Serial.print(t.pwmFreq, 1);
         Serial.println(F("Hz"));
-    } else {
+    }
+    else
+    {
         Serial.println(F("INVALIDHz"));
     }
 }
@@ -176,13 +184,19 @@ void loop()
                     Serial.print(F(" - ACK: "));
 
                     // Ensure null termination and print safely
-                    ap.text[sizeof(ap.text)-1] = '\0';
-                    for (uint8_t i = 0; i < sizeof(ap.text)-1; i++) {
-                        if (ap.text[i] >= 32 && ap.text[i] <= 126) {
+                    ap.text[sizeof(ap.text) - 1] = '\0';
+                    for (uint8_t i = 0; i < sizeof(ap.text) - 1; i++)
+                    {
+                        if (ap.text[i] >= 32 && ap.text[i] <= 126)
+                        {
                             Serial.print(ap.text[i]);
-                        } else if (ap.text[i] == 0) {
+                        }
+                        else if (ap.text[i] == 0)
+                        {
                             break;
-                        } else {
+                        }
+                        else
+                        {
                             Serial.print('?'); // Replace non-printable chars
                         }
                     }

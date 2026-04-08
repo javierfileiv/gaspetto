@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "soft/pio/arduino_box_hw_test"
+		},
+		{
+			"name": "GaspettoBox_pio",
+			"path": "soft/pio/GaspettoBox_pio"
+		}
+	],
+	"settings": {}
+}
