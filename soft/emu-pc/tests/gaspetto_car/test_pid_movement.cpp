@@ -28,6 +28,18 @@ using testing::Return;
 static constexpr uint32_t PWM_FREQ = 20000;
 static constexpr uint32_t PID_PERIOD_MS = 50; /* PID sample time. */
 
+namespace
+{
+int *gTelemetryCounter = nullptr;
+
+void telemetryCounterCallback(const TelemetryPacket &)
+{
+    if (gTelemetryCounter != nullptr) {
+        (*gTelemetryCounter)++;
+    }
+}
+}
+
 /* ---------------------------------------------------------------------------
  * Fixture: real MovementController + mock IMU/motors + controlled clock.
  * --------------------------------------------------------------------------- */
@@ -168,4 +180,127 @@ TEST_F(PIDMovementTest, TimedMovement_StopsAfterTimeout)
     /* Cross the 500 ms boundary. */
     runPIDCycles(1); /* 500 ms total */
     EXPECT_FALSE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, TurnTargetNormalizationAbove180IsHandled)
+{
+    setYaw(0.0f);
+    movementController.startTurningInPlace(270.0f, 30.0f, 5000); /* normalizes to -90 */
+    EXPECT_TRUE(movementController.isMoving());
+
+    const float steps[] = { -30, -60, -85, -89, -90, -90, -90, -90 };
+    for (float yaw : steps) {
+        setYaw(yaw);
+        advanceTime(PID_PERIOD_MS);
+        movementController.updateMovement();
+    }
+
+    EXPECT_FALSE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, TurnTargetNormalizationBelowMinus180IsHandled)
+{
+    setYaw(0.0f);
+    movementController.startTurningInPlace(-270.0f, 30.0f, 5000); /* normalizes to +90 */
+    EXPECT_TRUE(movementController.isMoving());
+
+    const float steps[] = { 30, 60, 85, 89, 90, 90, 90, 90 };
+    for (float yaw : steps) {
+        setYaw(yaw);
+        advanceTime(PID_PERIOD_MS);
+        movementController.updateMovement();
+    }
+
+    EXPECT_FALSE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, StraightDrivingWrapsPositiveDiffAcrossBoundary)
+{
+    setYaw(170.0f);
+    movementController.startStraightDriving(50.0f, 5000);
+
+    /* target=170, current=-170 => diff=340 => wrap branch diff>180 */
+    setYaw(-170.0f);
+
+    uint32_t lastLeft = 0, lastRight = 0;
+    ON_CALL(mockMotorControl, _setMotorSpeeds(_, _, _, _))
+            .WillByDefault([&](uint32_t l, uint32_t r, bool, bool) {
+                lastLeft = l;
+                lastRight = r;
+            });
+
+    runPIDCycles(3);
+    EXPECT_NE(lastLeft, lastRight);
+}
+
+TEST_F(PIDMovementTest, StraightDrivingWrapsNegativeDiffAcrossBoundary)
+{
+    setYaw(-170.0f);
+    movementController.startStraightDriving(50.0f, 5000);
+
+    /* target=-170, current=170 => diff=-340 => wrap branch diff<-180 */
+    setYaw(170.0f);
+
+    uint32_t lastLeft = 0, lastRight = 0;
+    ON_CALL(mockMotorControl, _setMotorSpeeds(_, _, _, _))
+            .WillByDefault([&](uint32_t l, uint32_t r, bool, bool) {
+                lastLeft = l;
+                lastRight = r;
+            });
+
+    runPIDCycles(3);
+    EXPECT_NE(lastLeft, lastRight);
+}
+
+TEST_F(PIDMovementTest, ZeroDurationModesRemainActiveUntilExplicitStop)
+{
+    setYaw(0.0f);
+    movementController.startStraightDriving(35.0f, 0);
+    runPIDCycles(6);
+    EXPECT_TRUE(movementController.isMoving());
+
+    movementController.stopMovement();
+    EXPECT_FALSE(movementController.isMoving());
+
+    movementController.startTurningInPlace(90.0f, 25.0f, 0);
+    runPIDCycles(4);
+    EXPECT_TRUE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, TelemetryCallbackRunsAtConfiguredInterval)
+{
+    int sent = 0;
+    gTelemetryCounter = &sent;
+    movementController.setTelemetryCallback(telemetryCounterCallback);
+
+    setYaw(0.0f);
+    movementController.startStraightDriving(40.0f, 5000);
+
+    /* 10 cycles x 50ms = 500ms -> one telemetry frame should be sent. */
+    runPIDCycles(10);
+    EXPECT_GE(sent, 1);
+
+    gTelemetryCounter = nullptr;
+}
+
+TEST(MovementControllerInitBranchTest, InitFailsWhenImuBeginFailsAndMovementStaysIdle)
+{
+    NiceMock<MockArduino> mockArduino;
+    NiceMock<MockIMUOrientation> mockIMU;
+    NiceMock<MockMotorControl> mockMotorControl;
+    MovementController movementController{ mockMotorControl, mockIMU };
+
+    ON_CALL(mockIMU, _begin(_, _)).WillByDefault(Return(false));
+
+    movementController.init(PWM_FREQ);
+    movementController.startStraightDriving(50.0f, 1000);
+    movementController.startTurningInPlace(90.0f, 25.0f, 1000);
+    movementController.updateMovement();
+
+    EXPECT_FALSE(movementController.isMoving());
+    EXPECT_FALSE(movementController.isImuOk());
+
+    TelemetryPacket telemetry = movementController.buildTelemetryPacket();
+    EXPECT_EQ(telemetry.imuOk, 0);
+    EXPECT_FLOAT_EQ(telemetry.yaw, 0.0f);
 }

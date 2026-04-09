@@ -1,13 +1,12 @@
 #pragma once
 
+#include "HardwareTimer.h"
 #include "Log.h"
 #include "MotorControlInterface.h"
 
 #ifndef ARDUINO
 #include <cstdint>
 #endif
-
-class HardwareTimer;
 
 struct MotorConfig {
     uint32_t pin[MAX_PIN];
@@ -54,6 +53,9 @@ public:
     struct MotorConfig motor[MAX_SIDES];
 
 private:
+    HardwareTimer leftTimer_;
+    HardwareTimer rightTimer_;
+
     /** setMotorLeft():
      * Set the left motor's direction and speed (PWM duty cycle 0-100).
      * @speed_percent: Speed percentage (0-100).

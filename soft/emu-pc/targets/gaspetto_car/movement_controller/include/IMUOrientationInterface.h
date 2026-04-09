@@ -26,10 +26,6 @@ public:
     virtual float pitch() const = 0;
     virtual float yaw() const = 0;
     virtual float gyroZDeg() const = 0;
-    virtual const Offsets &getOffsets() const = 0;
-
-    virtual void zeroYaw() = 0;
-    virtual float gyroZBiasValue() const = 0;
 };
 
 #endif // IMU_ORIENTATION_INTERFACE_H

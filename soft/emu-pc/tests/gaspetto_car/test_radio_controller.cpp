@@ -1,5 +1,7 @@
+#include "CommandPacket.h"
 #include "fixture.h"
 
+#include <cstring>
 #include <gtest/gtest.h>
 
 using ::testing::_;

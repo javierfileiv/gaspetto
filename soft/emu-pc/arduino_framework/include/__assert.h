@@ -3,6 +3,10 @@
 #include <cstdint>
 #define __ASSERT_USE_STDERR
 #include <assert.h>
+
+#ifndef G_ASSERT
+#define G_ASSERT(x) assert(x)
+#endif
 #else /* ARDUINO */
 #ifndef assert
 #define assert(x)                              \
@@ -18,4 +22,8 @@
         }                                      \
     } while (0)
 #endif /* assert */
+
+#ifndef G_ASSERT
+#define G_ASSERT(x) assert(x)
+#endif
 #endif /* ARDUINO */

@@ -5,35 +5,33 @@
 void ProcessingState::enter()
 {
     GaspettoBox *box = static_cast<GaspettoBox *>(active_object_);
+    CommandPacket packet{};
+    bool isEmpty = false;
 
-    for (int row = 0; row < 3; ++row) {
-        log("Scanning row ");
-        log(row);
-        logln("...\n");
-#ifndef ARDUINO
-        std::this_thread::sleep_for(std::chrono::duration<int>(1)); /*  Simulate some
-                                                                       processing work. */
-#else
-        delay(1000); /*  Simulate some processing work. */
-#endif
-        log("Processing row ");
-        log(row);
-        logln("...\n");
-#ifndef ARDUINO
-        std::this_thread::sleep_for(std::chrono::duration<int>(1)); /*  Simulate some
-                                                                       processing work. */
-#else
-        delay(1000); /*  Simulate some processing work. */
-#endif
-        log("Sending row ");
-        log(row);
-        logln("...\n");
-#ifndef ARDUINO
-        std::this_thread::sleep_for(std::chrono::duration<int>(1)); /*  Simulate some
-                                                                       processing work. */
-#else
-        delay(1000); /*  Simulate some processing work. */
-#endif
+    box->restoreFromStop();
+    box->setSensorRailEnabled(true);
+    box->runScanAnimation();
+    box->scanSlots();
+
+    const bool programReady = box->buildProgram(packet, isEmpty);
+    box->setSensorRailEnabled(false);
+
+    if (!programReady) {
+        if (isEmpty) {
+            box->runEmptyBoardAnimation();
+        } else {
+            box->runBuildErrorAnimation();
+        }
+        box->transitionTo(StateId::IDLE);
+        return;
     }
+
+    const bool radioOk = box->sendProgram(packet);
+    if (radioOk) {
+        box->runSuccessAnimation();
+    } else {
+        box->runRfErrorAnimation();
+    }
+
     box->transitionTo(StateId::IDLE);
 }

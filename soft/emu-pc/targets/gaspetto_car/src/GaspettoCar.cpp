@@ -6,8 +6,8 @@
 #include "Context.h"
 #include "EventQueue.h"
 #include "MovementControllerInterface.h"
+#include "__assert.h"
 
-#include <cassert>
 #ifdef USE_RADIO_CONTROLLER
 #include "RadioController.h"
 #else
@@ -28,13 +28,13 @@ GaspettoCar::GaspettoCar(Context &ctx)
 
 void GaspettoCar::init(StateId initialStateId)
 {
-    assert(_ctx.movementController);
+    G_ASSERT(_ctx.movementController);
     _ctx.movementController->init(_ctx.pwm_freq);
 #ifdef USE_RADIO_CONTROLLER
-    assert(_ctx.radioController);
+    G_ASSERT(_ctx.radioController);
     _ctx.radioController->init();
 #else
-    assert(_ctx.timeredEventQueue);
+    G_ASSERT(_ctx.timeredEventQueue);
 #endif
 
     CarActiveObject::init(initialStateId);

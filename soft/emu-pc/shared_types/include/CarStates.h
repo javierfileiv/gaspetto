@@ -14,7 +14,6 @@
 enum class StateId : uint8_t {
     IDLE, /**< Idle state - low power, waiting for events. */
     PROCESSING, /**< Processing state - handling motor commands. */
-    PAUSED, /**< Paused state (reserved). */
     MAX_STATE_ID /**< Sentinel - must be last. */
 };
 

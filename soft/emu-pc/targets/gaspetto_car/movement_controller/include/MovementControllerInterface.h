@@ -15,11 +15,6 @@ public:
     /** @brief Initialize the movement controller. */
     virtual void init(uint32_t pwm_freq) = 0;
 
-    /** @brief Set motor speeds and directions directly. */
-    virtual void setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed,
-                          bool forward_motor_left, bool forward_motor_right,
-                          uint32_t timeout_ms = 0) = 0;
-
     /** @brief Start PID-controlled straight driving. */
     virtual void startStraightDriving(float speed, uint32_t duration_ms = 0) = 0;
 

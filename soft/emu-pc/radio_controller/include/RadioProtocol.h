@@ -10,16 +10,8 @@
  * Use 5 non-null bytes (no embedded 0) for robust addressing. Last element of the 6-byte array
  * is unused/for readability only; RF24 uses first 5 bytes.
  */
-static const uint8_t RADIO_ADDR_CMD[6] = { 'C', 'M', 'D', 'C', '1', '\0' }; /* Commands TO vehicle.
-                                                                             */
 static const uint8_t RADIO_ADDR_TLM[6] = { 'T', 'L', 'M', 'T', '1', '\0' }; /* Telemetry FROM
                                                                                vehicle. */
-
-/* Command: ASCII text up to 15 chars + null (matches existing serial commands). */
-struct __attribute__((packed)) CommandPacket {
-    char text[16];
-};
-
 /* Telemetry: fits into 32 byte payload (nRF24 max). */
 struct __attribute__((packed)) TelemetryPacket {
     float targetYaw; /* 4 - Target yaw angle. */
