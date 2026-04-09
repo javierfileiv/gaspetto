@@ -20,9 +20,12 @@ echo "Project root: $PROJECT_ROOT"
 echo "Emu-pc dir  : $EMU_PC_DIR"
 
 cmake --preset tests -S "$EMU_PC_DIR"
-cmake --build "$EMU_PC_DIR/build-tests" --parallel "$NUM_CORES" --target utest
+cmake --build "$EMU_PC_DIR/build-tests" --parallel "$NUM_CORES" --target utest_car utest_box
 
-echo -e "${YELLOW}Running unit tests...${NC}"
-"$EMU_PC_DIR/build-tests/tests/utest" --gtest_color=yes
+echo -e "${YELLOW}Running utest_car...${NC}"
+"$EMU_PC_DIR/build-tests/tests/utest_car" --gtest_color=yes
+
+echo -e "${YELLOW}Running utest_box...${NC}"
+"$EMU_PC_DIR/build-tests/tests/utest_box" --gtest_color=yes
 
 echo -e "${GREEN}Unit tests passed.${NC}"

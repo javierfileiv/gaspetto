@@ -4,7 +4,31 @@
             "path": "soft/emu-pc"
         },
         {
+            "path": "soft/pio/GaspettoBox_pio"
+        },
+        {
+            "path": "soft/pio/GaspettoCar_pio"
+        },
+        {
+            "path": "soft/pio/NrfSender_pio"
+        },
+        {
+            "path": "tools"
+        },
+        {
+            "path": ".github"
+        },
+        {
+            "path": "soft/pio/arduino_car_hw_test"
+        },
+        {
             "path": "soft/pio/arduino_straight_drive"
+        },
+        {
+            "path": "soft/pio/arduino_box_hw_test"
+        },
+        {
+            "path": "tools"
         }
     ]
 }
