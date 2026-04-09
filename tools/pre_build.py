@@ -13,10 +13,6 @@ def before_build(source, target, env):
             print("Failed to generate compilation database")
             sys.exit(1)
 
-        print("Copying compile_commands.json...")
-
-        print("== Pre-build script finished ==")
-
     except Exception as e:
         print(f"Pre-build script failed: {str(e)}")
         sys.exit(1)

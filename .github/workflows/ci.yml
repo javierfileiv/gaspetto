@@ -7,6 +7,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build_pc:
     runs-on: ubuntu-latest
@@ -24,7 +29,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y cmake
 
       - name: Run Gaspetto PC build script
-        run: ./tools/build-gaspetto-pc
+        run: ./tools/build-gaspetto-pc.sh
         shell: bash
 
   utest:
@@ -43,8 +48,137 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y cmake
 
       - name: Run Gaspetto PC utest
-        run: ./tools/build-gaspetto-utest
+        run: ./tools/build-gaspetto-utest.sh
         shell: bash
+
+  coverage:
+    runs-on: ubuntu-latest
+    env:
+      COVERAGE_MIN: "95"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Sync and update submodules
+        run: git submodule update --init --recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install CMake and gcovr
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcovr
+
+      - name: Run coverage for emu-pc tests
+        run: ./tools/coverage-gaspetto-utest
+        shell: bash
+
+      - name: Extract coverage total
+        id: coverage_total
+        run: |
+          COVERAGE_FILE="soft/emu-pc/build-tests-coverage/coverage/coverage.txt"
+          TOTAL_LINE="$(grep '^TOTAL' "$COVERAGE_FILE" | tr -s ' ')"
+          TOTAL_PERCENT="$(echo "$TOTAL_LINE" | awk '{print $4}' | tr -d '%')"
+
+          echo "total=$TOTAL_PERCENT" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce minimum coverage
+        run: |
+          TOTAL="${{ steps.coverage_total.outputs.total }}"
+          MIN="$COVERAGE_MIN"
+
+          awk -v total="$TOTAL" -v min="$MIN" 'BEGIN {
+            if (total + 0 < min + 0) {
+              printf("Coverage gate failed: total %.2f%% is below minimum %.2f%%\n", total + 0, min + 0);
+              exit 1;
+            }
+            printf("Coverage gate passed: total %.2f%% (minimum %.2f%%)\n", total + 0, min + 0);
+          }'
+
+      - name: Publish coverage summary
+        run: |
+          COVERAGE_FILE="soft/emu-pc/build-tests-coverage/coverage/coverage.txt"
+
+          {
+            echo "## emu-pc Test Coverage"
+            echo
+            echo "- Total line coverage: **${{ steps.coverage_total.outputs.total }}%**"
+            echo "- Minimum required: **${COVERAGE_MIN}%**"
+            echo
+            echo "### gcovr summary"
+            echo
+            echo '```text'
+            cat "$COVERAGE_FILE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emu-pc-coverage
+          path: soft/emu-pc/build-tests-coverage/coverage
+
+      - name: Prepare GitHub Pages content
+        run: |
+          TOTAL="${{ steps.coverage_total.outputs.total }}"
+          COVERAGE_DIR="soft/emu-pc/build-tests-coverage/coverage"
+          PAGES_DIR="_site"
+
+          mkdir -p "$PAGES_DIR/coverage"
+          cp -r "$COVERAGE_DIR"/. "$PAGES_DIR/coverage/"
+
+          COLOR="red"
+          awk -v total="$TOTAL" 'BEGIN {
+            if (total + 0 >= 95) print "brightgreen";
+            else if (total + 0 >= 90) print "green";
+            else if (total + 0 >= 80) print "yellow";
+            else print "red";
+          }' > "$PAGES_DIR/.coverage_color"
+          COLOR="$(cat "$PAGES_DIR/.coverage_color")"
+          rm -f "$PAGES_DIR/.coverage_color"
+
+          cat > "$PAGES_DIR/coverage-badge.json" <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "coverage",
+            "message": "${TOTAL}%",
+            "color": "${COLOR}"
+          }
+          EOF
+
+          cat > "$PAGES_DIR/index.html" <<'EOF'
+          <!doctype html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=coverage/coverage.html">
+              <title>Gaspetto Coverage</title>
+            </head>
+            <body>
+              Redirecting to <a href="coverage/coverage.html">coverage report</a>.
+            </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  coverage_pages:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    needs: coverage
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   pio:
     runs-on: ubuntu-latest
@@ -62,4 +196,4 @@ jobs:
         run: pip install platformio
 
       - name: Run Gaspetto Arduino build script with Platform IO
-        run: ./tools/build-gaspetto-pio
+        run: ./tools/build-gaspetto-pio.sh

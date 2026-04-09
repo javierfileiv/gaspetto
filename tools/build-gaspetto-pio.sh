@@ -31,6 +31,12 @@ build_step() {
     local label="$1"; shift
     CURRENT_STEP="$label"
     echo -e "${YELLOW}==> $label (${path})${NC}"
+
+    if [[ ! -f "$path/platformio.ini" ]]; then
+        echo -e "${YELLOW}Skipping $label: no platformio.ini in $path${NC}"
+        return 0
+    fi
+
     pushd "$path" >/dev/null
     pio run "$@"
     popd >/dev/null
@@ -46,17 +52,33 @@ ensure_dir() {
 }
 
 # List of builds (path label [extra pio args...])
-ensure_dir "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"
-ensure_dir "$PROJECT_ROOT/soft/pio/NrfSender_pio"
-ensure_dir "$PROJECT_ROOT/soft/pio/arduino_straight_drive"
-ensure_dir "$PROJECT_ROOT/soft/pio/arduino_hw_test"
-ensure_dir "$PROJECT_ROOT/soft/pio/mpu_plot"
+declare -a BUILD_PATHS=(
+    "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"
+    "$PROJECT_ROOT/soft/pio/GaspettoBox_pio"
+    "$PROJECT_ROOT/soft/pio/NrfSender_pio"
+    "$PROJECT_ROOT/soft/pio/arduino_straight_drive"
+    "$PROJECT_ROOT/soft/pio/arduino_box_hw_test"
+    "$PROJECT_ROOT/soft/pio/arduino_car_hw_test"
+    "$PROJECT_ROOT/soft/pio/mpu_plot"
+)
 
-build_step "$PROJECT_ROOT/soft/pio/GaspettoCar_pio" "GaspettoCar"
-build_step "$PROJECT_ROOT/soft/pio/NrfSender_pio" "NrfSender"
-build_step "$PROJECT_ROOT/soft/pio/arduino_straight_drive" "Arduino Straight Drive"
-build_step "$PROJECT_ROOT/soft/pio/arduino_hw_test" "Arduino HW Test"
-build_step "$PROJECT_ROOT/soft/pio/mpu_plot" "MPU Plot"
+declare -a BUILD_LABELS=(
+    "GaspettoCar"
+    "GaspettoBox"
+    "NrfSender"
+    "Arduino Straight Drive"
+    "Arduino Box HW Test"
+    "Arduino Car HW Test"
+    "MPU Plot"
+)
+
+for path in "${BUILD_PATHS[@]}"; do
+    ensure_dir "$path"
+done
+
+for i in "${!BUILD_PATHS[@]}"; do
+    build_step "${BUILD_PATHS[$i]}" "${BUILD_LABELS[$i]}"
+done
 
 END_TS=$(date +%s)
 ELAPSED=$((END_TS-START_TS))
@@ -70,7 +92,7 @@ if [[ "${CLEAN_BUILD:-1}" == "1" ]]; then
             echo -e "  Removing $dir/.pio"
             rm -rf "$dir/.pio" || echo -e "${YELLOW}Warning: failed to remove $dir/.pio${NC}" >&2
         fi
-    done < <(find "$PROJECT_ROOT/soft/pio" -maxdepth 2 -type d -print0)
+    done < <(find "$PROJECT_ROOT/soft/pio" -mindepth 1 -maxdepth 1 -type d -print0)
     echo -e "${GREEN}Cleanup complete.${NC}"
 else
     echo -e "${YELLOW}Skipping cleanup (set CLEAN_BUILD=1 to enable).${NC}"
