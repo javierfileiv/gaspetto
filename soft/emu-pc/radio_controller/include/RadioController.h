@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "CarEvents.h"
+#include "CommandPacket.h"
 #include "EventQueue.h"
 #include "Log.h"
 #include "RadioProtocol.h"
@@ -24,6 +25,7 @@ public:
     void processRadio();
     void sendEvent(Event evt);
     EventQueue *getRadioQueue();
+    bool sendBuffer(const void *data, uint8_t len);
 
     /**
      * sendTelemetry(): Send telemetry packet via radio
@@ -33,6 +35,12 @@ public:
     bool sendTelemetry(const TelemetryPacket &telemetry);
 
 private:
+    /**
+     * @brief Decode a CommandPacket and enqueue each command as EVENT_ACTION.
+     * @param packet The CommandPacket to decode.
+     */
+    void decodeCommandPacket(const CommandPacket &packet);
+
     RF24 &_radio;
     uint8_t writing_addr[5];
     uint8_t reading_addr[5];

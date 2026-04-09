@@ -29,6 +29,7 @@
 #include "mock_Arduino.h"
 #include "mock_IMUOrientation.h"
 #include "mock_MotorControl.h"
+#include "mock_MovementController.h"
 #include "mock_RF24.h"
 
 #include <gmock/gmock.h>
@@ -42,6 +43,18 @@ static constexpr uint32_t PID_PERIOD_MS = 50;
 
 static const uint8_t *sys_writing_addr = gaspetto_box_pipe_name;
 static const uint8_t *sys_reading_addr = gaspetto_car_pipe_name;
+
+namespace
+{
+int *gLowPowerCalls = nullptr;
+
+void lowPowerCounterCallback()
+{
+    if (gLowPowerCalls != nullptr) {
+        (*gLowPowerCalls)++;
+    }
+}
+}
 
 /* ---------------------------------------------------------------------------
  * SystemPIDTest fixture
@@ -156,6 +169,84 @@ TEST_F(SystemPIDTest, InitStartsInIdleState)
 {
     EXPECT_TRUE(isInState(StateId::IDLE));
     EXPECT_FALSE(movementController.isMoving());
+}
+
+TEST(GaspettoCarCoverageTest, PostEventReturnsMinusOneWhenQueueIsMissing)
+{
+    IdleState idleState;
+    ProcessingState processingState;
+    Context ctx{ nullptr, nullptr, nullptr, nullptr, &idleState, &processingState, MOTOR_FREQ };
+    GaspettoCar gaspettoCar{ ctx };
+
+    EXPECT_EQ(gaspettoCar.postEvent(Event{ EventId::ACTION, CommandId::MOTOR_FORWARD }), -1);
+}
+
+TEST(GaspettoCarAssertTest, InitAssertsWhenMovementControllerIsMissing)
+{
+    NiceMock<MockArduino> mockArduino;
+    EventQueue eventQueue;
+    TimeredEventQueue timeredEventQueue;
+    IdleState idleState;
+    ProcessingState processingState;
+    Context ctx{ &eventQueue, nullptr,          nullptr,   &timeredEventQueue,
+                 &idleState,  &processingState, MOTOR_FREQ };
+    GaspettoCar gaspettoCar{ ctx };
+
+    EXPECT_DEATH(gaspettoCar.init(StateId::IDLE), ".*");
+}
+
+TEST(GaspettoCarAssertTest, InitAssertsWhenRadioControllerIsMissing)
+{
+    NiceMock<MockArduino> mockArduino;
+    EventQueue eventQueue;
+    TimeredEventQueue timeredEventQueue;
+    IdleState idleState;
+    ProcessingState processingState;
+    NiceMock<MockMovementController> mockMovementController;
+
+    Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
+                 &idleState,  &processingState,        MOTOR_FREQ };
+    GaspettoCar gaspettoCar{ ctx };
+
+    EXPECT_DEATH(gaspettoCar.init(StateId::IDLE), ".*");
+}
+
+TEST(GaspettoCarCoverageTest, EnterLowPowerModeInvokesCallbackWhenSet)
+{
+    NiceMock<MockArduino> mockArduino;
+    EventQueue eventQueue;
+    TimeredEventQueue timeredEventQueue;
+    IdleState idleState;
+    ProcessingState processingState;
+    NiceMock<MockMovementController> mockMovementController;
+
+    Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
+                 &idleState,  &processingState,        MOTOR_FREQ };
+    GaspettoCar gaspettoCar{ ctx };
+
+    int callbackCalls = 0;
+    gLowPowerCalls = &callbackCalls;
+    gaspettoCar.setLowPowerModeCallback(lowPowerCounterCallback);
+    gaspettoCar.enterLowPowerMode();
+    gLowPowerCalls = nullptr;
+
+    EXPECT_EQ(callbackCalls, 1);
+}
+
+TEST(GaspettoCarCoverageTest, EnterLowPowerModeDoesNothingWhenCallbackNotSet)
+{
+    NiceMock<MockArduino> mockArduino;
+    EventQueue eventQueue;
+    TimeredEventQueue timeredEventQueue;
+    IdleState idleState;
+    ProcessingState processingState;
+    NiceMock<MockMovementController> mockMovementController;
+
+    Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
+                 &idleState,  &processingState,        MOTOR_FREQ };
+    GaspettoCar gaspettoCar{ ctx };
+
+    gaspettoCar.enterLowPowerMode();
 }
 
 /* ---- Forward ---- */
@@ -280,6 +371,53 @@ TEST_F(SystemPIDTest, StopCommand_WhileProcessing_TransitionsToIdle)
     runWorkCycles(1);
 
     EXPECT_FALSE(movementController.isMoving());
+    EXPECT_TRUE(isInState(StateId::IDLE));
+}
+
+TEST_F(SystemPIDTest, ProcessingState_IgnoresNewMovementCommandWhileBusy)
+{
+    setYaw(0.0f);
+    postEvent(forwardEvent);
+    runWorkCycles(2);
+    ASSERT_TRUE(isInState(StateId::PROCESSING));
+
+    postEvent(rightEvent);
+    runWorkCycles(1);
+
+    EXPECT_TRUE(isInState(StateId::PROCESSING));
+    EXPECT_TRUE(movementController.isMoving());
+}
+
+TEST_F(SystemPIDTest, ProcessingState_HandlesUnhandledActionAndUnhandledEvent)
+{
+    setYaw(0.0f);
+    postEvent(forwardEvent);
+    runWorkCycles(2);
+    ASSERT_TRUE(isInState(StateId::PROCESSING));
+
+    /* Unhandled ACTION command in ProcessingState. */
+    postEvent(Event{ EventId::ACTION, CommandId::NONE });
+    runWorkCycles(1);
+    EXPECT_TRUE(isInState(StateId::PROCESSING));
+
+    /* Unhandled EventId in ProcessingState. */
+    postEvent(Event{ EventId::RADIO_TX, CommandId::NONE });
+    runWorkCycles(1);
+    EXPECT_TRUE(isInState(StateId::PROCESSING));
+}
+
+TEST_F(SystemPIDTest, IdleState_HandlesUnhandledActionAndUnhandledEvent)
+{
+    ASSERT_TRUE(isInState(StateId::IDLE));
+
+    /* Default ACTION branch in IdleState should re-enter IDLE. */
+    postEvent(Event{ EventId::ACTION, CommandId::NONE });
+    runWorkCycles(1);
+    EXPECT_TRUE(isInState(StateId::IDLE));
+
+    /* Default event-id branch in IdleState should remain IDLE. */
+    postEvent(Event{ EventId::RADIO_TX, CommandId::NONE });
+    runWorkCycles(1);
     EXPECT_TRUE(isInState(StateId::IDLE));
 }
 

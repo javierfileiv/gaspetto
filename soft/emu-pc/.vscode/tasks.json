@@ -286,9 +286,33 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "Run UTest",
+			"label": "Run UTest Car",
 			"type": "shell",
-			"command": "${workspaceFolder}/build-tests/tests/utest",
+			"command": "${workspaceFolder}/build-tests/tests/utest_car",
+			"args": [
+				"--gtest_color=yes",
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": false
+			},
+			"dependsOn": [
+				"CMake Build UTest"
+			],
+			"presentation": {
+				"clear": true
+			},
+			"problemMatcher": [],
+			"options": {
+				"env": {
+					"GMOCK_VERBOSE": "info"
+				}
+			}
+		},
+		{
+			"label": "Run UTest Box",
+			"type": "shell",
+			"command": "${workspaceFolder}/build-tests/tests/utest_box",
 			"args": [
 				"--gtest_color=yes",
 			],

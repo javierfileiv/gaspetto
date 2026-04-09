@@ -6,6 +6,14 @@
 // Stub implementation of Wire (I2C) for PC emulation
 class TwoWire {
 public:
+    TwoWire() = default;
+
+    TwoWire(int sdaPin, int sclPin)
+            : sclPin_(sclPin)
+            , sdaPin_(sdaPin)
+    {
+    }
+
     void begin()
     {
         // Stub: do nothing
@@ -18,7 +26,7 @@ public:
 
     void beginTransmission(uint8_t address)
     {
-        // Stub: do nothing
+        lastTransmissionAddress_ = address;
     }
 
     uint8_t endTransmission()
@@ -35,7 +43,7 @@ public:
 
     size_t write(uint8_t data)
     {
-        // Stub: always succeed
+        lastWrittenByte_ = data;
         return 1;
     }
 
@@ -72,7 +80,31 @@ public:
     {
         // Stub: do nothing
     }
+
+    void setSCL(int pin)
+    {
+        // Stub: remember configured pin for diagnostics.
+        sclPin_ = pin;
+    }
+
+    void setSDA(int pin)
+    {
+        // Stub: remember configured pin for diagnostics.
+        sdaPin_ = pin;
+    }
+
+    uint8_t lastWrittenByte() const
+    {
+        return lastWrittenByte_;
+    }
+
+private:
+    uint8_t lastTransmissionAddress_ = 0;
+    uint8_t lastWrittenByte_ = 1;
+    int sclPin_ = -1;
+    int sdaPin_ = -1;
 };
 
 // Global Wire object
 extern TwoWire Wire;
+extern TwoWire Wire3;

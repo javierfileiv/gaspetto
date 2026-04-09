@@ -2,8 +2,6 @@
 
 #include "Arduino.h"
 
-#define SET_HW_TIMER(pin) \
-    new HardwareTimer((TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(pin), PinMap_PWM))
 #define TIME_CHANNEL(pin) STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(pin), PinMap_PWM))
 
 MotorControl::MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB)
@@ -24,11 +22,15 @@ void MotorControl::init(uint32_t pwm_freq)
     pinMode(motor[LEFT].pin[FWD], OUTPUT);
     pinMode(motor[RIGHT].pin[BWD], OUTPUT);
     pinMode(motor[RIGHT].pin[FWD], OUTPUT);
-    motor[LEFT].timer = SET_HW_TIMER(motor[LEFT].pin[BWD]);
+    leftTimer_ = HardwareTimer((
+            TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(motor[LEFT].pin[BWD]), PinMap_PWM));
+    motor[LEFT].timer = &leftTimer_;
     motor[LEFT].timer->pause();
     motor[LEFT].tim_channel[BWD] = TIME_CHANNEL(motor[LEFT].pin[BWD]);
     motor[LEFT].tim_channel[FWD] = TIME_CHANNEL(motor[LEFT].pin[FWD]);
-    motor[RIGHT].timer = SET_HW_TIMER(motor[RIGHT].pin[BWD]);
+    rightTimer_ = HardwareTimer((TIM_TypeDef *)pinmap_peripheral(
+            digitalPinToPinName(motor[RIGHT].pin[BWD]), PinMap_PWM));
+    motor[RIGHT].timer = &rightTimer_;
     motor[RIGHT].timer->pause();
     motor[RIGHT].tim_channel[BWD] = TIME_CHANNEL(motor[RIGHT].pin[BWD]);
     motor[RIGHT].tim_channel[FWD] = TIME_CHANNEL(motor[RIGHT].pin[FWD]);

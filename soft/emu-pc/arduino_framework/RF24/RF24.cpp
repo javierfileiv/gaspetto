@@ -7,6 +7,7 @@
 /* Minimal state for emulation. */
 static uint8_t g_payload[32];
 static bool g_data_available = false;
+static bool g_fail_next_transmission = false;
 
 namespace
 {
@@ -81,6 +82,10 @@ void RF24::read(void *buf, uint8_t len)
 }
 bool RF24::write(const void *, uint8_t)
 {
+    if (g_fail_next_transmission) {
+        g_fail_next_transmission = false;
+        return false;
+    }
     return true;
 }
 
@@ -96,7 +101,9 @@ void RF24::simulateReceivedPacket(uint8_t, const void *data, uint8_t len)
 }
 void RF24::simulateFailedTransmission()
 {
+    g_fail_next_transmission = true;
 }
 void RF24::simulateSuccessfulTransmission()
 {
+    g_fail_next_transmission = false;
 }

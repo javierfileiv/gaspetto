@@ -71,17 +71,6 @@ void MovementController::init(uint32_t pwm_freq)
     currentState = MovementState::IDLE;
 }
 
-void MovementController::setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed,
-                                  bool forward_motor_left, bool forward_motor_right,
-                                  uint32_t timeout_ms)
-{
-    uint32_t _leftPercent = map(motor_left_speed, 0, 100, 0, 255);
-    uint32_t _rightPercent = map(motor_right_speed, 0, 100, 0, 255);
-
-    _motorControl.setMotorSpeeds(_leftPercent, _rightPercent, forward_motor_left,
-                                 forward_motor_right);
-}
-
 void MovementController::stopBothMotors()
 {
     _motorControl.setMotorSpeeds(0, 0, false, false);
@@ -271,13 +260,6 @@ float MovementController::yawDiff(float target, float current)
     while (d < -180.0f)
         d += 360.0f;
     return d;
-}
-
-void MovementController::checkMovementTimeout()
-{
-    if (timedMovement && (millis() - movementStartMs >= movementDurationMs)) {
-        stopMovement();
-    }
 }
 
 void MovementController::setTelemetryCallback(void (*callback)(const TelemetryPacket &))

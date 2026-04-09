@@ -1,6 +1,7 @@
 add_library(arduino_framework_itf INTERFACE)
 target_include_directories(
   arduino_framework_itf INTERFACE include RF24 HardwareTimer Adafruit_MPU6050 PID_v1
+                                  Adafruit_ADS1X15
 )
 add_library(arduino_framework_impl STATIC Serial.cpp Wire.cpp Arduino.cpp main.cpp)
 # Always include emulation sources so all targets link millis, micros, delay, getEmulatedEvent, etc.

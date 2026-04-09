@@ -42,21 +42,6 @@ public:
     {
         return lastGyroZDeg;
     }
-    const Offsets &getOffsets() const override
-    {
-        return offsets;
-    }
-
-    void zeroYaw() override
-    {
-        yawDeg = 0.0f;
-    }
-
-    /* Expose current estimated gyro Z bias (for diagnostics). */
-    float gyroZBiasValue() const override
-    {
-        return gyroZBias;
-    }
 
 private:
     Adafruit_MPU6050 mpu;

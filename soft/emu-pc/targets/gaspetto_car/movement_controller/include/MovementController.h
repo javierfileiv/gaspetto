@@ -22,18 +22,6 @@ public:
     void init(uint32_t pwm_freq) override;
 
     /**
-     * setMotor: set motor speeds and directions for a specified distance
-     * @motor_left_speed: PWM duty cycle (0-100) for left motor
-     * @motor_right_speed: PWM duty cycle (0-100) for right motor
-     * @forward_motor_left: true for left motor forward, false for backward
-     * @forward_motor_right: true for right motor forward, false for backward
-     * @timeout_ms: optional timeout in milliseconds to stop motors after this duration. If 0, no
-     * timeout.
-     */
-    void setMotor(uint32_t motor_left_speed, uint32_t motor_right_speed, bool forward_motor_left,
-                  bool forward_motor_right, uint32_t timeout_ms = 0) override;
-
-    /**
      * stopBothMotors: stop both motors and reset counters and targets
      */
     void stopBothMotors() override;
@@ -130,6 +118,5 @@ private:
     /* PID helper methods. */
     float yawDiff(float target, float current);
     void applyPidOutput();
-    void checkMovementTimeout();
     void checkTelemetry();
 };

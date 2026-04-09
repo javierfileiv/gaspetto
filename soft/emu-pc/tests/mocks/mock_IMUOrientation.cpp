@@ -52,21 +52,3 @@ float MockIMUOrientation::gyroZDeg() const
     auto mock = MockIMUOrientation::get_instance();
     return mock->_gyroZDeg();
 }
-
-const IMUOrientationInterface::Offsets &MockIMUOrientation::getOffsets() const
-{
-    auto mock = MockIMUOrientation::get_instance();
-    return mock->_getOffsets();
-}
-
-void MockIMUOrientation::zeroYaw()
-{
-    auto mock = MockIMUOrientation::get_instance();
-    mock->_zeroYaw();
-}
-
-float MockIMUOrientation::gyroZBiasValue() const
-{
-    auto mock = MockIMUOrientation::get_instance();
-    return mock->_gyroZBiasValue();
-}

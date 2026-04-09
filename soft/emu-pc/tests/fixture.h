@@ -68,6 +68,7 @@ public:
     /* Radio. */
     void expect_radio_initialization();
     void radio_receive_event(Event *evt = nullptr);
+    void radio_receive_raw(const void *data, uint8_t len = Event::packetSize());
     void expect_transmit_event(Event evt);
     void expect_process_radio_no_event();
     void RxRadioEvent(Event evt);

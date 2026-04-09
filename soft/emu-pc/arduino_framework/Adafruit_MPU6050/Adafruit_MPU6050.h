@@ -72,8 +72,13 @@ public:
 
     bool begin(uint8_t addr = 0x68, TwoWire *theWire = &Wire)
     {
+        const char *forceFail = std::getenv("IMU_BEGIN_FAIL");
         (void)addr;
         (void)theWire;
+
+        if ((forceFail != nullptr) && (std::string(forceFail) == "1")) {
+            return false;
+        }
         load_csv_samples();
         return true;
     }

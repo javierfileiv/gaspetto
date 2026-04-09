@@ -1,5 +1,7 @@
 #include "fixture.h"
 
+#include "CommandId.h"
+
 using testing::NotNull;
 using testing::Return;
 using testing::Invoke;
@@ -81,7 +83,9 @@ void Fixture::expect_radio_initialization()
     EXPECT_CALL(_mock_RF24, _setPALevel(PA_LEVEL, true));
     EXPECT_CALL(_mock_RF24, _setDataRate(DATA_RATE)).WillOnce(Return(true));
     EXPECT_CALL(_mock_RF24, _setAddressWidth(5));
-    EXPECT_CALL(_mock_RF24, _setPayloadSize(Event::packetSize()));
+    /* RadioController now sets payload size to CommandPacket (32 bytes) to support both
+     * EventPacket (2 bytes) and CommandPacket (32 bytes) formats. */
+    EXPECT_CALL(_mock_RF24, _setPayloadSize(sizeof(CommandPacket)));
     EXPECT_CALL(_mock_RF24, _openWritingPipe(::testing::_))
             .WillOnce(::testing::Invoke([this](const uint8_t *ptr) {
                 for (int i = 0; i < 5; ++i) {
@@ -104,16 +108,31 @@ void Fixture::radio_receive_event(Event *evt)
 {
     EXPECT_CALL(_mock_RF24, _available(_)).WillOnce(Return(evt ? true : false));
     if (evt)
-        EXPECT_CALL(_mock_RF24, _read(_, Event::packetSize()))
+        EXPECT_CALL(_mock_RF24, _read(_, sizeof(CommandPacket)))
                 .WillOnce([evt](void *buf, uint8_t len) {
                     std::cout << "_read called with buf=" << buf << " len=" << (int)len
                               << std::endl;
                     if (evt) {
                         EventPacket packet;
                         evt->toPacket(packet);
-                        memcpy(buf, &packet, len);
+                        /* Clear buffer and copy EventPacket at the beginning. */
+                        memset(buf, 0, len);
+                        memcpy(buf, &packet, sizeof(packet));
                     }
                 });
+}
+
+void Fixture::radio_receive_raw(const void *data, uint8_t len)
+{
+    EXPECT_CALL(_mock_RF24, _available(_)).WillOnce(Return(true));
+    /* RadioController now reads 32 bytes to support both EventPacket and CommandPacket. */
+    EXPECT_CALL(_mock_RF24, _read(_, sizeof(CommandPacket)))
+            .WillOnce([data, len](void *buf, uint8_t readLen) {
+                ASSERT_EQ(readLen, sizeof(CommandPacket));
+                /* Copy the provided data and zero-pad the rest. */
+                memset(buf, 0, readLen);
+                memcpy(buf, data, (len < readLen) ? len : readLen);
+            });
 }
 
 void Fixture::expect_transmit_event(Event evt)
