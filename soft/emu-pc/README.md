@@ -179,6 +179,29 @@ The following compile definitions are enabled by default:
 GMOCK_VERBOSE=info ./build-tests/tests/utest_car
 ```
 
+### Quick Test Runner Script
+
+A convenience script is available at the root of the `soft/` directory:
+
+```bash
+# Run all tests (uses existing build if present)
+../run_tests.sh
+
+# Force reconfigure + rebuild then run
+../run_tests.sh --rebuild
+
+# Delete build directory, reconfigure, rebuild, and run
+../run_tests.sh --clean
+
+# Build with coverage instrumentation, run tests, and generate report
+../run_tests.sh --coverage
+```
+
+Coverage reports are generated under `emu-pc/build-tests-coverage/coverage/`:
+
+- `coverage.txt` and `coverage.html` when `gcovr` is installed
+- `coverage.filtered.info` and `html/index.html` when using `lcov` + `genhtml`
+
 ## Gaspetto Box PC Emulator
 
 The `gaspetto_box` binary emulates the BlackPill hardware controller on PC. It runs the same

@@ -3,6 +3,7 @@
 #include "EventQueue.h"
 #include "GaspettoBox.h"
 #include "IdleState.h"
+#include "Log.h"
 #include "ProcessingState.h"
 #include "RF24.h"
 #include "RadioController.h"
@@ -31,6 +32,7 @@ Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };
 GaspettoBox gaspetto_box(context);
+Log mainLog;
 
 #ifdef ARDUINO
 /* Arduino-specific function for button interrupt */
@@ -52,7 +54,7 @@ void enter_low_power_mode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    Serial.println("Entering low-power mode...\n");
+    mainLog.logln("Entering low-power mode...\n");
     SwitchToLowPowerMode();
 #else
     HAL_SuspendTick();
@@ -65,17 +67,20 @@ void enter_low_power_mode()
 void setup()
 {
     Serial.begin(115200);
+#ifdef GASPETTO_LOG_OVER_NRF24
+    Log::attachNrf24(radio, gaspetto_box_log_pipe_name, gaspetto_box_pipe_name);
+#endif
 #ifdef ARDUINO
     /* Wait for CDC USB enumeration on Arduino before printing. */
     const unsigned long deadline = millis() + 1500;
     while (!Serial && millis() < deadline) {
         delay(10);
     }
-    Serial.println("GaspettoBox BlackPill boot");
+    mainLog.logln("GaspettoBox BlackPill boot");
 #else
-    Serial.println("Gaspetto Box Initialized");
-    Serial.println("Starting up...");
-    Serial.println("Commands: P wake, F fail next RF TX\n");
+    mainLog.logln("Gaspetto Box Initialized");
+    mainLog.logln("Starting up...");
+    mainLog.logln("Commands: P wake, F fail next RF TX\n");
 #endif /* ARDUINO */
 
     gaspetto_box.initHardware();

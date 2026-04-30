@@ -1,6 +1,13 @@
 #include "IMUOrientation.h"
 
+#include "Log.h"
+
 #include <cmath>
+
+namespace
+{
+Log imuLog;
+}
 
 // Conversion
 #ifndef RAD_TO_DEG
@@ -47,19 +54,21 @@ void IMUOrientation::calibrate(bool print)
     offsets.gyroY = sumGy / N;
     offsets.gyroZ = sumGz / N;
     if (print) {
-        Serial.println(F("IMU Calibration complete"));
-        Serial.print(F("Acc Offsets: "));
-        Serial.print(offsets.accX, 4);
-        Serial.print(',');
-        Serial.print(offsets.accY, 4);
-        Serial.print(',');
-        Serial.println(offsets.accZ, 4);
-        Serial.print(F("Gyro Offsets: "));
-        Serial.print(offsets.gyroX, 4);
-        Serial.print(',');
-        Serial.print(offsets.gyroY, 4);
-        Serial.print(',');
-        Serial.println(offsets.gyroZ, 4);
+        imuLog.logln(F("IMU Calibration complete"));
+        imuLog.log(F("Acc Offsets: "));
+        imuLog.log(offsets.accX, 4);
+        imuLog.log(',');
+        imuLog.log(offsets.accY, 4);
+        imuLog.log(',');
+        imuLog.log(offsets.accZ, 4);
+        imuLog.logln();
+        imuLog.log(F("Gyro Offsets: "));
+        imuLog.log(offsets.gyroX, 4);
+        imuLog.log(',');
+        imuLog.log(offsets.gyroY, 4);
+        imuLog.log(',');
+        imuLog.log(offsets.gyroZ, 4);
+        imuLog.logln();
     }
     // Initialize orientation from accel
     sensors_event_t a2, g2, t2;

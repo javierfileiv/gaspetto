@@ -6,6 +6,7 @@
 #include "GaspettoCar.h"
 #include "IMUOrientation.h"
 #include "IdleState.h"
+#include "Log.h"
 #include "MotorControl.h"
 #include "MovementController.h"
 #include "ProcessingState.h"
@@ -40,6 +41,7 @@ Context context = {
     &idleState,  &processingState,       MOTOR_FREQ,
 };
 GaspettoCar gaspetto_car(context);
+Log mainLog;
 
 void ISR(void)
 {
@@ -53,7 +55,7 @@ void enter_low_power_mode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    Serial.println("Entering low-power mode...\n");
+    mainLog.logln("Entering low-power mode...\n");
     SwitchToLowPowerMode();
 #else
     /*  Implement low-power mode for Arduino. */
@@ -66,6 +68,9 @@ void enter_low_power_mode()
 void setup()
 {
     Serial.begin(115200);
+#ifdef GASPETTO_LOG_OVER_NRF24
+    Log::attachNrf24(radio, gaspetto_car_log_pipe_name, gaspetto_car_pipe_name);
+#endif
 #ifdef ARDUINO
     while (!Serial) {
         /* Wait for serial port to connect. Needed for native USB port only */

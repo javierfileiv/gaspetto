@@ -16,6 +16,8 @@
 #define PB_14 14
 #define PB_15 15
 #define PA_4 4
+#define PA_8 8
+#define PC_13 113
 #define PC_14 114
 #define RISING 0
 #define FALLING 1
