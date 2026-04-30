@@ -1,76 +1,90 @@
-#include "pin_definitions.h"
-
 #include <Arduino.h>
 #include <SPI.h>
-#include <Wire.h>
-#include <stdint.h> /* For uint8_t type. */
+#include <RF24.h>
+#include "pin_definitions.h"
 
-/* nRF24L01 registers. */
-#define NRF24_REG_CONFIG    0x00
-#define NRF24_REG_STATUS    0x07
-#define NRF24_CMD_READ_REG  0x00
-#define NRF24_CMD_WRITE_REG 0x20
 
-/* MPU6050 registers. */
-#define MPU6050_WHO_AM_I     0x75
-#define MPU6050_PWR_MGMT_1   0x6B
-#define MPU6050_ACCEL_XOUT_H 0x3B
+// Initialize radio object
+RF24 radio(NRF24_CE, NRF24_CSN);
 
-void setup()
-{
-    uint8_t counter = 0;
+// ==========================================
+// 2. SETUP
+// ==========================================
+void setup() {
+  // Initialize USB CDC Serial Monitor
+  Serial.begin(115200);
+  delay(3000); // Wait for Serial Monitor to open
+  Serial.println("\n\n--- HARDWARE TEST STARTED ---");
 
-    Serial.begin(115200);
+  // --- LED Configuration ---
+  pinMode(PIN_LED, OUTPUT);
+  digitalWrite(PIN_LED, HIGH); // Turn OFF LED initially
 
-    pinMode(PIN_MOSFET_5V_LEDS, OUTPUT_OPEN_DRAIN);
-    pinMode(PIN_MOSFET_3V3_SENSORS, OUTPUT);
-    pinMode(PIN_LED, OUTPUT);
+  // --- MOSFETs Configuration (Active-Low Logic) ---
+  // IMPORTANT: PB14 must be OPEN DRAIN to safely handle 5V!
+  pinMode(PIN_MOSFET_5V_LEDS, OUTPUT_OPEN_DRAIN);
+  pinMode(PIN_MOSFET_3V3_SENSORS, OUTPUT_OPEN_DRAIN);
 
-    /* Step 3: Turn everything off at startup. */
-    /* Reminder: P-channel MOSFET with pull-up uses active-low logic. */
-    /* HIGH (or released in open-drain mode) = MOSFET OFF. */
-    /* LOW (pulled to ground) = MOSFET ON. */
+  // Turn OFF all rails by default (HIGH = OFF for P-Channel MOSFETs)
+  digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+  digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+  Serial.println("1. MOSFETs initialized and TURNED OFF.");
 
-    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     /* Turn off 5V rail. */
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); /* Turn off 3.3V rail. */
+  // --- nRF24L01+ SPI Test ---
+  Serial.println("\n2. Testing nRF24L01+ SPI communication...");
 
-    delay(2000);                                /* Wait 2 seconds before starting. */
-    Serial.println("Starting power rail test...");
+  // Initialize SPI bus pins for STM32
+  SPI.setMISO(PA6);
+  SPI.setMOSI(PA7);
+  SPI.setSCLK(PA5);
+  SPI.begin();
+
+  if (radio.begin()) {
+    Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
+    radio.setPALevel(RF24_PA_LOW); // Set low power for testing
+    radio.printDetails();          // Print chip info to Serial
+  } else {
+    Serial.println("   [ERROR] nRF24L01+ not found!");
+    Serial.println("   -> Check soldering on PA3, PA4, PA5, PA6, PA7.");
+    Serial.println("   -> Check if 3.3V is reaching the nRF board.");
+  }
+  Serial.println("\n--- POWER RAILS TEST CYCLE ---");
 }
 
-void loop()
-{
-    /* Step 1: Turn on the 3.3V sensor rail. */
-    Serial.println("Turning sensors on (3V3_SWITCHED = ON)");
-    digitalWrite(PIN_LED, LOW); /* Turn on onboard LED (active-low). */
+#define DELAY 3000
+// ==========================================
+// 3. MAIN LOOP (Test Cycle)
+// ==========================================
+void loop() {
+  // --- Test 3.3V Rail (Sensors) ---
+  digitalWrite(PIN_LED, HIGH);         // Turn ON board LED
+  Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
+  digitalWrite(PIN_MOSFET_5V_LEDS, LOW);      // Turn ON Q1
+  Serial.println("-> TURNING ON 3V3_SWITCHED (Sensors)...");
+  digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);     // Turn ON Q2
 
-    /* Turn on Q2 by pulling the gate to ground. */
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+  // Quick double blink to indicate cycle restart
+  for(int i = 0; i < 2; i++) {
+      digitalWrite(PIN_LED, LOW);
+      delay(100);
+      digitalWrite(PIN_LED, HIGH);
+      delay(100);
+  }
+  delay(DELAY);                                // Keep ON for 10 seconds
 
-    delay(3000); /* Keep it on for 3 seconds (verify with multimeter). */
+  digitalWrite(PIN_LED, HIGH);        // Turn OFF board LED
+  Serial.println("-> TURNING OFF 5V_SWITCHED...");
+  digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     // Turn OFF Q1
+  Serial.println("-> TURNING OFF 3V3_SWITCHED...");
+  digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);    // Turn OFF Q2
+  // Quick double blink to indicate cycle restart
+  for(int i = 0; i < 2; i++) {
+      digitalWrite(PIN_LED, LOW);
+      delay(100);
+      digitalWrite(PIN_LED, HIGH);
+      delay(100);
+  }
 
-    /* Step 2: Turn off the 3.3V sensor rail. */
-    Serial.println("Turning sensors off (3V3_SWITCHED = OFF)");
-    digitalWrite(PIN_LED, HIGH); /* Turn off onboard LED. */
-
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
-
-    delay(2000); /* Wait 2 seconds with all rails off. */
-
-    /* Step 3: Turn on the 5V LED power rail. */
-    Serial.println("Turning LED power on (5V_SWITCHED = ON)");
-    digitalWrite(PIN_LED, LOW);
-
-    /* Turn on Q1. */
-    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
-
-    delay(3000); /* Keep it on for 3 seconds (verify with multimeter). */
-
-    /* Step 4: Turn off the 5V LED power rail. */
-    Serial.println("Turning LED power off (5V_SWITCHED = OFF)");
-    digitalWrite(PIN_LED, HIGH);
-
-    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-
-    delay(2000); /* Wait before restarting the cycle. */
+  Serial.println("Cycle complete. Restarting in 2 seconds.");
+  delay(DELAY);
 }
