@@ -57,6 +57,14 @@ public:
         return count_;
     }
 
+    /** Clear all events from the queue. */
+    void clear()
+    {
+        head_ = 0;
+        tail_ = 0;
+        count_ = 0;
+    }
+
 private:
     EventT events_[Capacity];
     uint8_t head_ = 0;

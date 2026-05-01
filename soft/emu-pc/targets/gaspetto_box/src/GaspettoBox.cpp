@@ -122,6 +122,7 @@ GaspettoBox::GaspettoBox(Context &ctx)
 #endif
         , initialized_(false)
         , lastDebounceTime_(0)
+        , isScanning_(false)
 {
     initMachine(StateId::IDLE, ctx.idleState);
     initMachine(StateId::PROCESSING, ctx.processingState);
@@ -638,4 +639,39 @@ const char *GaspettoBox::pieceToString(BoxPieceId piece) const
     default:
         return "INVALID";
     }
+}
+
+bool GaspettoBox::sendClearQueueCommand()
+{
+    if (_ctx.radioController == nullptr) {
+        logln("Radio controller unavailable for clear queue command.");
+        return false;
+    }
+
+    CommandPacket packet{};
+    packet.count = 2;
+    packet.commands[0] = static_cast<uint8_t>(CommandId::QUEUE_CLEAR);
+    packet.commands[1] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+
+    log("Sending clear queue command with MOTOR_STOP.");
+    logln();
+
+    return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
+}
+
+bool GaspettoBox::isCurrentlyScanning() const
+{
+    return isScanning_;
+}
+
+void GaspettoBox::startScanning()
+{
+    isScanning_ = true;
+    logln("Scanning started.");
+}
+
+void GaspettoBox::interruptScanning()
+{
+    isScanning_ = false;
+    logln("Scanning interrupted by button press.");
 }

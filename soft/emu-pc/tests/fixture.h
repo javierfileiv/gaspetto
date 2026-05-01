@@ -86,6 +86,7 @@ protected:
     Event stopEvent{ EventId::ACTION, CommandId::MOTOR_STOP };
     Event leftEvent{ EventId::ACTION, CommandId::MOTOR_TURN_LEFT };
     Event rightEvent{ EventId::ACTION, CommandId::MOTOR_TURN_RIGHT };
+    Event queueClearEvent{ EventId::ACTION, CommandId::QUEUE_CLEAR };
 
 private:
     EventQueue eventQueue;

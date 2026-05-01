@@ -55,6 +55,13 @@ void GaspettoCar::stopBothMotors(void)
     _ctx.movementController->stopBothMotors();
 }
 
+void GaspettoCar::clearEventQueue(void)
+{
+    if (_ctx.mainEventQueue) {
+        _ctx.mainEventQueue->clear();
+    }
+}
+
 bool GaspettoCar::isTargetReached(void)
 {
     return !_ctx.movementController->isMoving();

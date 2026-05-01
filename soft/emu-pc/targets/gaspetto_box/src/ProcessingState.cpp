@@ -35,3 +35,19 @@ void ProcessingState::enter()
 
     box->transitionTo(StateId::IDLE);
 }
+
+void ProcessingState::processEvent(Event &evt)
+{
+    GaspettoBox *box = static_cast<GaspettoBox *>(active_object_);
+
+    switch (evt.getEventId()) {
+    case EventId::BUTTON_PRESSED:
+        /* Button pressed during processing - interrupt and send clear queue command */
+        box->interruptScanning();
+        box->sendClearQueueCommand();
+        box->transitionTo(StateId::IDLE);
+        break;
+    default:
+        break;
+    }
+}

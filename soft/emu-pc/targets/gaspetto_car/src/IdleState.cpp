@@ -37,6 +37,10 @@ void IdleState::processEvent(Event &evt)
             car->transitionTo(StateId::PROCESSING);
             logln(F("Transition to PROCESSING (Turn Right)"));
             break;
+        case CommandId::QUEUE_CLEAR:
+            car->clearEventQueue();
+            logln(F("IdleState: Queue clear command received. Clearing queue."));
+            /* Fall through to default to re-enter sleep state. */
         default:
             /* Re-set state to enter low power. */
             car->stopBothMotors();

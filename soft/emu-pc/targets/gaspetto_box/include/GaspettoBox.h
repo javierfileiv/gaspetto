@@ -90,6 +90,10 @@ public:
     void scanSlots();
     bool buildProgram(CommandPacket &packet, bool &isEmpty);
     bool sendProgram(const CommandPacket &packet);
+    bool sendClearQueueCommand();
+    bool isCurrentlyScanning() const;
+    void startScanning();
+    void interruptScanning();
 
     static bool routeForSlot(std::size_t slot, AdsRouteInfo &route);
 
@@ -113,5 +117,6 @@ private:
 #endif
     bool initialized_;
     unsigned long lastDebounceTime_;
+    bool isScanning_;
     static constexpr unsigned long debounceDelay = 50; /* 50ms debounce delay */
 };

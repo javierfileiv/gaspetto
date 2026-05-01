@@ -59,6 +59,10 @@ public:
     /* stopBothMotors: stop all motor movement immediately */
     void stopBothMotors(void);
 
+    /** clearEventQueue(): Clear all pending events from the queue.
+     */
+    void clearEventQueue(void);
+
     /** postEvent(): Post an event to the event queue.
      * @evt: The event to be posted.
      * @return 0 on success, -1 on failure.

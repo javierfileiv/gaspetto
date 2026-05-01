@@ -6,4 +6,5 @@
 class ProcessingState : public GenericState<Event> {
 public:
     void enter() override;
+    void processEvent(Event &evt) override;
 };

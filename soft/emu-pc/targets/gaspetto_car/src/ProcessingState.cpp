@@ -27,6 +27,12 @@ void ProcessingState::processEvent(Event &evt)
             logln(F("ProcessingState: -> Transition to IDLE (Explicit Stop Command)"));
             ao->transitionTo(StateId::IDLE);
             break;
+        case CommandId::QUEUE_CLEAR:
+            ao->stopBothMotors();
+            ao->clearEventQueue();
+            logln(F("ProcessingState: -> Transition to IDLE (Queue Clear Command)"));
+            ao->transitionTo(StateId::IDLE);
+            break;
         case CommandId::MOTOR_FORWARD:
         case CommandId::MOTOR_BACKWARD:
         case CommandId::MOTOR_TURN_LEFT:

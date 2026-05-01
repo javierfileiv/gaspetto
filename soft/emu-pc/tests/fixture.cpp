@@ -113,9 +113,10 @@ void Fixture::radio_receive_event(Event *evt)
                     std::cout << "_read called with buf=" << buf << " len=" << (int)len
                               << std::endl;
                     if (evt) {
-                        EventPacket packet;
-                        evt->toPacket(packet);
-                        /* Clear buffer and copy EventPacket at the beginning. */
+                        CommandPacket packet{};
+                        packet.count = 1;
+                        packet.commands[0] = static_cast<uint8_t>(evt->getPayload());
+                        /* Clear buffer and copy CommandPacket at the beginning. */
                         memset(buf, 0, len);
                         memcpy(buf, &packet, sizeof(packet));
                     }

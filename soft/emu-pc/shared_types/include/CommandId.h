@@ -11,7 +11,8 @@ enum class CommandId : uint8_t {
     MOTOR_TURN_RIGHT = 3,
     MOTOR_TURN_LEFT = 4,
     MOTOR_STOP = 5,
-    MAX_COMMAND_ID = 6,
+    QUEUE_CLEAR = 6,
+    MAX_COMMAND_ID = 7,
 };
 
 inline const char *commandIdToString(CommandId id)
@@ -29,6 +30,8 @@ inline const char *commandIdToString(CommandId id)
         return "MOTOR_TURN_LEFT";
     case CommandId::MOTOR_STOP:
         return "MOTOR_STOP";
+    case CommandId::QUEUE_CLEAR:
+        return "QUEUE_CLEAR";
     default:
         return "UNKNOWN";
     }

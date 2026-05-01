@@ -18,6 +18,7 @@ add_executable(
   gaspetto_car/test_pid_movement.cpp
   gaspetto_car/test_system_pid.cpp
   gaspetto_car/test_motor_imu.cpp
+  gaspetto_car/test_queue_clear.cpp
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
@@ -48,7 +49,7 @@ add_test(NAME utest_car COMMAND utest_car)
 
 add_executable(
   utest_box main.cpp gaspetto_box/test_program_builder.cpp gaspetto_box/test_fsm.cpp
-            mocks/mock_RF24.cpp
+            gaspetto_box/test_button_interrupt.cpp mocks/mock_RF24.cpp
 )
 target_include_directories(utest_box PRIVATE ./ mocks)
 target_link_libraries(
