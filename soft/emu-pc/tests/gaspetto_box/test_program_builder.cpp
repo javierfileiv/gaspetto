@@ -1,4 +1,6 @@
+#include "Adafruit_ADS1X15.h"
 #include "GaspettoBox.h"
+#include "Wire.h"
 #include "board_presets.h"
 
 #include <gtest/gtest.h>
@@ -145,9 +147,39 @@ TEST(GaspettoBoxProgramBuilderTest, MapsSlotsToExpectedAdsBusesAndAddresses)
     for (std::size_t slot = 16; slot < BOX_TOTAL_SLOTS; ++slot) {
         ASSERT_TRUE(GaspettoBox::routeForSlot(slot, route));
         EXPECT_TRUE(route.usesI2c3);
-        EXPECT_EQ(route.address, 0x48);
+        EXPECT_EQ(route.address, 0x4A);
         EXPECT_EQ(route.channel, static_cast<uint8_t>(slot - 16));
     }
 
     EXPECT_FALSE(GaspettoBox::routeForSlot(BOX_TOTAL_SLOTS, route));
+}
+
+TEST(AdafruitAdsEmulationTest, AsyncReadReturnsMuxSelectedI2c3RawValue)
+{
+    Adafruit_ADS1115::resetPattern();
+    Adafruit_ADS1115::setRawValue(16, 1234);
+    Adafruit_ADS1115::setRawValue(19, 3210);
+
+    TwoWire i2c3;
+    Adafruit_ADS1115 ads;
+
+    ASSERT_TRUE(ads.begin(0x4A, &i2c3));
+
+    ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_0, false);
+    EXPECT_TRUE(ads.conversionComplete());
+    EXPECT_EQ(1234, ads.getLastConversionResults());
+
+    ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_3, false);
+    EXPECT_TRUE(ads.conversionComplete());
+    EXPECT_EQ(3210, ads.getLastConversionResults());
+
+    Adafruit_ADS1115::resetPattern();
+}
+
+TEST(AdafruitAdsEmulationTest, RejectsUnexpectedI2c3Address)
+{
+    TwoWire i2c3;
+    Adafruit_ADS1115 ads;
+
+    EXPECT_FALSE(ads.begin(0x48, &i2c3));
 }

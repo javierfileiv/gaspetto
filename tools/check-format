@@ -33,9 +33,9 @@ done
 shift $(( $OPTIND - 1 ))
 
 if [[ -z $clang_format ]]; then
-	clang_format=clang-format-14
-	if [[  "$("$clang_format" --version)" != *'version 14.0'* ]]; then
-		die "please use clang-format version 14.0"
+	clang_format=clang-format
+	if [[  "$("$clang_format" --version)" != *'version 22.1'* ]]; then
+		die "please use clang-format version 22.1"
 	fi
 fi
 

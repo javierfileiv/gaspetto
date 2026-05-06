@@ -24,6 +24,11 @@ public:
         // Stub: do nothing
     }
 
+    void end()
+    {
+        // Stub: do nothing
+    }
+
     void beginTransmission(uint8_t address)
     {
         lastTransmissionAddress_ = address;

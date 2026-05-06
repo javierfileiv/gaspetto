@@ -31,6 +31,18 @@ constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
 };
 
 constexpr uint8_t kChannelsPerAds = 4;
+constexpr uint32_t kI2cClockHz = 100000;
+constexpr uint8_t kAdcSamplesPerChannel = 3;
+constexpr uint8_t kAdcMinValidSamples = 2;
+constexpr uint8_t kAdcReadRecoveryRetries = 1;
+constexpr uint16_t kAdcConversionTimeoutMs = 40;
+
+constexpr std::array<uint16_t, 4> kMuxByChannel = {
+    ADS1X15_REG_CONFIG_MUX_SINGLE_0,
+    ADS1X15_REG_CONFIG_MUX_SINGLE_1,
+    ADS1X15_REG_CONFIG_MUX_SINGLE_2,
+    ADS1X15_REG_CONFIG_MUX_SINGLE_3,
+};
 
 enum class AdsBus : uint8_t {
     BUS_1,
@@ -52,7 +64,7 @@ TwoWire gI2c3;
 constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
     AdsDeviceConfig{ AdsBus::BUS_1, 0x48, 0 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x49, 4 },
     AdsDeviceConfig{ AdsBus::BUS_1, 0x4A, 8 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x4B, 12 },
-    AdsDeviceConfig{ AdsBus::BUS_3, 0x48, 16 },
+    AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
 #ifdef ARDUINO
@@ -65,6 +77,45 @@ constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
 TwoWire &wireForAdsBus(AdsBus bus)
 {
     return bus == AdsBus::BUS_1 ? Wire : gI2c3;
+}
+
+void recoverAdsBus(AdsBus bus)
+{
+    TwoWire &wire = wireForAdsBus(bus);
+
+    wire.end();
+    delay(5);
+
+    if (bus == AdsBus::BUS_1) {
+        Wire.setSCL(I2C1_SCL_PIN);
+        Wire.setSDA(I2C1_SDA_PIN);
+    } else {
+        gI2c3.setSCL(I2C3_SCL_PIN);
+        gI2c3.setSDA(I2C3_SDA_PIN);
+    }
+
+    wire.begin();
+    wire.setClock(kI2cClockHz);
+    delay(10);
+}
+
+bool readSingleEndedWithTimeout(Adafruit_ADS1115 &ads, uint8_t channel, int16_t &raw)
+{
+    if (channel >= kMuxByChannel.size()) {
+        return false;
+    }
+
+    ads.startADCReading(kMuxByChannel[channel], false);
+    const unsigned long startMs = millis();
+    while (!ads.conversionComplete()) {
+        if (millis() - startMs > kAdcConversionTimeoutMs) {
+            return false;
+        }
+        delay(1);
+    }
+
+    raw = ads.getLastConversionResults();
+    return true;
 }
 
 const char *busName(AdsBus bus)
@@ -519,6 +570,11 @@ void GaspettoBox::scanSlots()
         TwoWire &deviceWire = wireForAdsBus(device.bus);
 
         if (!ads.begin(device.address, &deviceWire)) {
+            log("ADS init failed [");
+            log(busName(device.bus));
+            log(" addr=0x");
+            log(device.address, HEX);
+            logln("]");
             for (uint8_t channel = 0; channel < kChannelsPerAds; ++channel) {
                 const std::size_t slot = static_cast<std::size_t>(device.slotBase) + channel;
                 lastScan[slot].rawValue = 0;
@@ -530,10 +586,77 @@ void GaspettoBox::scanSlots()
         ads.setGain(GAIN_ONE);
         for (uint8_t channel = 0; channel < kChannelsPerAds; ++channel) {
             const std::size_t slot = static_cast<std::size_t>(device.slotBase) + channel;
-            const int16_t raw = ads.readADC_SingleEnded(channel);
-            const uint16_t rawU16 = raw < 0 ? 0 : static_cast<uint16_t>(raw);
-            lastScan[slot].rawValue = rawU16;
-            lastScan[slot].piece = decodePiece(rawU16);
+            bool readOk = false;
+            uint16_t rawU16 = 0;
+            uint8_t attemptUsed = 0;
+            uint8_t bestValidSamples = 0;
+            uint8_t timeoutCount = 0;
+            uint8_t negativeCount = 0;
+
+            for (uint8_t recoveryAttempt = 0; recoveryAttempt <= kAdcReadRecoveryRetries;
+                 ++recoveryAttempt) {
+                uint32_t sum = 0;
+                uint8_t validSamples = 0;
+
+                for (uint8_t sample = 0; sample < kAdcSamplesPerChannel; ++sample) {
+                    int16_t raw = 0;
+                    if (!readSingleEndedWithTimeout(ads, channel, raw)) {
+                        ++timeoutCount;
+                        continue;
+                    }
+
+                    if (raw >= 0) {
+                        sum += static_cast<uint16_t>(raw);
+                        ++validSamples;
+                    } else {
+                        ++negativeCount;
+                    }
+                }
+
+                if (validSamples > bestValidSamples) {
+                    bestValidSamples = validSamples;
+                }
+
+                if (validSamples >= kAdcMinValidSamples) {
+                    rawU16 = static_cast<uint16_t>(sum / validSamples);
+                    readOk = true;
+                    attemptUsed = recoveryAttempt;
+                    break;
+                }
+
+                if (recoveryAttempt < kAdcReadRecoveryRetries) {
+                    log("ADC retry [");
+                    log(busName(device.bus));
+                    log(" addr=0x");
+                    log(device.address, HEX);
+                    log(" ch=");
+                    log(static_cast<int>(channel));
+                    log("] valid=");
+                    log(validSamples);
+                    log("/");
+                    log(kAdcSamplesPerChannel);
+                    log(" timeouts=");
+                    log(timeoutCount);
+                    log(" negatives=");
+                    log(negativeCount);
+                    logln();
+
+                    recoverAdsBus(device.bus);
+                    if (!ads.begin(device.address, &deviceWire)) {
+                        log("ADS re-init failed [");
+                        log(busName(device.bus));
+                        log(" addr=0x");
+                        log(device.address, HEX);
+                        logln("]");
+                        break;
+                    }
+                    ads.setGain(GAIN_ONE);
+                }
+            }
+
+            lastScan[slot].rawValue = readOk ? rawU16 : 0;
+            lastScan[slot].piece = readOk ? decodePiece(rawU16) : BoxPieceId::INVALID;
+
             log("Scan slot ");
             log(static_cast<int>(slot) + 1);
             log(" [");
@@ -543,10 +666,28 @@ void GaspettoBox::scanSlots()
             log(" ch=");
             log(static_cast<int>(channel));
             log("]");
-            log(": ADC=");
-            log(lastScan[slot].rawValue);
-            log(" => ");
-            logln(pieceToString(lastScan[slot].piece));
+            if (readOk) {
+                log(": ADC(avg)=");
+                log(lastScan[slot].rawValue);
+                log(" samples=");
+                log(bestValidSamples);
+                log("/");
+                log(kAdcSamplesPerChannel);
+                log(" attempt=");
+                log(attemptUsed + 1);
+                log(" => ");
+                logln(pieceToString(lastScan[slot].piece));
+            } else {
+                log(": ADC read failed valid=");
+                log(bestValidSamples);
+                log("/");
+                log(kAdcSamplesPerChannel);
+                log(" timeouts=");
+                log(timeoutCount);
+                log(" negatives=");
+                log(negativeCount);
+                logln(" => INVALID");
+            }
         }
     }
 }

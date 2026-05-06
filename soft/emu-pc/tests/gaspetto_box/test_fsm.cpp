@@ -7,6 +7,7 @@
 #include "config_radio.h"
 #include "mock_RF24.h"
 
+#include <cstdlib>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -34,6 +35,23 @@ Event makeButtonPressedEvent()
 {
     return Event{ EventId::BUTTON_PRESSED, CommandId::NONE };
 }
+
+class ScopedEnvFlag {
+public:
+    explicit ScopedEnvFlag(const char *name)
+            : name_(name)
+    {
+        setenv(name_, "1", 1);
+    }
+
+    ~ScopedEnvFlag()
+    {
+        unsetenv(name_);
+    }
+
+private:
+    const char *name_;
+};
 
 struct BoxTestRig {
     EventQueue eventQueue;
@@ -294,4 +312,34 @@ TEST(GaspettoBoxFsmTest, AdsBeginFailurePathProducesBuildErrorWithoutRadioSend)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
     unsetenv("ADS_BEGIN_FAIL");
+}
+
+TEST(GaspettoBoxFsmTest, NegativeAdsSamplesTriggerRecoveryAndBuildErrorWithoutRadioSend)
+{
+    BoxTestRig rig;
+    ScopedEnvFlag forceNegativeRaw("ADS_FORCE_NEGATIVE_RAW");
+
+    EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
+    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
+
+    ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
+    rig.box.work();
+
+    EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
+}
+
+TEST(GaspettoBoxFsmTest, StuckAdsConversionTriggersTimeoutRecoveryAndBuildErrorWithoutRadioSend)
+{
+    BoxTestRig rig;
+    ScopedEnvFlag stuckConversion("ADS_CONVERSION_STUCK");
+
+    EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
+    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
+
+    ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
+    rig.box.work();
+
+    EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }

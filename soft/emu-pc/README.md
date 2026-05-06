@@ -230,7 +230,7 @@ The box uses the same `GenericActiveObject` framework as the car. Two states dri
 
 **IdleState** — box is in low-power STOP mode, waiting for the wake button (PB12).
 **ProcessingState** — runs `executeProgrammingCycle()` synchronously then returns to IDLE:
-1. Power on sensor rail → scan 20 ADC slots (5× ADS1115: 4 on `I2C1` at `0x48..0x4B`, 1 on `I2C3` at `0x48`)
+1. Power on sensor rail → scan 20 ADC slots (5× ADS1115: 4 on `I2C1` at `0x48..0x4B`, 1 on `I2C3` at `0x4A`)
 2. Build `CommandPacket` via `buildProgramFromPieces()`
 3. Send packet over RF24 to the car
 4. Run LED feedback animation (success / error)
