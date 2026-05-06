@@ -11,7 +11,7 @@ public:
     MOCK_METHOD(void, _startListening, ());
     MOCK_METHOD(void, _stopListening, ());
     MOCK_METHOD(bool, _available, ());
-    MOCK_METHOD(bool, _available, (uint8_t * pipe_num));
+    MOCK_METHOD(bool, _available, (uint8_t *pipe_num));
     MOCK_METHOD(bool, _write, (const void *buf, uint8_t len));
     MOCK_METHOD(bool, _write, (const void *buf, uint8_t len, bool multicast));
     MOCK_METHOD(void, _read, (void *buf, uint8_t len));

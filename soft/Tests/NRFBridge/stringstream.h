@@ -34,7 +34,7 @@ public:
     {
         return position < string.length() ? string[position] : -1;
     }
-    virtual void flush(){};
+    virtual void flush() {};
     // Print methods
     virtual size_t write(uint8_t c)
     {

@@ -72,7 +72,7 @@ void IMUOrientation::calibrate(bool print)
     pitchDeg = atan2(-a2.acceleration.x, sqrt(a2.acceleration.y * a2.acceleration.y +
                                               a2.acceleration.z * a2.acceleration.z)) *
                RAD_TO_DEG;
-    yawDeg = 0.0f;
+    yawDeg   = 0.0f;
 }
 
 void IMUOrientation::update()
