@@ -22,17 +22,61 @@ constexpr uint32_t kI2c1ClockHz = 100000;
 #ifndef TEST_I2C3_CLOCK_HZ
 #define TEST_I2C3_CLOCK_HZ 50000
 #endif
-constexpr uint32_t kI2c3ClockHz            = TEST_I2C3_CLOCK_HZ;
-constexpr uint16_t kRailSettleDelayMs      = 250;
-constexpr uint16_t kAdsConversionTimeoutMs = 40;
+constexpr uint32_t kI2c3ClockHz             = TEST_I2C3_CLOCK_HZ;
+constexpr uint16_t kRailSettleDelayMs       = 250;
+constexpr uint16_t kAdsConversionTimeoutMs  = 40;
+constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 
 #ifndef TEST_ADS1115_MEAN_SAMPLES
 #define TEST_ADS1115_MEAN_SAMPLES 10
 #endif
 
+#ifndef TEST_THRESHOLD_FORWARD_START
+#define TEST_THRESHOLD_FORWARD_START 100
+#endif
+
+#ifndef TEST_THRESHOLD_BACKWARD_START
+#define TEST_THRESHOLD_BACKWARD_START 700
+#endif
+
+#ifndef TEST_THRESHOLD_TURN_RIGHT_START
+#define TEST_THRESHOLD_TURN_RIGHT_START 1300
+#endif
+
+#ifndef TEST_THRESHOLD_TURN_LEFT_START
+#define TEST_THRESHOLD_TURN_LEFT_START 1900
+#endif
+
+#ifndef TEST_THRESHOLD_STOP_START
+#define TEST_THRESHOLD_STOP_START 2500
+#endif
+
+#ifndef TEST_THRESHOLD_LOOP_START
+#define TEST_THRESHOLD_LOOP_START 3100
+#endif
+
 static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be >= 1");
+static_assert(TEST_THRESHOLD_FORWARD_START > 0, "Forward threshold must be > 0");
+static_assert(TEST_THRESHOLD_FORWARD_START < TEST_THRESHOLD_BACKWARD_START,
+              "Thresholds must be strictly increasing");
+static_assert(TEST_THRESHOLD_BACKWARD_START < TEST_THRESHOLD_TURN_RIGHT_START,
+              "Thresholds must be strictly increasing");
+static_assert(TEST_THRESHOLD_TURN_RIGHT_START < TEST_THRESHOLD_TURN_LEFT_START,
+              "Thresholds must be strictly increasing");
+static_assert(TEST_THRESHOLD_TURN_LEFT_START < TEST_THRESHOLD_STOP_START,
+              "Thresholds must be strictly increasing");
+static_assert(TEST_THRESHOLD_STOP_START < TEST_THRESHOLD_LOOP_START,
+              "Thresholds must be strictly increasing");
+static_assert(TEST_THRESHOLD_LOOP_START <= 4095, "Loop threshold must be <= 4095");
 
 constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
+
+struct CalibrationStats
+{
+    bool initialized;
+    int16_t minRaw;
+    int16_t maxRaw;
+};
 
 #ifdef TEST_LED_ANIMATIONS
 constexpr uint8_t kLedCount = 3;
@@ -100,7 +144,10 @@ static AdsTestEntry kAdsTests[] = {
     {&i2c1, 0x4A, "I2C1", "ADDR->SDA"}, {&i2c1, 0x4B, "I2C1", "ADDR->SCL"},
     {&i2c3, 0x4A, "I2C3", "ADDR->SDA"},
 };
-constexpr uint8_t kAdsCount = sizeof(kAdsTests) / sizeof(kAdsTests[0]);
+constexpr uint8_t kAdsCount             = sizeof(kAdsTests) / sizeof(kAdsTests[0]);
+constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
+
+CalibrationStats gCalibrationStats[kCalibrationSlotCount] = {};
 
 bool isI2c3Wire(const TwoWire *wire)
 {
@@ -184,6 +231,152 @@ bool readAdsSingleEndedMeanWithTimeout(Adafruit_ADS1115 &ads, uint8_t channel, i
 
     meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(kAdsMeanSamples));
     return true;
+}
+
+const char *pieceLabelForRaw(int16_t raw)
+{
+    if (raw < 0)
+    {
+        return "INVALID";
+    }
+    if (raw < TEST_THRESHOLD_FORWARD_START)
+    {
+        return "EMPTY";
+    }
+    if (raw < TEST_THRESHOLD_BACKWARD_START)
+    {
+        return "FORWARD";
+    }
+    if (raw < TEST_THRESHOLD_TURN_RIGHT_START)
+    {
+        return "BACKWARD";
+    }
+    if (raw < TEST_THRESHOLD_TURN_LEFT_START)
+    {
+        return "TURN_RIGHT";
+    }
+    if (raw < TEST_THRESHOLD_STOP_START)
+    {
+        return "TURN_LEFT";
+    }
+    if (raw < TEST_THRESHOLD_LOOP_START)
+    {
+        return "STOP";
+    }
+    if (raw <= 4095)
+    {
+        return "LOOP_CALL";
+    }
+    return "INVALID";
+}
+
+void updateCalibrationStats(uint8_t slotIndex, int16_t raw)
+{
+    CalibrationStats &stats = gCalibrationStats[slotIndex];
+    if (!stats.initialized)
+    {
+        stats.initialized = true;
+        stats.minRaw      = raw;
+        stats.maxRaw      = raw;
+        return;
+    }
+
+    if (raw < stats.minRaw)
+    {
+        stats.minRaw = raw;
+    }
+    if (raw > stats.maxRaw)
+    {
+        stats.maxRaw = raw;
+    }
+}
+
+void runPieceCalibrationScan()
+{
+    static uint32_t scanCounter = 0;
+
+    Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
+    Serial.print("scan=");
+    Serial.println(++scanCounter);
+    Serial.print("mean samples=");
+    Serial.print(kAdsMeanSamples);
+    Serial.print(" thresholds=[FWD:");
+    Serial.print(TEST_THRESHOLD_FORWARD_START);
+    Serial.print(" BACK:");
+    Serial.print(TEST_THRESHOLD_BACKWARD_START);
+    Serial.print(" RIGHT:");
+    Serial.print(TEST_THRESHOLD_TURN_RIGHT_START);
+    Serial.print(" LEFT:");
+    Serial.print(TEST_THRESHOLD_TURN_LEFT_START);
+    Serial.print(" STOP:");
+    Serial.print(TEST_THRESHOLD_STOP_START);
+    Serial.print(" LOOP:");
+    Serial.print(TEST_THRESHOLD_LOOP_START);
+    Serial.println("]");
+
+    for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
+    {
+        const AdsTestEntry &entry = kAdsTests[deviceIndex];
+        Adafruit_ADS1115 ads;
+
+        if (!ads.begin(entry.address, entry.wire))
+        {
+            Serial.print("   [MISS] ");
+            Serial.print(entry.busName);
+            Serial.print(" 0x");
+            Serial.print(entry.address, HEX);
+            Serial.println(" calibration scan skipped");
+            continue;
+        }
+
+        ads.setGain(GAIN_ONE);
+
+        for (uint8_t ch = 0; ch < 4; ++ch)
+        {
+            int16_t rawMean = 0;
+            bool readOk     = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
+            if (!readOk && isI2c3Wire(entry.wire))
+            {
+                recoverI2c3Bus();
+                if (ads.begin(entry.address, entry.wire))
+                {
+                    ads.setGain(GAIN_ONE);
+                    readOk = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
+                }
+            }
+
+            const uint8_t slotIndex = static_cast<uint8_t>(deviceIndex * 4 + ch);
+            Serial.print("   slot ");
+            Serial.print(slotIndex + 1);
+            Serial.print(" [");
+            Serial.print(entry.busName);
+            Serial.print(" 0x");
+            Serial.print(entry.address, HEX);
+            Serial.print(" ch");
+            Serial.print(ch);
+            Serial.print("] ");
+
+            if (!readOk)
+            {
+                Serial.println("TIMEOUT/FAIL");
+                continue;
+            }
+
+            updateCalibrationStats(slotIndex, rawMean);
+            const CalibrationStats &stats = gCalibrationStats[slotIndex];
+
+            Serial.print("mean=");
+            Serial.print(rawMean);
+            Serial.print(" min=");
+            Serial.print(stats.minRaw);
+            Serial.print(" max=");
+            Serial.print(stats.maxRaw);
+            Serial.print(" span=");
+            Serial.print(stats.maxRaw - stats.minRaw);
+            Serial.print(" => ");
+            Serial.println(pieceLabelForRaw(rawMean));
+        }
+    }
 }
 
 // ==========================================
@@ -475,6 +668,12 @@ void setup()
 
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
+#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
+    Serial.println("   MODE: piece threshold calibration");
+#else
+    Serial.println("   MODE: hardware connectivity test");
+#endif
+
     Serial.println("\n--- POWER RAILS TEST CYCLE ---");
 }
 
@@ -483,6 +682,39 @@ void setup()
 // ==========================================
 void loop()
 {
+#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
+    static bool calibrationRailsOn = false;
+
+    if (!calibrationRailsOn)
+    {
+        Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
+        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+        delay(kRailSettleDelayMs);
+        calibrationRailsOn = true;
+    }
+
+    // Quick double blink visual check on builtin LED.
+    for (int i = 0; i < 2; i++)
+    {
+        digitalWrite(PIN_LED, LOW);
+        delay(100);
+        digitalWrite(PIN_LED, HIGH);
+        delay(100);
+    }
+
+    probeI2CDevices();
+
+#ifdef TEST_ADS1115
+    runPieceCalibrationScan();
+#endif
+
+#ifdef TEST_LED_ANIMATIONS
+    runScanAnimationTest();
+#endif
+
+    delay(kCalibrationScanPeriodMs);
+    return;
+#else
     // Quick double blink visual check on builtin LED.
     for (int i = 0; i < 2; i++)
     {
@@ -529,4 +761,5 @@ void loop()
 
     Serial.println("Cycle complete. Restarting in 2 seconds.");
     delay(DELAY);
+#endif
 }

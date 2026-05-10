@@ -20,22 +20,97 @@
 
 namespace
 {
+#ifndef GASPETTO_I2C_CLOCK_HZ
+#define GASPETTO_I2C_CLOCK_HZ 100000
+#endif
+
+#ifndef GASPETTO_ADC_SAMPLES_PER_CHANNEL
+#define GASPETTO_ADC_SAMPLES_PER_CHANNEL 3
+#endif
+
+#ifndef GASPETTO_ADC_MIN_VALID_SAMPLES
+#define GASPETTO_ADC_MIN_VALID_SAMPLES 2
+#endif
+
+#ifndef GASPETTO_ADC_READ_RECOVERY_RETRIES
+#define GASPETTO_ADC_READ_RECOVERY_RETRIES 1
+#endif
+
+#ifndef GASPETTO_ADC_CONVERSION_TIMEOUT_MS
+#define GASPETTO_ADC_CONVERSION_TIMEOUT_MS 40
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_FORWARD_START
+#define GASPETTO_ADC_THRESHOLD_FORWARD_START 100
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_BACKWARD_START
+#define GASPETTO_ADC_THRESHOLD_BACKWARD_START 700
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START
+#define GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START 1300
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
+#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 1900
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_STOP_START
+#define GASPETTO_ADC_THRESHOLD_STOP_START 2500
+#endif
+
+#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
+#define GASPETTO_ADC_THRESHOLD_LOOP_START 3100
+#endif
+
+static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
+              "GASPETTO_ADC_SAMPLES_PER_CHANNEL must be >= 1");
+static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLES must be >= 1");
+static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
+              "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
+static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START > 0,
+              "GASPETTO_ADC_THRESHOLD_FORWARD_START must be > 0");
+static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START < GASPETTO_ADC_THRESHOLD_BACKWARD_START,
+              "ADC thresholds must be strictly increasing");
+static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
+              "ADC thresholds must be strictly increasing");
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
+              "ADC thresholds must be strictly increasing");
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_STOP_START,
+              "ADC thresholds must be strictly increasing");
+static_assert(GASPETTO_ADC_THRESHOLD_STOP_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
+              "ADC thresholds must be strictly increasing");
+static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= 4095,
+              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= 4095");
+
 constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
-    AdcDecodeEntry{ 0, 99, BoxPieceId::EMPTY, "EMPTY" },
-    AdcDecodeEntry{ 100, 699, BoxPieceId::FORWARD, "FORWARD" },
-    AdcDecodeEntry{ 700, 1299, BoxPieceId::BACKWARD, "BACKWARD" },
-    AdcDecodeEntry{ 1300, 1899, BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
-    AdcDecodeEntry{ 1900, 2499, BoxPieceId::TURN_LEFT, "TURN_LEFT" },
-    AdcDecodeEntry{ 2500, 3099, BoxPieceId::STOP, "STOP" },
-    AdcDecodeEntry{ 3100, 4095, BoxPieceId::LOOP_CALL, "LOOP_CALL" },
+    AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
+                    BoxPieceId::EMPTY, "EMPTY" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
+                    BoxPieceId::FORWARD, "FORWARD" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
+                    BoxPieceId::BACKWARD, "BACKWARD" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START - 1),
+                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_STOP_START - 1),
+                    BoxPieceId::TURN_LEFT, "TURN_LEFT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_STOP_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1), BoxPieceId::STOP,
+                    "STOP" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, 4095, BoxPieceId::LOOP_CALL, "LOOP_CALL" },
 };
 
 constexpr uint8_t kChannelsPerAds = 4;
-constexpr uint32_t kI2cClockHz = 100000;
-constexpr uint8_t kAdcSamplesPerChannel = 3;
-constexpr uint8_t kAdcMinValidSamples = 2;
-constexpr uint8_t kAdcReadRecoveryRetries = 1;
-constexpr uint16_t kAdcConversionTimeoutMs = 40;
+constexpr uint32_t kI2cClockHz = GASPETTO_I2C_CLOCK_HZ;
+constexpr uint8_t kAdcSamplesPerChannel = GASPETTO_ADC_SAMPLES_PER_CHANNEL;
+constexpr uint8_t kAdcMinValidSamples = GASPETTO_ADC_MIN_VALID_SAMPLES;
+constexpr uint8_t kAdcReadRecoveryRetries = GASPETTO_ADC_READ_RECOVERY_RETRIES;
+constexpr uint16_t kAdcConversionTimeoutMs = GASPETTO_ADC_CONVERSION_TIMEOUT_MS;
 
 constexpr std::array<uint16_t, 4> kMuxByChannel = {
     ADS1X15_REG_CONFIG_MUX_SINGLE_0,
@@ -443,7 +518,7 @@ void GaspettoBox::runScanAnimation()
     blackoutLeds();
 #else
     for (std::size_t slot = 0; slot < BOX_LED_SLOTS; ++slot) {
-        log("LED scanner CYAN slot ");
+        log("LED scanner CYAN slot (Scan animation) ");
         log(static_cast<int>(slot) + 1);
         logln();
         delayMs(15);
@@ -465,7 +540,7 @@ void GaspettoBox::runSuccessAnimation()
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
     for (int pulse = 0; pulse < 3; ++pulse) {
-        log("LED pulse GREEN step ");
+        log("LED pulse GREEN step (Success animation) ");
         log(pulse + 1);
         logln();
         delayMs(70);
@@ -492,9 +567,9 @@ void GaspettoBox::runBuildErrorAnimation()
     leds_.show();
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
-    logln("LED build error: LED2 blinks red.");
+    logln("LED build error: LED2 blinks red (Build error animation).");
     for (int blink = 0; blink < 3; ++blink) {
-        log("LED blink RED (build) step ");
+        log("LED blink RED (build) step (Build error animation) ");
         log(blink + 1);
         logln();
         delayMs(90);
