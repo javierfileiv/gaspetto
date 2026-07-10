@@ -28,16 +28,22 @@ GaspettoCar::GaspettoCar(Context &ctx)
 
 void GaspettoCar::init(StateId initialStateId)
 {
+    logln(F("GaspettoCar: checking movement controller"));
     G_ASSERT(_ctx.movementController);
+    logln(F("GaspettoCar: init movement controller"));
     _ctx.movementController->init(_ctx.pwm_freq);
 #ifdef USE_RADIO_CONTROLLER
+    logln(F("GaspettoCar: init radio controller"));
     G_ASSERT(_ctx.radioController);
     _ctx.radioController->init();
 #else
+    logln(F("GaspettoCar: timered event queue mode"));
     G_ASSERT(_ctx.timeredEventQueue);
 #endif
 
+    logln(F("GaspettoCar: init state machine"));
     CarActiveObject::init(initialStateId);
+    logln(F("GaspettoCar: state machine ready"));
 }
 
 void GaspettoCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
@@ -92,6 +98,13 @@ void GaspettoCar::work(void)
 
         StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
         _ctx.mainEventQueue->dequeue(evt);
+        log(F("GaspettoCar RX: processing "));
+        log(eventIdToString(evt.getEventId()));
+        if (evt.getEventId() == EventId::ACTION) {
+            log(F(" "));
+            log(commandIdToString(evt.getPayload()));
+        }
+        logln();
         currentState->processEvent(evt);
     }
     if (getCurrentStateId() != StateId::IDLE && isTargetReached()) {

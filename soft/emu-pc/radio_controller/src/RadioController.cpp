@@ -65,7 +65,9 @@ void RadioController::processRadio()
 
     /* RX processing. */
     if (_radio.available(&pipe)) {
-        logln(F("ProcessRadio():"));
+        log(F("Radio RX: pipe "));
+        log(static_cast<int>(pipe));
+        logln();
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
 
         /* Heuristic: Detect packet type based on buffer content.
@@ -73,22 +75,21 @@ void RadioController::processRadio()
          * CommandPacket: count (byte 0) = 0-31, commands[0] = CommandId
          * If byte[0] <= 31 AND byte[1] is valid CommandId, assume BoxProgram.
          */
-        uint8_t first_byte = buffer[0];
         uint8_t second_byte = buffer[1];
         uint8_t maxCommandId = static_cast<uint8_t>(CommandId::MAX_COMMAND_ID);
 
         /* Check if it looks like a CommandPacket. */
         if (second_byte < maxCommandId) {
-            logln(F("Detected CommandPacket"));
             CommandPacket *boxPacket = reinterpret_cast<CommandPacket *>(buffer);
+            log(F("Radio RX: CommandPacket count="));
+            logln(static_cast<int>(boxPacket->count));
             decodeCommandPacket(*boxPacket);
         } else {
             /* Treat as EventPacket. */
-            logln(F("Detected EventPacket"));
             EventPacket *eventPacket = reinterpret_cast<EventPacket *>(buffer);
-            log(F("Received EventId:"));
+            log(F("Radio RX: EventPacket "));
             log(eventIdToString(static_cast<EventId>(eventPacket->eventId)));
-            log(F(" CommandId:"));
+            log(F(" "));
             log(commandIdToString(static_cast<CommandId>(eventPacket->payload)));
             logln(F("."));
             Event evt = Event::fromPacket(*eventPacket);
@@ -98,6 +99,8 @@ void RadioController::processRadio()
             }
             /* Post to active object queue. */
             gaspettoQueue->enqueue(evt);
+            log(F("Radio RX: queued event; app queue size="));
+            logln(static_cast<int>(gaspettoQueue->GetSize()));
         }
     }
     /* TX processing. Only send the first one. */
@@ -166,8 +169,8 @@ bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 
 void RadioController::decodeCommandPacket(const CommandPacket &packet)
 {
-    log(F("CommandPacket: count="));
-    log(packet.count);
+    log(F("Radio RX: decode command count="));
+    log(static_cast<int>(packet.count));
     logln();
 
     if (packet.count == 0 || packet.count > BOX_MAX_PAYLOAD_COMMANDS) {
@@ -180,18 +183,19 @@ void RadioController::decodeCommandPacket(const CommandPacket &packet)
     /* Enqueue each command as an ACTION event. */
     for (uint8_t i = 0; i < packet.count; ++i) {
         if (gaspettoQueue->IsFull()) {
-            logln(F("RadioController::decodeCommandPacket: Queue is full."));
+            logln(F("Radio RX: app queue full."));
             break;
         }
 
         CommandId cmdId = static_cast<CommandId>(packet.commands[i]);
-        log(F("  Command["));
-        log(i);
-        log(F("]: "));
+        log(F("Radio RX: command["));
+        log(static_cast<int>(i));
+        log(F("] "));
         log(commandIdToString(cmdId));
-        logln();
 
         Event evt(EventId::ACTION, cmdId);
         gaspettoQueue->enqueue(evt);
+        log(F(" queued; app queue size="));
+        logln(static_cast<int>(gaspettoQueue->GetSize()));
     }
 }

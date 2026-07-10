@@ -76,9 +76,14 @@ void setup()
         /* Wait for serial port to connect. Needed for native USB port only */
     }
 #endif
+    mainLog.logln();
+    mainLog.logln(F("GaspettoCar boot"));
+
     /* Initialize the GaspettoCar state machine. */
     gaspetto_car.setLowPowerModeCallback(enter_low_power_mode);
+    mainLog.logln(F("GaspettoCar init begin"));
     gaspetto_car.init(StateId::IDLE);
+    mainLog.logln(F("GaspettoCar init done"));
 
 #ifdef USE_RADIO_CONTROLLER
     /* Set up telemetry callback to send IMU/PID data via radio */
@@ -99,6 +104,7 @@ void setup()
     timeredEventQueue.scheduleEventDelayed(21000,
                                            Event(EventId::ACTION, CommandId::MOTOR_TURN_LEFT));
     timeredEventQueue.scheduleEventDelayed(24000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
+    mainLog.logln(F("Timered test sequence scheduled"));
 #endif /* USE_RADIO_CONTROLLER */
 }
 
