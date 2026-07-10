@@ -290,63 +290,6 @@ void processCommand(const String &cmd)
         }
         break;
 
-    case 'F':
-    case 'f':
-        if (imuOk && value > 0)
-        {
-            // Capture current yaw as the target heading
-            yawSetpoint = imu.yaw();   // Set PID setpoint to current direction
-            targetYaw   = yawSetpoint; // Keep for telemetry compatibility
-            baseSpeed   = (float)value;
-
-            // Reset and configure PID
-            myPID.SetTunings(Kp, Ki, Kd);
-            myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
-            myPID.SetSampleTime(50);              // 50ms sample time for 20Hz update rate
-            myPID.SetMode(1); // AUTOMATIC mode (using 1 instead of AUTOMATIC constant)
-
-            straightDriving = true;
-            straightStartMs = millis();
-
-            // Reset telemetry timer for continuous debug output
-            lastTelemetryMs = millis();
-
-            // Initialize timer if set
-            if (movementDurationMs > 0)
-            {
-                timedMovement   = true;
-                movementStartMs = millis();
-            }
-            else
-            {
-                timedMovement = false;
-            }
-
-            Serial.print(F("Straight driving at PWM "));
-            Serial.print(value);
-            Serial.print(F(", target yaw: "));
-            Serial.print(targetYaw);
-            if (timedMovement)
-            {
-                Serial.print(F(", timer: "));
-                Serial.print(movementDurationMs);
-                Serial.print(F("ms"));
-            }
-            Serial.println();
-        }
-        else if (!imuOk)
-        {
-            Serial.println(F("IMU not available for straight driving"));
-        }
-        else
-        {
-            straightDriving = false;
-            driveOne(motorLeft, 0);
-            driveOne(motorRight, 0);
-            Serial.println(F("Straight driving stopped"));
-        }
-        break;
-
     case 'G': // Backward movement with PID
     case 'g':
         if (imuOk && value > 0)
@@ -399,98 +342,6 @@ void processCommand(const String &cmd)
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Backward driving stopped"));
-        }
-        break;
-
-        break;
-
-    case 'Z':
-    case 'z':
-        if (cmd.startsWith("TL") || cmd.startsWith("tl")) // Turn left 90 degrees
-        {
-            if (imuOk)
-            {
-                float currentYaw = imu.yaw();
-                yawSetpoint      = currentYaw - 90.0; // Turn left 90 degrees
-
-                // Handle 360-degree wraparound
-                if (yawSetpoint < -180.0)
-                {
-                    yawSetpoint += 360.0;
-                }
-
-                targetYaw = yawSetpoint;
-                baseSpeed = 100.0f; // Fixed speed for turning
-
-                myPID.SetTunings(Kp, Ki, Kd);
-                myPID.SetOutputLimits(-180.0, 180.0);
-                myPID.SetSampleTime(50);
-                myPID.SetMode(1);
-
-                straightDriving = false;
-                turningInPlace  = true;
-                straightStartMs = millis();
-                lastTelemetryMs = millis();
-
-                Serial.print(F("Turning left 90°: "));
-                Serial.print(currentYaw, 1);
-                Serial.print(F("° → "));
-                Serial.print(yawSetpoint, 1);
-                Serial.println(F("°"));
-            }
-            else
-            {
-                Serial.println(F("IMU not available for turning"));
-            }
-            return; // Exit early for two-character command
-        }
-        else if (cmd.startsWith("TR") || cmd.startsWith("tr")) // Turn right 90 degrees
-        {
-            if (imuOk)
-            {
-                float currentYaw = imu.yaw();
-                yawSetpoint      = currentYaw + 90.0; // Turn right 90 degrees
-
-                // Handle 360-degree wraparound
-                if (yawSetpoint > 180.0)
-                {
-                    yawSetpoint -= 360.0;
-                }
-
-                targetYaw = yawSetpoint;
-                baseSpeed = 100.0f; // Fixed speed for turning
-
-                myPID.SetTunings(Kp, Ki, Kd);
-                myPID.SetOutputLimits(-180.0, 180.0);
-                myPID.SetSampleTime(50);
-                myPID.SetMode(1);
-
-                straightDriving = false;
-                turningInPlace  = true;
-                straightStartMs = millis();
-                lastTelemetryMs = millis();
-
-                Serial.print(F("Turning right 90°: "));
-                Serial.print(currentYaw, 1);
-                Serial.print(F("° → "));
-                Serial.print(yawSetpoint, 1);
-                Serial.println(F("°"));
-            }
-            else
-            {
-                Serial.println(F("IMU not available for turning"));
-            }
-            return;     // Exit early for two-character command
-        }
-        else if (imuOk) // Original Z command
-        {
-            imu.zeroYaw();
-            targetYaw = 0.0f;
-            Serial.println(F("Yaw reset to zero"));
-        }
-        else
-        {
-            Serial.println(F("IMU not available for yaw reset"));
         }
         break;
 
@@ -700,16 +551,16 @@ void processCommand(const String &cmd)
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
-            // Initialize timer if set
-            if (movementDurationMs > 0)
-            {
-                timedMovement   = true;
-                movementStartMs = millis();
-            }
-            else
-            {
-                timedMovement = false;
-            }
+            // // Initialize timer if set
+            // if (movementDurationMs > 0)
+            // {
+            //     timedMovement   = true;
+            //     movementStartMs = millis();
+            // }
+            // else
+            // {
+            timedMovement = false;
+            // }
 
             Serial.print(F("Turning left 90° at PWM "));
             Serial.print(value);
@@ -721,6 +572,8 @@ void processCommand(const String &cmd)
         }
         else if (!imuOk)
         {
+            imu.zeroYaw();
+            targetYaw = 0.0f;
             Serial.println(F("IMU not available for turning"));
         }
         else
@@ -756,16 +609,16 @@ void processCommand(const String &cmd)
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
-            // Initialize timer if set
-            if (movementDurationMs > 0)
-            {
-                timedMovement   = true;
-                movementStartMs = millis();
-            }
-            else
-            {
-                timedMovement = false;
-            }
+            // // Initialize timer if set
+            // if (movementDurationMs > 0)
+            // {
+            //     timedMovement   = true;
+            //     movementStartMs = millis();
+            // }
+            // else
+            // {
+            timedMovement = false;
+            // }
 
             Serial.print(F("Turning right 90° at PWM "));
             Serial.print(value);
@@ -777,6 +630,8 @@ void processCommand(const String &cmd)
         }
         else if (!imuOk)
         {
+            imu.zeroYaw();
+            targetYaw = 0.0f;
             Serial.println(F("IMU not available for turning"));
         }
         else
