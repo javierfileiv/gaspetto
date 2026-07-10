@@ -93,8 +93,12 @@ void RadioController::processRadio()
             log(commandIdToString(static_cast<CommandId>(eventPacket->payload)));
             logln(F("."));
             Event evt = Event::fromPacket(*eventPacket);
-            if (radioQueue.IsFull()) {
-                logln(F("RadioController::ProcessRadio: Queue is full."));
+            if (gaspettoQueue == nullptr) {
+                logln(F("Radio RX: app queue unavailable."));
+                return;
+            }
+            if (gaspettoQueue->IsFull()) {
+                logln(F("Radio RX: app queue full."));
                 return;
             }
             /* Post to active object queue. */
@@ -182,6 +186,10 @@ void RadioController::decodeCommandPacket(const CommandPacket &packet)
 
     /* Enqueue each command as an ACTION event. */
     for (uint8_t i = 0; i < packet.count; ++i) {
+        if (gaspettoQueue == nullptr) {
+            logln(F("Radio RX: app queue unavailable."));
+            break;
+        }
         if (gaspettoQueue->IsFull()) {
             logln(F("Radio RX: app queue full."));
             break;
