@@ -75,11 +75,27 @@ bool GaspettoCar::isTargetReached(void)
 
 int GaspettoCar::postEvent(Event evt)
 {
-    if (_ctx.mainEventQueue) {
-        _ctx.mainEventQueue->enqueue(evt);
-        return 0;
+    if (!_ctx.mainEventQueue) {
+        logln(F("GaspettoCar RX: main event queue unavailable."));
+        return -1;
     }
-    return -1;
+
+    log(F("GaspettoCar RX: "));
+    log(eventIdToString(evt.getEventId()));
+    if (evt.getEventId() == EventId::ACTION) {
+        log(F(" "));
+        log(commandIdToString(evt.getPayload()));
+    }
+
+    if (_ctx.mainEventQueue->IsFull()) {
+        logln(F(" dropped; queue full."));
+        return -1;
+    }
+
+    _ctx.mainEventQueue->enqueue(evt);
+    log(F(" queued; queue size="));
+    logln(static_cast<int>(_ctx.mainEventQueue->GetSize()));
+    return 0;
 }
 
 void GaspettoCar::work(void)
