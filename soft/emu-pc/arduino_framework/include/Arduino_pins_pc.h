@@ -4,6 +4,8 @@
 #define PA0 3
 #define PA1 4
 #define PA3 5
+#define PA4 4
+#define PA_4 4
 #define PA8 8
 #define PB4 9
 #define PB0 0
@@ -15,7 +17,11 @@
 #define PB12 12
 #define PB14 14
 #define PB15 15
-#define PA4 4
+#define PB_10 10
+#define PB_11 11
+#define PB_12 12
+#define PB_14 14
+#define PB_15 15
 #define PA8 8
 #define PC13 113
 #define PC14 114

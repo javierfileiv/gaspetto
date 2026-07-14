@@ -14,10 +14,10 @@
 
 const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
 
-const uint32_t MOTOR_LEFT_BWD = PB14; /* Example PWM pin for motor left. D4 on salaea. */
-const uint32_t MOTOR_LEFT_FWD = PB15; /* Direction pin for motor left.  D5 on salaea. */
-const uint32_t MOTOR_RIGHT_FWD = PB11; /* PWM pin for motor right. D1 on salaea. */
-const uint32_t MOTOR_RIGHT_BWD = PB10; /* Direction pin for motor right. D2 on salaea. */
+const uint32_t MOTOR_LEFT_BWD = PB_14; /* Example PWM pin for motor left. D4 on salaea. */
+const uint32_t MOTOR_LEFT_FWD = PB_15; /* Direction pin for motor left.  D5 on salaea. */
+const uint32_t MOTOR_RIGHT_FWD = PB_11; /* PWM pin for motor right. D1 on salaea. */
+const uint32_t MOTOR_RIGHT_BWD = PB_10; /* Direction pin for motor right. D2 on salaea. */
 
 /** @brief Number of states for GaspettoCar. */
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
