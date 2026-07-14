@@ -1,6 +1,6 @@
 #include "IdleState.h"
 
-#include "GaspettoCar.h"
+#include "GCar.h"
 #include "__assert.h"
 
 #include <cstdint>
@@ -12,7 +12,7 @@ void IdleState::enter()
 
 void IdleState::processEvent(Event &evt)
 {
-    GaspettoCar *car = static_cast<GaspettoCar *>(active_object_);
+    GCar *car = static_cast<GCar *>(active_object_);
 
     switch (evt.getEventId()) {
     case EventId::ACTION: {

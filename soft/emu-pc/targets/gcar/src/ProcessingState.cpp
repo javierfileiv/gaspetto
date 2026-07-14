@@ -1,6 +1,6 @@
 #include "ProcessingState.h"
 
-#include "GaspettoCar.h"
+#include "GCar.h"
 
 #include <Arduino.h>
 
@@ -17,7 +17,7 @@ void ProcessingState::processEvent(Event &evt)
     log(commandIdToString(evt.getPayload()));
     logln(F("."));
 
-    GaspettoCar *ao = static_cast<GaspettoCar *>(active_object_);
+    GCar *ao = static_cast<GCar *>(active_object_);
 
     switch (evt.getEventId()) {
     case EventId::ACTION: {

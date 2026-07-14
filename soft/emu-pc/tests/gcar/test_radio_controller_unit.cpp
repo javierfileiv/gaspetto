@@ -31,7 +31,7 @@ class RadioControllerUnitTest : public ::testing::Test {
 protected:
     EventQueue appQueue;
     StrictMock<MockRF24> rf{ 10000000 };
-    RadioController controller{ rf, &appQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name };
+    RadioController controller{ rf, &appQueue, gaspetto_box_pipe_name, gcar_pipe_name };
 
     static Event makeAction(CommandId cmd)
     {

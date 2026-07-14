@@ -8,7 +8,7 @@
 /**
  * @brief Mock for MovementControllerInterface.
  *
- * Allows testing GaspettoCar state machine without PID/motor internals.
+ * Allows testing GCar state machine without PID/motor internals.
  */
 class MockMovementController : public MockBase<MockMovementController>,
                                public MovementControllerInterface {

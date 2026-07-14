@@ -4,7 +4,7 @@
 #include "State.h"
 
 /**
- * @brief Idle state for GaspettoCar.
+ * @brief Idle state for GCar.
  *
  * Enters low power mode and waits for motor commands.
  */

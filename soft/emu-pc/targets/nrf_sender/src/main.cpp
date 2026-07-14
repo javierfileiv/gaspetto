@@ -14,7 +14,7 @@
 #endif
 
 const uint8_t gaspetto_box_pipe_name[] = "_box_";
-const uint8_t gaspetto_car_pipe_name[] = "_car_";
+const uint8_t gcar_pipe_name[] = "_car_";
 RF24 radio(CE_PIN, CSN_PIN);
 
 /* Forward declarations. */
@@ -39,7 +39,7 @@ void setup()
     radio.setAddressWidth(5);
     /* Support CommandPacket (32 bytes) for multi-command programs. */
     radio.setPayloadSize(sizeof(CommandPacket));
-    radio.openWritingPipe(gaspetto_car_pipe_name);
+    radio.openWritingPipe(gcar_pipe_name);
     radio.openReadingPipe(1, gaspetto_box_pipe_name);
     radio.powerUp();
     radio.printDetails();

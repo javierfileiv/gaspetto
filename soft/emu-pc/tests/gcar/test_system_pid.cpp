@@ -1,7 +1,7 @@
 /**
  * @file test_system_pid.cpp
  *
- * System-level tests: radio event → GaspettoCar state machine →
+ * System-level tests: radio event → GCar state machine →
  * real MovementController (PID) → mock IMU / mock MotorControl.
  *
  * Unlike test_pid_movement.cpp (which tests MovementController in isolation),
@@ -19,7 +19,7 @@
 #include "CarStates.h"
 #include "Context.h"
 #include "EventQueue.h"
-#include "GaspettoCar.h"
+#include "GCar.h"
 #include "IdleState.h"
 #include "MovementController.h"
 #include "ProcessingState.h"
@@ -42,7 +42,7 @@ using testing::Return;
 static constexpr uint32_t PID_PERIOD_MS = 50;
 
 static const uint8_t *sys_writing_addr = gaspetto_box_pipe_name;
-static const uint8_t *sys_reading_addr = gaspetto_car_pipe_name;
+static const uint8_t *sys_reading_addr = gcar_pipe_name;
 
 namespace
 {
@@ -76,7 +76,7 @@ protected:
     ProcessingState processingState;
     Context ctx{ &eventQueue, &movementController, &radioController, nullptr,
                  &idleState,  &processingState,    MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     /* Simulated time and IMU state. */
     unsigned long currentTimeMs = 0;
@@ -171,17 +171,17 @@ TEST_F(SystemPIDTest, InitStartsInIdleState)
     EXPECT_FALSE(movementController.isMoving());
 }
 
-TEST(GaspettoCarCoverageTest, PostEventReturnsMinusOneWhenQueueIsMissing)
+TEST(GCarCoverageTest, PostEventReturnsMinusOneWhenQueueIsMissing)
 {
     IdleState idleState;
     ProcessingState processingState;
     Context ctx{ nullptr, nullptr, nullptr, nullptr, &idleState, &processingState, MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     EXPECT_EQ(gaspettoCar.postEvent(Event{ EventId::ACTION, CommandId::MOTOR_FORWARD }), -1);
 }
 
-TEST(GaspettoCarAssertTest, InitAssertsWhenMovementControllerIsMissing)
+TEST(GCarAssertTest, InitAssertsWhenMovementControllerIsMissing)
 {
     NiceMock<MockArduino> mockArduino;
     EventQueue eventQueue;
@@ -190,12 +190,12 @@ TEST(GaspettoCarAssertTest, InitAssertsWhenMovementControllerIsMissing)
     ProcessingState processingState;
     Context ctx{ &eventQueue, nullptr,          nullptr,   &timeredEventQueue,
                  &idleState,  &processingState, MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     EXPECT_DEATH(gaspettoCar.init(StateId::IDLE), ".*");
 }
 
-TEST(GaspettoCarAssertTest, InitAssertsWhenRadioControllerIsMissing)
+TEST(GCarAssertTest, InitAssertsWhenRadioControllerIsMissing)
 {
     NiceMock<MockArduino> mockArduino;
     EventQueue eventQueue;
@@ -206,12 +206,12 @@ TEST(GaspettoCarAssertTest, InitAssertsWhenRadioControllerIsMissing)
 
     Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
                  &idleState,  &processingState,        MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     EXPECT_DEATH(gaspettoCar.init(StateId::IDLE), ".*");
 }
 
-TEST(GaspettoCarCoverageTest, EnterLowPowerModeInvokesCallbackWhenSet)
+TEST(GCarCoverageTest, EnterLowPowerModeInvokesCallbackWhenSet)
 {
     NiceMock<MockArduino> mockArduino;
     EventQueue eventQueue;
@@ -222,7 +222,7 @@ TEST(GaspettoCarCoverageTest, EnterLowPowerModeInvokesCallbackWhenSet)
 
     Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
                  &idleState,  &processingState,        MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     int callbackCalls = 0;
     gLowPowerCalls = &callbackCalls;
@@ -233,7 +233,7 @@ TEST(GaspettoCarCoverageTest, EnterLowPowerModeInvokesCallbackWhenSet)
     EXPECT_EQ(callbackCalls, 1);
 }
 
-TEST(GaspettoCarCoverageTest, EnterLowPowerModeDoesNothingWhenCallbackNotSet)
+TEST(GCarCoverageTest, EnterLowPowerModeDoesNothingWhenCallbackNotSet)
 {
     NiceMock<MockArduino> mockArduino;
     EventQueue eventQueue;
@@ -244,7 +244,7 @@ TEST(GaspettoCarCoverageTest, EnterLowPowerModeDoesNothingWhenCallbackNotSet)
 
     Context ctx{ &eventQueue, &mockMovementController, nullptr,   &timeredEventQueue,
                  &idleState,  &processingState,        MOTOR_FREQ };
-    GaspettoCar gaspettoCar{ ctx };
+    GCar gaspettoCar{ ctx };
 
     gaspettoCar.enterLowPowerMode();
 }

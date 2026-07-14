@@ -19,7 +19,7 @@ const uint32_t MOTOR_LEFT_FWD = PB_15; /* Direction pin for motor left.  D5 on s
 const uint32_t MOTOR_RIGHT_FWD = PB_11; /* PWM pin for motor right. D1 on salaea. */
 const uint32_t MOTOR_RIGHT_BWD = PB_10; /* Direction pin for motor right. D2 on salaea. */
 
-/** @brief Number of states for GaspettoCar. */
+/** @brief Number of states for GCar. */
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
 
 const float INITIAL_MOTOR_SPEED = 50;
@@ -27,18 +27,18 @@ const uint32_t TURN_MOTOR_SPEED = 30;
 const uint32_t MOTOR_TIMEOUT_MS = 5000; /* Default timeout for motor commands. */
 
 /**
- * @brief Active object base type for GaspettoCar.
+ * @brief Active object base type for GCar.
  */
 using CarActiveObject = GenericActiveObject<StateId, Event, CAR_MAX_STATES>;
 
-class GaspettoCar : public CarActiveObject {
+class GCar : public CarActiveObject {
 public:
-    /** GaspettoCar(): Constructor for the GaspettoCar class.
+    /** GCar(): Constructor for the GCar class.
      *  @ctx: Reference to the Context instance containing dependencies.
      */
-    GaspettoCar(Context &ctx);
+    GCar(Context &ctx);
 
-    /** init(): Initialize the GaspettoCar instance.
+    /** init(): Initialize the GCar instance.
      *  @initialStateId: The initial state ID to start the state machine.
      */
     void init(StateId initialStateId = StateId::IDLE);

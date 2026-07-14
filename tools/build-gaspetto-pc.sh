@@ -58,15 +58,15 @@ smoke_run() {
   fi
 }
 
-configure_and_build "car-release" "build-car" "gaspetto_car"
-configure_and_build "car-debug" "build-car-debug" "gaspetto_car"
+configure_and_build "car-release" "build-car" "gcar"
+configure_and_build "car-debug" "build-car-debug" "gcar"
 configure_and_build "box-release" "build-box" "gaspetto_box"
 configure_and_build "box-debug" "build-box-debug" "gaspetto_box"
 configure_and_build "nrf-release" "build-nrf" "nrf_sender"
 configure_and_build "nrf-debug" "build-nrf-debug" "nrf_sender"
 
-smoke_run "Gaspetto Car (Release)" "$EMU_PC_DIR/build-car/targets/gaspetto_car/gaspetto_car"
-smoke_run "Gaspetto Car (Debug)" "$EMU_PC_DIR/build-car-debug/targets/gaspetto_car/gaspetto_car"
+smoke_run "Gaspetto Car (Release)" "$EMU_PC_DIR/build-car/targets/gcar/gcar"
+smoke_run "Gaspetto Car (Debug)" "$EMU_PC_DIR/build-car-debug/targets/gcar/gcar"
 smoke_run "Gaspetto Box (Release)" "$EMU_PC_DIR/build-box/targets/gaspetto_box/gaspetto_box"
 smoke_run "Gaspetto Box (Debug)" "$EMU_PC_DIR/build-box-debug/targets/gaspetto_box/gaspetto_box"
 smoke_run "NRF Sender (Release)" "$EMU_PC_DIR/build-nrf/targets/nrf_sender/nrf_sender"

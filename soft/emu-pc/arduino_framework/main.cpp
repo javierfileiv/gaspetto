@@ -1,6 +1,6 @@
 #include "Arduino.h"
 #include "CarEvents.h"
-#include "GaspettoCar_ino.h"
+#include "GCar_ino.h"
 #include "Serial.h"
 #include "implementations.h"
 
@@ -43,8 +43,8 @@ static void keyboardInput(void)
     while (true) {
         if (Serial.available()) {
             char ch = Serial.read();
-#ifdef GASPETTO_CAR
-            gaspetto_car_input_switch(ch);
+#ifdef GCAR
+            gcar_input_switch(ch);
 #ifndef USE_RADIO_CONTROLLER
             ISR();
 #endif

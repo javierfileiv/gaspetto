@@ -1,4 +1,4 @@
-#include "GaspettoCar.h"
+#include "GCar.h"
 
 #include "ActiveObject.h"
 #include "Arduino.h"
@@ -18,7 +18,7 @@
 
 class State;
 
-GaspettoCar::GaspettoCar(Context &ctx)
+GCar::GCar(Context &ctx)
         : CarActiveObject()
         , _ctx(ctx)
 {
@@ -26,61 +26,61 @@ GaspettoCar::GaspettoCar(Context &ctx)
     initMachine(StateId::PROCESSING, ctx.processingState);
 }
 
-void GaspettoCar::init(StateId initialStateId)
+void GCar::init(StateId initialStateId)
 {
-    logln(F("GaspettoCar: checking movement controller"));
+    logln(F("GCar: checking movement controller"));
     G_ASSERT(_ctx.movementController);
-    logln(F("GaspettoCar: init movement controller"));
+    logln(F("GCar: init movement controller"));
     _ctx.movementController->init(_ctx.pwm_freq);
 #ifdef USE_RADIO_CONTROLLER
-    logln(F("GaspettoCar: init radio controller"));
+    logln(F("GCar: init radio controller"));
     G_ASSERT(_ctx.radioController);
     _ctx.radioController->init();
 #else
-    logln(F("GaspettoCar: timered event queue mode"));
+    logln(F("GCar: timered event queue mode"));
     G_ASSERT(_ctx.timeredEventQueue);
 #endif
 
-    logln(F("GaspettoCar: init state machine"));
+    logln(F("GCar: init state machine"));
     CarActiveObject::init(initialStateId);
-    logln(F("GaspettoCar: state machine ready"));
+    logln(F("GCar: state machine ready"));
 }
 
-void GaspettoCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
+void GCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
 {
     _ctx.movementController->startStraightDriving(speed, timeout_ms);
 }
 
-void GaspettoCar::setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms)
+void GCar::setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms)
 {
     _ctx.movementController->startTurningInPlace(final_yaw_angle, speed, timeout_ms);
 }
 
-void GaspettoCar::stopBothMotors(void)
+void GCar::stopBothMotors(void)
 {
     _ctx.movementController->stopBothMotors();
 }
 
-void GaspettoCar::clearEventQueue(void)
+void GCar::clearEventQueue(void)
 {
     if (_ctx.mainEventQueue) {
         _ctx.mainEventQueue->clear();
     }
 }
 
-bool GaspettoCar::isTargetReached(void)
+bool GCar::isTargetReached(void)
 {
     return !_ctx.movementController->isMoving();
 }
 
-int GaspettoCar::postEvent(Event evt)
+int GCar::postEvent(Event evt)
 {
     if (!_ctx.mainEventQueue) {
-        logln(F("GaspettoCar RX: main event queue unavailable."));
+        logln(F("GCar RX: main event queue unavailable."));
         return -1;
     }
 
-    log(F("GaspettoCar RX: "));
+    log(F("GCar RX: "));
     log(eventIdToString(evt.getEventId()));
     if (evt.getEventId() == EventId::ACTION) {
         log(F(" "));
@@ -98,7 +98,7 @@ int GaspettoCar::postEvent(Event evt)
     return 0;
 }
 
-void GaspettoCar::work(void)
+void GCar::work(void)
 {
 #ifdef USE_RADIO_CONTROLLER
     _ctx.radioController->processRadio();
@@ -114,7 +114,7 @@ void GaspettoCar::work(void)
 
         StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
         _ctx.mainEventQueue->dequeue(evt);
-        log(F("GaspettoCar RX: processing "));
+        log(F("GCar RX: processing "));
         log(eventIdToString(evt.getEventId()));
         if (evt.getEventId() == EventId::ACTION) {
             log(F(" "));
@@ -129,7 +129,7 @@ void GaspettoCar::work(void)
     }
 }
 
-void GaspettoCar::enterLowPowerMode()
+void GCar::enterLowPowerMode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO

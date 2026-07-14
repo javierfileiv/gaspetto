@@ -3,7 +3,7 @@
 #include "CarStates.h"
 #include "Context.h"
 #include "EventQueue.h"
-#include "GaspettoCar.h"
+#include "GCar.h"
 #include "IMUOrientation.h"
 #include "IdleState.h"
 #include "Log.h"
@@ -31,8 +31,7 @@ ProcessingState processingState;
 IMUOrientation imu;
 MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD);
 MovementController carMovementController(motorControl, imu);
-RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name,
-                                   gaspetto_car_pipe_name);
+RadioController radioControllerCar(radio, &eventQueue, gaspetto_box_pipe_name, gcar_pipe_name);
 
 TimeredEventQueue timeredEventQueue;
 
@@ -40,14 +39,14 @@ Context context = {
     &eventQueue, &carMovementController, &radioControllerCar, &timeredEventQueue,
     &idleState,  &processingState,       MOTOR_FREQ,
 };
-GaspettoCar gaspetto_car(context);
+GCar gcar(context);
 Log mainLog;
 
 void ISR(void)
 {
 #ifndef ARDUINO
     Event evt = getEmulatedEvent();
-    gaspetto_car.postEvent(evt);
+    gcar.postEvent(evt);
 #endif
 }
 
@@ -69,7 +68,7 @@ void setup()
 {
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
-    Log::attachNrf24(radio, gaspetto_car_log_pipe_name, gaspetto_car_pipe_name);
+    Log::attachNrf24(radio, gcar_log_pipe_name, gcar_pipe_name);
 #endif
 #ifdef ARDUINO
     while (!Serial) {
@@ -77,13 +76,13 @@ void setup()
     }
 #endif
     mainLog.logln();
-    mainLog.logln(F("GaspettoCar boot"));
+    mainLog.logln(F("GCar boot"));
 
-    /* Initialize the GaspettoCar state machine. */
-    gaspetto_car.setLowPowerModeCallback(enter_low_power_mode);
-    mainLog.logln(F("GaspettoCar init begin"));
-    gaspetto_car.init(StateId::IDLE);
-    mainLog.logln(F("GaspettoCar init done"));
+    /* Initialize the GCar state machine. */
+    gcar.setLowPowerModeCallback(enter_low_power_mode);
+    mainLog.logln(F("GCar init begin"));
+    gcar.init(StateId::IDLE);
+    mainLog.logln(F("GCar init done"));
 
 #ifdef USE_RADIO_CONTROLLER
     /* Set up telemetry callback to send IMU/PID data via radio */
@@ -110,5 +109,5 @@ void setup()
 
 void loop()
 {
-    gaspetto_car.work();
+    gcar.work();
 }

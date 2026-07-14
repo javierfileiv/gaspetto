@@ -30,7 +30,7 @@ IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
 EventQueue eventQueue;
-RadioController radioController(radio, &eventQueue, gaspetto_box_pipe_name, gaspetto_car_pipe_name);
+RadioController radioController(radio, &eventQueue, gaspetto_box_pipe_name, gcar_pipe_name);
 Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };

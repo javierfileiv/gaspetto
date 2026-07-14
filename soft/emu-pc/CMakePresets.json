@@ -34,7 +34,7 @@
       "binaryDir": "${sourceDir}/build-car",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "GASPETTO_CAR": "ON"
+        "GCAR": "ON"
       }
     },
     {
@@ -45,7 +45,7 @@
       "binaryDir": "${sourceDir}/build-car-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "GASPETTO_CAR": "ON"
+        "GCAR": "ON"
       }
     },
     {

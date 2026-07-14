@@ -1,25 +1,25 @@
 # Gaspetto Emu-PC
 
-PC emulation environment for the Gaspetto remote-controlled car project. This allows development, testing, and debugging of the embedded firmware on a desktop PC without hardware.
+PC emulation environment for Gaspetto. Build and run the same car and box firmware logic on a desktop machine for fast iteration, interactive testing, and GoogleTest-based unit tests.
 
 ## Overview
 
-Gaspetto is a remote-controlled car system consisting of:
+Gaspetto consists of:
 
-- **Gaspetto Car** - The vehicle with motors, IMU, and NRF24 radio receiver
-- **Gaspetto Box** - The programming controller with ADC slot sensors, NeoPixel LEDs, and NRF24 radio transmitter
-- **NRF Sender** - Standalone NRF24 radio test utility
+- **Gaspetto Car** — motors, IMU, NRF24 receiver
+- **Gaspetto Box** — ADC slot sensors, NeoPixel LEDs, NRF24 transmitter
+- **NRF Sender** — standalone radio test utility
 
-The system uses a hierarchical state machine (HSM) architecture based on the Active Object pattern for event-driven control.
+Both car and box use the Active Object pattern with a small state machine (`IdleState` ↔ `ProcessingState`).
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Active Object                          │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │  IdleState  │◄──►│ProcessState │◄──►│ PausedState │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│  ┌─────────────┐    ┌─────────────┐                        │
+│  │  IdleState  │◄──►│ProcessState │                        │
+│  └─────────────┘    └─────────────┘                        │
 │         │                  │                                │
 │         └──────────────────┼────────────────────────────────│
 │                            ▼                                │
@@ -30,28 +30,21 @@ The system uses a hierarchical state machine (HSM) architecture based on the Act
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Project Structure
+## Project structure
 
 ```
 emu-pc/
 ├── arduino_framework/     # Arduino API emulation for PC
-│   ├── include/           # Arduino.h, Serial.h, Wire.h stubs
-│   ├── HardwareTimer/     # Timer emulation
-│   ├── RF24/              # NRF24L01+ radio emulation
-│   └── implementations/   # Platform-specific implementations
 ├── state_machine_framework/
-│   ├── include/           # ActiveObject, State, Event, EventQueue
-│   └── src/               # Queue implementations
-├── radio_controller/      # NRF24 radio abstraction layer
-├── read_hall/             # Hall sensor reading (encoder)
+├── radio_controller/      # NRF24 abstraction
 ├── targets/
-│   ├── gaspetto_car/      # Car firmware
+│   ├── gcar/      # Car firmware
 │   │   ├── movement_controller/  # Motor + IMU control with PID
 │   │   └── src/           # State implementations
     ├── gaspetto_box/      # Box firmware (GaspettoBox + states + pin defs)
 │   └── nrf_sender/        # Radio test utility
 └── tests/                 # Google Test unit tests
-    ├── gaspetto_car/      # Car-specific tests
+    ├── gcar/      # Car-specific tests
     ├── gaspetto_box/      # Box-specific tests (program builder)
     └── mocks/             # GMock implementations + Arduino stubs
 ```
@@ -60,12 +53,14 @@ emu-pc/
 
 - CMake 3.10+
 - C++17 compiler (GCC 9+ or Clang 10+)
-- Google Test (fetched automatically)
-- Optional: ccache for faster rebuilds
+- Google Test (fetched automatically by CMake)
+- Optional: `gcovr` for coverage, `ccache` for faster rebuilds
+
+All `cmake --preset` commands below are run from this directory (`soft/emu-pc/`). Presets are defined in `CMakePresets.json`.
 
 ## Building
 
-### Configure and Build All Tests
+### Unit tests
 
 ```bash
 cmake --preset tests
@@ -73,180 +68,112 @@ cmake --build build-tests --target utest_car
 cmake --build build-tests --target utest_box
 ```
 
-
-### Build All Targets Using CMakePresets
-
-You can build all main targets and tests using CMakePresets (recommended for consistent builds):
-
-#### Gaspetto Car
-Release:
-```bash
-cmake --preset car-release
-cmake --build build-car
-```
-Debug:
-```bash
-cmake --preset car-debug
-cmake --build build-car-debug
-```
-
-#### Gaspetto Box
-Release:
-```bash
-cmake --preset box-release
-cmake --build build-box
-```
-Debug:
-```bash
-cmake --preset box-debug
-cmake --build build-box-debug
-```
-
-#### NRF Sender
-Release:
-```bash
-cmake --preset nrf-release
-cmake --build build-nrf
-```
-Debug:
-```bash
-cmake --preset nrf-debug
-cmake --build build-nrf-debug
-```
-
-#### Unit Tests
-```bash
-cmake --preset tests
-cmake --build build-tests
-```
-
-All presets are defined in `CMakePresets.json` in the project root.
-
-### VS Code Tasks
-
-Pre-configured VS Code tasks are available:
-
-- **CMake Build Gaspetto Car** - Build car target (Release)
-- **CMake Build Gaspetto Box** - Build box target (Release)
-- **CMake Build NRF Sender** - Build NRF sender (Release)
-- **CMake Build UTest** - Build unit tests
-- **CMake Debug Gaspetto Car** - Build car target (Debug)
-- **CMake Debug Gaspetto Box** - Build box target (Debug)
-- **CMake Debug NRF Sender** - Build NRF sender (Debug)
-- **Run UTest** - Build and run unit tests (car + box)
-- **Run Pre Push test** - Full build verification
-
-### Quick Build Commands
+### PC emulators
 
 ```bash
 # Gaspetto Car
-cmake --preset car-release && cmake --build build-car --target gaspetto_car
+cmake --preset car-release && cmake --build build-car --target gcar
 
-# Gaspetto Box
+# Box
 cmake --preset box-release && cmake --build build-box --target gaspetto_box
-
-# All tests
-cmake --preset tests
-cmake --build build-tests --target utest_car
-cmake --build build-tests --target utest_box
 ```
 
-## Compile Definitions
+Debug presets (`car-debug`, `box-debug`, `nrf-debug`) and NRF sender targets follow the same pattern.
 
-The following compile definitions are enabled by default:
+### VS Code tasks
+
+Pre-configured tasks include **CMake Build Gaspetto Car/Box**, **CMake Build UTest**, **Run UTest**, and **Run Pre Push test**.
+
+## PC vs firmware build flags
+
+CMake and PlatformIO do not enable the same defines today. This matters when behavior differs between emulator and hardware.
+
+| Definition | emu-pc (CMake) | Car PIO | Box PIO |
+|------------|----------------|---------|---------|
+| `USE_RADIO_CONTROLLER` | **on** | off (commented) | on (via radio lib) |
+| `LOW_POWER_MODE` | **on** | off | off |
+| `GASPETTO_LOG` | **on** | on | on |
+| `GASPETTO_LOG_OVER_NRF24` | off | off (optional) | off (optional) |
+| USB CDC + `dfu_upload.py` | n/a | partial | **on** |
+
+**Implication:** the PC car emulator always listens on NRF24. The car PIO build currently schedules a timer-based motor demo unless you uncomment `-DUSE_RADIO_CONTROLLER` in `GCar_pio/platformio.ini`.
+
+Low-power STOP mode is emulated on PC (`SwitchToLowPowerMode`). On STM32 PIO builds, `enterLowPowerMode()` is still a stub (`delay(100)`).
+
+## Compile definitions (emu-pc defaults)
 
 | Definition | Purpose |
 |------------|---------|
-| `USE_RADIO_CONTROLLER` | Enable NRF24 radio communication |
-| `LOW_POWER_MODE` | Enable low power mode callbacks |
-| `GASPETTO_LOG` | Enable debug logging |
-| `NRF_LOG` | Enable NRF24 debug logging |
+| `USE_RADIO_CONTROLLER` | NRF24 radio communication |
+| `LOW_POWER_MODE` | Low-power mode callbacks |
+| `GASPETTO_LOG` | Debug logging to Serial |
+| `NRF_LOG` | NRF24 debug logging |
 
-## Running Tests
+Box-only tuning defines (`GASPETTO_ADC_THRESHOLD_*`, `GASPETTO_I2C_CLOCK_HZ`, etc.) are documented as comments in `soft/pio/GaspettoBox_pio/platformio.ini`.
+
+## Running tests
 
 ```bash
-# Car tests (29 tests)
+# from soft/emu-pc/
 ./build-tests/tests/utest_car --gtest_color=yes
-
-# Box tests (4 tests)
 ./build-tests/tests/utest_box --gtest_color=yes
 
-# Run a specific suite
+# filter a suite
 ./build-tests/tests/utest_car --gtest_filter="MovementControllerTest.*"
 ./build-tests/tests/utest_box --gtest_filter="GaspettoBoxProgramBuilderTest.*"
 
-# Verbose mock output
-GMOCK_VERBOSE=info ./build-tests/tests/utest_car
+# list all tests
+./build-tests/tests/utest_car --gtest_list_tests
 ```
 
-### Quick Test Runner Script
+### Quick test runner
 
-A convenience script is available at the root of the `soft/` directory:
+`soft/run_tests.sh` wraps configure, build, and run:
 
 ```bash
-# Run all tests (uses existing build if present)
+# from repository root
+soft/run_tests.sh
+
+# from soft/emu-pc/
 ../run_tests.sh
 
-# Force reconfigure + rebuild then run
+# options
 ../run_tests.sh --rebuild
-
-# Delete build directory, reconfigure, rebuild, and run
 ../run_tests.sh --clean
-
-# Build with coverage instrumentation, run tests, and generate report
 ../run_tests.sh --coverage
 ```
 
-Coverage reports are generated under `emu-pc/build-tests-coverage/coverage/`:
+Coverage output: `build-tests-coverage/coverage/coverage.txt` and `coverage.html`.
 
-- `coverage.txt` and `coverage.html` when `gcovr` is installed
-- `coverage.filtered.info` and `html/index.html` when using `lcov` + `genhtml`
+## Radio protocol
 
-## Gaspetto Box PC Emulator
+Two payload shapes share the same NRF24 pipe (32-byte max):
 
-The `gaspetto_box` binary emulates the BlackPill hardware controller on PC. It runs the same
-state machine and `GaspettoBox` business logic used on the STM32 target.
+| Packet | Size | Used by |
+|--------|------|---------|
+| `EventPacket` | 2 bytes | Single command (`eventId` + `CommandId`) |
+| `CommandPacket` | 32 bytes | Full program from box (`count` + up to 31 commands) |
 
-### State Machine
+The car's `RadioController` distinguishes them heuristically from buffer content. A dedicated packet-type byte would be more robust — treat mis-decoding as a known limitation.
 
-The box uses the same `GenericActiveObject` framework as the car. Two states drive the full programming cycle:
+## Gaspetto Car PC emulator
 
-```
-                  ┌──────────────────────────────────────┐
-                  │          GaspettoBox (Active Object)  │
-                  │                                       │
-  ┌───────────────▼──────────┐       ┌────────────────────▼──────┐
-  │         IdleState         │       │      ProcessingState       │
-  │                           │       │                            │
-  │  enter() →                │       │  enter() →                 │
-  │    prepareForStop()       │       │    executeProgrammingCycle │
-  │    SwitchToLowPowerMode() │       │      ()                    │
-  │                           │       │    transitionTo(IDLE)      │
-  │  on BUTTON_PRESSED →      │──────►│                            │
-  │    transitionTo(PROCESSING│       │  (scan → build → send      │
-  └───────────────────────────┘◄──────│   → LED feedback)          │
-                                      └────────────────────────────┘
+```bash
+cmake --preset car-release && cmake --build build-car --target gaspetto_car
+./build-car/targets/gaspetto_car/gaspetto_car
 ```
 
-**IdleState** — box is in low-power STOP mode, waiting for the wake button (PB12).
-**ProcessingState** — runs `executeProgrammingCycle()` synchronously then returns to IDLE:
-1. Power on sensor rail → scan 20 ADC slots (5× ADS1115: 4 on `I2C1` at `0x48..0x4B`, 1 on `I2C3` at `0x4A`)
-2. Build `CommandPacket` via `buildProgramFromPieces()`
-3. Send packet over RF24 to the car
-4. Run LED feedback animation (success / error)
-5. Power off sensor rail → `transitionTo(IDLE)` → enter STOP
-
-### Keyboard Commands
+With `USE_RADIO_CONTROLLER` (default on PC), keyboard commands simulate radio input:
 
 | Key | Action |
 |-----|--------|
-| `P` | Wake from STOP (simulates PB12 button press) |
-| `D` | Load **demo** board (FORWARD / BACKWARD / LOOP with TURN_LEFT loop) |
-| `E` | Load **empty** board (all slots EMPTY) |
-| `O` | Load **overflow** board (all 14 main slots = LOOP_CALL → triggers overflow error) |
-| `F` | Simulate **failed** RF24 transmission on next send |
+| `W` | Forward |
+| `S` | Backward |
+| `A` | Turn left |
+| `D` | Turn right |
+| `X` | Stop |
 
-### Board Layout
+### IMU CSV playback
 
 The box has **20 physical slots** distributed across two areas:
 
@@ -329,14 +256,14 @@ cmake --preset box-release && cmake --build build-box --target gaspetto_box
 The emulated `Adafruit_MPU6050` can replay raw IMU samples from a CSV file.
 This is useful for deterministic debugging and regression tests.
 
-Enable it with environment variables before launching `gaspetto_car`:
+Enable it with environment variables before launching `gcar`:
 
 ```bash
-IMU_CSV=/absolute/path/to/imu_samples.csv IMU_LOOP=1 ./build-car/targets/gaspetto_car/gaspetto_car
+IMU_CSV=/absolute/path/to/imu_samples.csv IMU_LOOP=1 ./build-car/targets/gcar/gcar
 ```
 
-- `IMU_CSV`: CSV file path. If missing or unreadable, the default built-in stub values are used.
-- `IMU_LOOP`: Optional. `1` (default) loops when the end of file is reached. `0` holds the last sample.
+- `IMU_CSV` — path to CSV; falls back to built-in stub values if missing
+- `IMU_LOOP` — `1` (default) loops at EOF; `0` holds last sample
 
 Supported row formats:
 
@@ -347,31 +274,115 @@ t,ax,ay,az,gx,gy,gz
 t,ax,ay,az,gx,gy,gz,tempC
 ```
 
-Notes:
+Lines starting with `#` and a single header row are allowed. Units match the Adafruit API: acceleration in m/s², gyro in rad/s.
 
-- Lines starting with `#` are ignored.
-- A single header line (for example `ax,ay,az,gx,gy,gz,tempC`) is allowed.
-- Units are expected to match the Adafruit API: acceleration in m/s^2 and gyro in rad/s.
+## Gaspetto Box PC emulator
 
-## Event System
+```bash
+cmake --preset box-release && cmake --build build-box --target gaspetto_box
+./build-box/targets/gaspetto_box/gaspetto_box
+```
 
-Events drive the state machine:
+### State machine
 
-| EventId | Description |
-|---------|-------------|
-| `ACTION` | Motor command event |
+```
+                  ┌──────────────────────────────────────┐
+                  │          GaspettoBox (Active Object)  │
+  ┌───────────────▼──────────┐       ┌────────────────────▼──────┐
+  │         IdleState         │       │      ProcessingState       │
+  │  enter() → low power      │       │  scan → build → send       │
+  │  BUTTON_PRESSED →         │──────►│  → LED feedback → IDLE     │
+  └───────────────────────────┘◄──────└────────────────────────────┘
+```
+
+**ProcessingState** runs `executeProgrammingCycle()` synchronously:
+
+1. Power sensor rail → scan 20 ADC slots (5× ADS1115)
+2. Build `CommandPacket` via `buildProgramFromPieces()`
+3. Send over RF24
+4. LED feedback animation
+5. Power off sensor rail → return to IDLE / STOP
+
+### Keyboard commands
+
+| Key | Action |
+|-----|--------|
+| `P` | Wake from STOP (simulates PB12) |
+| `D` | Load **demo** board |
+| `E` | Load **empty** board |
+| `O` | Load **overflow** board (14× `LOOP_CALL`) |
+| `F` | Simulate failed RF24 transmission |
+
+### Board layout
+
+```
+Slots  0–13  →  Main program area  (14 slots)
+Slots 14–19  →  Loop sub-program   ( 6 slots)
+```
+
+| Piece (`BoxPieceId`) | Motor command |
+|----------------------|---------------|
+| `EMPTY` | (skip) |
+| `FORWARD` | `MOTOR_FORWARD` |
+| `BACKWARD` | `MOTOR_BACKWARD` |
+| `TURN_RIGHT` | `MOTOR_TURN_RIGHT` |
+| `TURN_LEFT` | `MOTOR_TURN_LEFT` |
+| `STOP` | `MOTOR_STOP` |
+| `LOOP_CALL` | Inline-expand loop slots 14–19 |
+
+### LED signaling
+
+3-LED NeoPixel strip (WS2812B on `PC_14`):
+
+| LED | Role | Idle | Active states |
+|-----|------|------|---------------|
+| 0 | System | Off | Cyan (scanning), Green (success) |
+| 1 | RF | Off | White (TX), Red (RF error) |
+| 2 | Build errors | Off | Amber (empty), Red (overflow) |
+
+After success or error animations, the active LED holds for **60 seconds** before returning to idle.
+
+### Program build algorithm
+
+`GaspettoBox::buildProgramFromPieces()` (tested in `utest_box`):
+
+1. Iterate main slots 0–13; append non-`EMPTY` pieces.
+2. On `LOOP_CALL`, inline non-`EMPTY` loop slots 14–19.
+3. `LOOP_CALL` inside the loop area → error.
+4. More than 31 output commands → overflow error.
+5. All slots empty → empty board (not transmitted).
+
+## Event system
+
+| `EventId` | Description |
+|-----------|-------------|
+| `ACTION` | Motor command |
 | `TIMER_ELAPSED` | Timer expiration |
-| `BUTTON_PRESSED` | Physical button press |
+| `BUTTON_PRESSED` | Physical button |
 | `RADIO_TX` | Radio transmission |
 
-| CommandId | Description |
-|-----------|-------------|
+| `CommandId` | Description |
+|-------------|-------------|
 | `MOTOR_FORWARD` | Drive forward |
 | `MOTOR_BACKWARD` | Drive backward |
-| `MOTOR_LEFT` | Turn left |
-| `MOTOR_RIGHT` | Turn right |
-| `MOTOR_STOP` | Stop all motors |
+| `MOTOR_TURN_RIGHT` | Turn right |
+| `MOTOR_TURN_LEFT` | Turn left |
+| `MOTOR_STOP` | Stop motors |
+| `QUEUE_CLEAR` | Clear queued commands and stop |
+
+## Hardware test firmware
+
+These PIO projects live alongside production firmware under `soft/pio/`:
+
+| Project | Purpose |
+|---------|---------|
+| `arduino_box_hw_test` | ADS1115, NeoPixel, NRF bring-up |
+| `arduino_car_hw_test` | Motors, IMU bring-up |
+| `arduino_straight_drive` | PWM threshold + PID straight-drive tuning |
+| `mpu_plot` | IMU plotting utility |
+
+See the root [README.md](../../README.md) for build and flash commands.
 
 ## License
 
-Proprietary - Gaspetto Project
+Proprietary — Gaspetto Project. See root README.

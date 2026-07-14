@@ -6,7 +6,7 @@
 static constexpr uint32_t CE_PIN = PB_15;
 static constexpr uint32_t CSN_PIN = PA_4;
 static const uint8_t gaspetto_box_log_pipe_name[] = "_logb";
-static const uint8_t gaspetto_car_log_pipe_name[] = "_logc";
+static const uint8_t gcar_log_pipe_name[] = "_logc";
 
 RF24 radio(CE_PIN, CSN_PIN);
 
@@ -15,7 +15,7 @@ static void printHelp()
     Serial.println("\\n=== NRF Log Receiver ===");
     Serial.println("Listening on pipes:");
     Serial.println("  Pipe 1: _logb (GaspettoBox logs)");
-    Serial.println("  Pipe 2: _logc (GaspettoCar logs)");
+    Serial.println("  Pipe 2: _logc (GCar logs)");
     Serial.println("Messages are auto-fragmented. Newline ends a log line.");
     Serial.println("========================\\n");
 }
@@ -44,7 +44,7 @@ void setup()
     radio.setAddressWidth(5);
     radio.setPayloadSize(32);
     radio.openReadingPipe(1, gaspetto_box_log_pipe_name);
-    radio.openReadingPipe(2, gaspetto_car_log_pipe_name);
+    radio.openReadingPipe(2, gcar_log_pipe_name);
     radio.startListening();
 
     radio.printDetails();

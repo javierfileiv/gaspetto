@@ -12,13 +12,13 @@ FetchContent_MakeAvailable(googletest)
 add_executable(
   utest_car
   main.cpp
-  gaspetto_car/test_movement_controller.cpp
-  gaspetto_car/test_radio_controller.cpp
-  gaspetto_car/test_radio_controller_unit.cpp
-  gaspetto_car/test_pid_movement.cpp
-  gaspetto_car/test_system_pid.cpp
-  gaspetto_car/test_motor_imu.cpp
-  gaspetto_car/test_queue_clear.cpp
+  gcar/test_movement_controller.cpp
+  gcar/test_radio_controller.cpp
+  gcar/test_radio_controller_unit.cpp
+  gcar/test_pid_movement.cpp
+  gcar/test_system_pid.cpp
+  gcar/test_motor_imu.cpp
+  gcar/test_queue_clear.cpp
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
   mocks/stub_RF24.cpp
@@ -34,8 +34,8 @@ target_link_libraries(
   gtest
   gmock
   pthread
-  gaspetto_car_impl
-  gaspetto_car_itf
+  gcar_impl
+  gcar_itf
   arduino_framework_itf
   arduino_framework_impl
   state_machine_framework_itf

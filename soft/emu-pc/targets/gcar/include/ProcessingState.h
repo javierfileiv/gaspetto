@@ -4,7 +4,7 @@
 #include "State.h"
 
 /**
- * @brief Processing state for GaspettoCar.
+ * @brief Processing state for GCar.
  *
  * Handles motor commands and transitions back to idle on stop.
  */

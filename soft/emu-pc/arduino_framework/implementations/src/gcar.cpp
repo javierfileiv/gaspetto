@@ -1,5 +1,5 @@
 #include "CarEvents.h"
-#include "GaspettoCar_ino.h"
+#include "GCar_ino.h"
 #include "Serial.h"
 
 #ifdef USE_RADIO_CONTROLLER
@@ -8,7 +8,7 @@ extern EventPacket pkt;
 extern Event event;
 #endif
 
-void gaspetto_car_input_switch(char ch)
+void gcar_input_switch(char ch)
 {
     switch (ch) {
 #ifdef USE_RADIO_CONTROLLER

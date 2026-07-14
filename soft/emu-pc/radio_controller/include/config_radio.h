@@ -4,11 +4,11 @@
 #include "RF24.h"
 
 const uint8_t gaspetto_box_pipe_name[] = "_box_";
-const uint8_t gaspetto_car_pipe_name[] = "_car_";
+const uint8_t gcar_pipe_name[] = "_car_";
 /* Log pipe from the Box. */
 const uint8_t gaspetto_box_log_pipe_name[] = "_logb";
 /* Log pipe from the Car. */
-const uint8_t gaspetto_car_log_pipe_name[] = "_logc";
+const uint8_t gcar_log_pipe_name[] = "_logc";
 
 const uint32_t CE_PIN = PB15; /* Chip enable RF24 pin*/
 const uint32_t CSN_PIN = PA4; /* Chip select RF24 pin*/

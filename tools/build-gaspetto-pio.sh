@@ -53,7 +53,7 @@ ensure_dir() {
 
 # List of builds (path label [extra pio args...])
 declare -a BUILD_PATHS=(
-    "$PROJECT_ROOT/soft/pio/GaspettoCar_pio"
+    "$PROJECT_ROOT/soft/pio/GCar_pio"
     "$PROJECT_ROOT/soft/pio/GaspettoBox_pio"
     "$PROJECT_ROOT/soft/pio/NrfSender_pio"
     "$PROJECT_ROOT/soft/pio/arduino_straight_drive"
@@ -63,7 +63,7 @@ declare -a BUILD_PATHS=(
 )
 
 declare -a BUILD_LABELS=(
-    "GaspettoCar"
+    "GCar"
     "GaspettoBox"
     "NrfSender"
     "Arduino Straight Drive"

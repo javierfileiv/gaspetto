@@ -1,11 +1,11 @@
-#ifndef GASPETTO_CAR_FIXTURE_H
-#define GASPETTO_CAR_FIXTURE_H
+#ifndef GCAR_FIXTURE_H
+#define GCAR_FIXTURE_H
 
 #include "CarEvents.h"
 #include "CarStates.h"
 #include "Context.h"
 #include "EventQueue.h"
-#include "GaspettoCar.h"
+#include "GCar.h"
 #include "ProcessingState.h"
 #include "RadioController.h"
 #include "State.h"
@@ -21,7 +21,7 @@ using testing::_;
 using testing::Eq;
 
 static const uint8_t *test_writing_addr = gaspetto_box_pipe_name;
-static const uint8_t *test_reading_addr = gaspetto_car_pipe_name;
+static const uint8_t *test_reading_addr = gcar_pipe_name;
 
 extern bool low_power_mode;
 void enter_low_power_mode(void);
@@ -80,7 +80,7 @@ protected:
     IdleState idleState;
     ProcessingState processingState;
     Context ctx;
-    GaspettoCar gaspettoCar;
+    GCar gaspettoCar;
     Event forwardEvent{ EventId::ACTION, CommandId::MOTOR_FORWARD };
     Event backwardEvent{ EventId::ACTION, CommandId::MOTOR_BACKWARD };
     Event stopEvent{ EventId::ACTION, CommandId::MOTOR_STOP };
@@ -97,4 +97,4 @@ private:
     ::testing::InSequence seq;
 };
 
-#endif /* GASPETTO_CAR_FIXTURE_H */
+#endif /* GCAR_FIXTURE_H */

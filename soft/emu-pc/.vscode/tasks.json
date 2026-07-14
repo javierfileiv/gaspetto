@@ -11,7 +11,7 @@
 				"-B",
 				"${workspaceFolder}/build-car",
 				"-DCMAKE_BUILD_TYPE=Release",
-				"-DGASPETTO_CAR=ON"
+				"-DGCAR=ON"
 			],
 			"group": {
 				"kind": "build",
@@ -61,7 +61,7 @@
 				"--build",
 				"${workspaceFolder}/build-car",
 				"--target",
-				"gaspetto_car"
+				"gcar"
 			],
 			"dependsOn": [
 				"CMake Release Configure Car"
@@ -129,7 +129,7 @@
 				"-B",
 				"${workspaceFolder}/build-car",
 				"-DCMAKE_BUILD_TYPE=Debug",
-				"-DGASPETTO_CAR=ON"
+				"-DGCAR=ON"
 			],
 			"problemMatcher": [],
 			"hide": true
@@ -172,7 +172,7 @@
 				"--build",
 				"${workspaceFolder}/build-car",
 				"--target",
-				"gaspetto_car"
+				"gcar"
 			],
 			"dependsOn": [
 				"CMake Debug Configure Car"

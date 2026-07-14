@@ -5,7 +5,7 @@
             "name": "Debug Gaspetto Car Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-car/targets/gaspetto_car/gaspetto_car",
+            "program": "${workspaceFolder}/build-car/targets/gcar/gcar",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build-car/",

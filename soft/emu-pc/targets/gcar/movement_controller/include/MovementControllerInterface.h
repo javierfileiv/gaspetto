@@ -6,7 +6,7 @@
  * @brief Interface for movement controller.
  *
  * Abstracts the motor/IMU/PID control so that higher-level code
- * (GaspettoCar, states) can be tested with a mock implementation.
+ * (GCar, states) can be tested with a mock implementation.
  */
 class MovementControllerInterface {
 public:

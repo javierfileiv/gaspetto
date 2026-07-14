@@ -1,7 +1,7 @@
 #include "mock_Arduino.h"
 
 #include "Arduino.h"
-#include "GaspettoCar.h" /* Need for pin definitions. */
+#include "GCar.h" /* Need for pin definitions. */
 #include "fixture.h"
 
 #include <atomic>
