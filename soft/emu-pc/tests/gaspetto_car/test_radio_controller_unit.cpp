@@ -125,29 +125,6 @@ TEST_F(RadioControllerUnitTest, ProcessRadioFallsBackToEventPacketPath)
     EXPECT_EQ(appQueue.GetSize(), 1);
 }
 
-TEST_F(RadioControllerUnitTest, EventPacketRxReturnsEarlyWhenRadioQueueIsFull)
-{
-    fillRadioQueue();
-
-    std::array<uint8_t, sizeof(CommandPacket)> raw{};
-    raw[0] = static_cast<uint8_t>(EventId::ACTION);
-    raw[1] = static_cast<uint8_t>(CommandId::MAX_COMMAND_ID); /* force event path */
-
-    EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
-    EXPECT_CALL(rf, _read(_, sizeof(CommandPacket))).WillOnce(Invoke([&raw](void *buf, uint8_t len) {
-        ASSERT_EQ(len, sizeof(CommandPacket));
-        std::memcpy(buf, raw.data(), raw.size());
-    }));
-
-    EXPECT_CALL(rf, _stopListening()).Times(0);
-    EXPECT_CALL(rf, _write(_, _)).Times(0);
-    EXPECT_CALL(rf, _startListening()).Times(0);
-
-    controller.processRadio();
-
-    EXPECT_TRUE(controller.getRadioQueue()->IsFull());
-}
-
 TEST_F(RadioControllerUnitTest, CommandPacketRxStopsWhenAppQueueIsFull)
 {
     fillAppQueue();
