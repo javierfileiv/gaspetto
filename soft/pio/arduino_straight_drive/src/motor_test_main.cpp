@@ -50,32 +50,6 @@ bool timedMovement               = false;
 
 // Forward declarations
 void sendTelemetry();
-void processCommand(const String &cmd);
-void processBinaryCommand(CommandId cmdId)
-{
-    switch (cmdId)
-    {
-    case CommandId::MOTOR_FORWARD:
-        processCommand("W100");
-        break;
-    case CommandId::MOTOR_BACKWARD:
-        processCommand("S100");
-        break;
-    case CommandId::MOTOR_TURN_LEFT:
-        processCommand("A50");
-        break;
-    case CommandId::MOTOR_TURN_RIGHT:
-        processCommand("D50");
-        break;
-    case CommandId::MOTOR_STOP:
-        processCommand("X0");
-        break;
-    default:
-        Serial.print(F("Unknown binary cmd: "));
-        Serial.println(static_cast<int>(cmdId));
-        break;
-    }
-}
 
 // Motor helper: DRV8871 style (two inputs per motor). One side PWM, other LOW.
 struct MotorPins
@@ -195,7 +169,7 @@ void updateStraightDriving()
     unsigned long currentTime = millis();
     if (currentTime - lastTelemetryMs >= telemetryIntervalMs)
     {
-        sendTelemetry();
+        // sendTelemetry();
         lastTelemetryMs = currentTime;
     }
 }
@@ -310,6 +284,63 @@ void processCommand(const String &cmd)
         }
         break;
 
+    case 'F':
+    case 'f':
+        if (imuOk && value > 0)
+        {
+            // Capture current yaw as the target heading
+            yawSetpoint = imu.yaw();   // Set PID setpoint to current direction
+            targetYaw   = yawSetpoint; // Keep for telemetry compatibility
+            baseSpeed   = (float)value;
+
+            // Reset and configure PID
+            myPID.SetTunings(Kp, Ki, Kd);
+            myPID.SetOutputLimits(-180.0, 180.0); // Output in degrees
+            myPID.SetSampleTime(50);              // 50ms sample time for 20Hz update rate
+            myPID.SetMode(1); // AUTOMATIC mode (using 1 instead of AUTOMATIC constant)
+
+            straightDriving = true;
+            straightStartMs = millis();
+
+            // Reset telemetry timer for continuous debug output
+            lastTelemetryMs = millis();
+
+            // Initialize timer if set
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
+                movementStartMs = millis();
+            }
+            else
+            {
+                timedMovement = false;
+            }
+
+            Serial.print(F("Straight driving at PWM "));
+            Serial.print(value);
+            Serial.print(F(", target yaw: "));
+            Serial.print(targetYaw);
+            if (timedMovement)
+            {
+                Serial.print(F(", timer: "));
+                Serial.print(movementDurationMs);
+                Serial.print(F("ms"));
+            }
+            Serial.println();
+        }
+        else if (!imuOk)
+        {
+            Serial.println(F("IMU not available for straight driving"));
+        }
+        else
+        {
+            straightDriving = false;
+            driveOne(motorLeft, 0);
+            driveOne(motorRight, 0);
+            Serial.println(F("Straight driving stopped"));
+        }
+        break;
+
     case 'G': // Backward movement with PID
     case 'g':
         if (imuOk && value > 0)
@@ -362,6 +393,98 @@ void processCommand(const String &cmd)
             driveOne(motorLeft, 0);
             driveOne(motorRight, 0);
             Serial.println(F("Backward driving stopped"));
+        }
+        break;
+
+        break;
+
+    case 'Z':
+    case 'z':
+        if (cmd.startsWith("TL") || cmd.startsWith("tl")) // Turn left 90 degrees
+        {
+            if (imuOk)
+            {
+                float currentYaw = imu.yaw();
+                yawSetpoint      = currentYaw - 90.0; // Turn left 90 degrees
+
+                // Handle 360-degree wraparound
+                if (yawSetpoint < -180.0)
+                {
+                    yawSetpoint += 360.0;
+                }
+
+                targetYaw = yawSetpoint;
+                baseSpeed = 100.0f; // Fixed speed for turning
+
+                myPID.SetTunings(Kp, Ki, Kd);
+                myPID.SetOutputLimits(-180.0, 180.0);
+                myPID.SetSampleTime(50);
+                myPID.SetMode(1);
+
+                straightDriving = false;
+                turningInPlace  = true;
+                straightStartMs = millis();
+                lastTelemetryMs = millis();
+
+                Serial.print(F("Turning left 90°: "));
+                Serial.print(currentYaw, 1);
+                Serial.print(F("° → "));
+                Serial.print(yawSetpoint, 1);
+                Serial.println(F("°"));
+            }
+            else
+            {
+                Serial.println(F("IMU not available for turning"));
+            }
+            return; // Exit early for two-character command
+        }
+        else if (cmd.startsWith("TR") || cmd.startsWith("tr")) // Turn right 90 degrees
+        {
+            if (imuOk)
+            {
+                float currentYaw = imu.yaw();
+                yawSetpoint      = currentYaw + 90.0; // Turn right 90 degrees
+
+                // Handle 360-degree wraparound
+                if (yawSetpoint > 180.0)
+                {
+                    yawSetpoint -= 360.0;
+                }
+
+                targetYaw = yawSetpoint;
+                baseSpeed = 100.0f; // Fixed speed for turning
+
+                myPID.SetTunings(Kp, Ki, Kd);
+                myPID.SetOutputLimits(-180.0, 180.0);
+                myPID.SetSampleTime(50);
+                myPID.SetMode(1);
+
+                straightDriving = false;
+                turningInPlace  = true;
+                straightStartMs = millis();
+                lastTelemetryMs = millis();
+
+                Serial.print(F("Turning right 90°: "));
+                Serial.print(currentYaw, 1);
+                Serial.print(F("° → "));
+                Serial.print(yawSetpoint, 1);
+                Serial.println(F("°"));
+            }
+            else
+            {
+                Serial.println(F("IMU not available for turning"));
+            }
+            return;     // Exit early for two-character command
+        }
+        else if (imuOk) // Original Z command
+        {
+            imu.zeroYaw();
+            targetYaw = 0.0f;
+            Serial.println(F("Yaw reset to zero"));
+        }
+        else
+        {
+            Serial.println(F("IMU not available for yaw reset"));
         }
         break;
 
@@ -571,16 +694,16 @@ void processCommand(const String &cmd)
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
-            // // Initialize timer if set
-            // if (movementDurationMs > 0)
-            // {
-            //     timedMovement   = true;
-            //     movementStartMs = millis();
-            // }
-            // else
-            // {
-            timedMovement = false;
-            // }
+            // Initialize timer if set
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
+                movementStartMs = millis();
+            }
+            else
+            {
+                timedMovement = false;
+            }
 
             Serial.print(F("Turning left 90° at PWM "));
             Serial.print(value);
@@ -592,8 +715,6 @@ void processCommand(const String &cmd)
         }
         else if (!imuOk)
         {
-            imu.zeroYaw();
-            targetYaw = 0.0f;
             Serial.println(F("IMU not available for turning"));
         }
         else
@@ -629,16 +750,16 @@ void processCommand(const String &cmd)
             straightStartMs = millis();
             lastTelemetryMs = millis();
 
-            // // Initialize timer if set
-            // if (movementDurationMs > 0)
-            // {
-            //     timedMovement   = true;
-            //     movementStartMs = millis();
-            // }
-            // else
-            // {
-            timedMovement = false;
-            // }
+            // Initialize timer if set
+            if (movementDurationMs > 0)
+            {
+                timedMovement   = true;
+                movementStartMs = millis();
+            }
+            else
+            {
+                timedMovement = false;
+            }
 
             Serial.print(F("Turning right 90° at PWM "));
             Serial.print(value);
@@ -650,8 +771,6 @@ void processCommand(const String &cmd)
         }
         else if (!imuOk)
         {
-            imu.zeroYaw();
-            targetYaw = 0.0f;
             Serial.println(F("IMU not available for turning"));
         }
         else
@@ -695,15 +814,18 @@ void setup()
     while (!Serial && millis() < 3000)
     {
     }
-    Serial.println(F("NRF24 Motor Test Receiver"));
-    Serial.println(F("Serial commands: L<val>, R<val>, B<val> (direct PWM)"));
-    Serial.println(F("PID Movement: W<val> forward, S<val> backward"));
-    Serial.println(F("  A<val> left 90deg, D<val> right 90deg, X stop"));
-    Serial.println(F("Radio expects binary CommandPacket (count + commands[])"));
-    Serial.println(F("Other: Q<freq> set PWM freq, P show PID, T<val> tune PID"));
-    Serial.println(F("  K<val> set Kp, I<val> set Ki, V<val> set Kd"));
-    Serial.println(F("  M<sec> movement timer, E send debug telemetry"));
+    Serial.println(F("Motor PWM Test Receiver"));
+    Serial.println(F("Commands: L<val>, R<val>, B<val>, F<val> (forward+PID), Z (reset yaw)"));
+    Serial.println(F(
+        "         Q<freq> (set PWM frequency), P (show PID), T<val> (tune PID), D (debug telemetry)"));
+    Serial.println(F(
+        "         M<ms> (set movement timer), K<val> (set Kp), I<val> (set Ki), V<val> (set Kd)"));
+    Serial.println(F(
+        "PID Movement: W<val> (forward), S<val> (backward), A<val> (left 90°), E<val> (right 90°)"));
+    Serial.println(F("         X (emergency stop all movement)"));
     Serial.println(F("PWM range: -255 to +255 (optimized for 17Hz slow movement)"));
+    Serial.println(
+        F("WASDX controls: W30 forward, S30 backward, A50 left turn, E50 right turn, X stop"));
 
     // Setup motor pins
     pinMode(MOTOR_LEFT_BWD, OUTPUT);
@@ -844,23 +966,22 @@ void loop()
 
             CommandPacket cp{};
             radio.read(&cp, len);
+            if (len < sizeof(cp.text))
+                cp.text[len] = '\0';
+            else
+                cp.text[sizeof(cp.text) - 1] = '\0';
 
-            Serial.print(F("RADIO: packet received, count="));
-            Serial.println(cp.count);
-
-            for (uint8_t i = 0; i < cp.count; i++)
+            String cmd = String(cp.text);
+            cmd.trim();
+            if (cmd.length() > 0)
             {
-                CommandId cmdId = static_cast<CommandId>(cp.commands[i]);
-                Serial.print(F("RADIO cmd "));
-                Serial.print(i);
-                Serial.print(F(": "));
-                Serial.println(static_cast<int>(cmdId));
+                Serial.print(F("RADIO: "));
+                processCommand(cmd);
 
-                processBinaryCommand(cmdId);
-
-                // Send ACK with command id
+                // Send ACK
                 AckPayload ap{};
-                snprintf(ap.text, sizeof(ap.text), "ACK:%d", static_cast<int>(cmdId));
+                String ack = "OK:" + cmd;
+                ack.toCharArray(ap.text, sizeof(ap.text));
                 radio.writeAckPayload(0, &ap, sizeof(ap));
             }
         }

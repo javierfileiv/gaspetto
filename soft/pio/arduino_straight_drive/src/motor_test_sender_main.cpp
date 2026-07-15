@@ -158,82 +158,59 @@ void loop()
         if (radioOk)
         {
             CommandPacket cp{};
-            cp.count = 0;
+            cmd.toCharArray(cp.text, sizeof(cp.text));
 
-            if (cmd.length() > 0)
+            radio.stopListening();
+            radio.openWritingPipe(RADIO_ADDR_CMD);
+
+            bool success = radio.write(&cp, sizeof(cp));
+
+            if (success)
             {
-                char ch = cmd.charAt(0);
-                if (ch == 'W' || ch == 'F')
-                    cp.commands[cp.count++] = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
-                else if (ch == 'S' || ch == 'G')
-                    cp.commands[cp.count++] = static_cast<uint8_t>(CommandId::MOTOR_BACKWARD);
-                else if (ch == 'A' || ch == 'Q')
-                    cp.commands[cp.count++] = static_cast<uint8_t>(CommandId::MOTOR_TURN_LEFT);
-                else if (ch == 'D' || ch == 'E')
-                    cp.commands[cp.count++] = static_cast<uint8_t>(CommandId::MOTOR_TURN_RIGHT);
-                else if (ch == 'X')
-                    cp.commands[cp.count++] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
-                else
+                Serial.print(F("TX: OK"));
+
+                // Check for ACK payload
+                if (radio.isAckPayloadAvailable())
                 {
-                    Serial.print(F("Unknown cmd: "));
-                    Serial.println(ch);
-                }
-            }
+                    AckPayload ap{};
+                    memset(&ap, 0, sizeof(ap)); // Clear buffer first
+                    radio.read(&ap, sizeof(ap));
+                    Serial.print(F(" - ACK: "));
 
-            if (cp.count > 0)
-            {
-                radio.stopListening();
-                radio.openWritingPipe(RADIO_ADDR_CMD);
-
-                bool success = radio.write(&cp, sizeof(cp));
-
-                if (success)
-                {
-                    Serial.print(F("TX: OK"));
-
-                    // Check for ACK payload
-                    if (radio.isAckPayloadAvailable())
+                    // Ensure null termination and print safely
+                    ap.text[sizeof(ap.text) - 1] = '\0';
+                    for (uint8_t i = 0; i < sizeof(ap.text) - 1; i++)
                     {
-                        AckPayload ap{};
-                        memset(&ap, 0, sizeof(ap)); // Clear buffer first
-                        radio.read(&ap, sizeof(ap));
-                        Serial.print(F(" - ACK: "));
-
-                        // Ensure null termination and print safely
-                        ap.text[sizeof(ap.text) - 1] = '\0';
-                        for (uint8_t i = 0; i < sizeof(ap.text) - 1; i++)
+                        if (ap.text[i] >= 32 && ap.text[i] <= 126)
                         {
-                            if (ap.text[i] >= 32 && ap.text[i] <= 126)
-                            {
-                                Serial.print(ap.text[i]);
-                            }
-                            else if (ap.text[i] == 0)
-                            {
-                                break;
-                            }
-                            else
-                            {
-                                Serial.print('?'); // Replace non-printable chars
-                            }
+                            Serial.print(ap.text[i]);
+                        }
+                        else if (ap.text[i] == 0)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            Serial.print('?'); // Replace non-printable chars
                         }
                     }
-                    Serial.println();
+                }
+                Serial.println();
+            }
+            else
+            {
+                // Try without ACK as fallback
+                bool fallback = radio.write(&cp, sizeof(cp), true);
+                if (fallback)
+                {
+                    Serial.println(F("TX: FALLBACK"));
                 }
                 else
                 {
-                    // Try without ACK as fallback
-                    bool fallback = radio.write(&cp, sizeof(cp), true);
-                    if (fallback)
-                    {
-                        Serial.println(F("TX: FALLBACK"));
-                    }
-                    else
-                    {
-                        Serial.println(F("TX: FAILED"));
-                    }
+                    Serial.println(F("TX: FAILED"));
                 }
-                radio.startListening();
             }
+            radio.startListening();
         }
         else
         {

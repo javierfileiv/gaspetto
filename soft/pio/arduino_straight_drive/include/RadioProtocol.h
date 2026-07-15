@@ -1,10 +1,6 @@
 // Simple NRF24L01 protocol definitions for command & telemetry + optional ACK payloads
 #pragma once
-#include "CommandId.h"
-#include "CommandPacket.h"
-
 #include <Arduino.h>
-#include <stdint.h>
 
 // 5-byte addresses (nRF24 treats them as char arrays; keep 5 chars + null for readability)
 // NOTE: nRF24 uses fixed 5-byte addresses. We provide a 6-byte array only so the
@@ -13,6 +9,12 @@
 // Use 5 non-null bytes (no embedded 0) for robust addressing. Last element of the 6-byte array
 // is unused/for readability only; RF24 uses first 5 bytes.
 static const uint8_t RADIO_ADDR_CMD[6] = {'C', 'M', 'D', 'C', '1', '\0'}; // Commands TO vehicle
+
+// Command: ASCII text up to 15 chars + null (matches existing serial commands)
+struct __attribute__((packed)) CommandPacket
+{
+    char text[16];
+};
 
 // Telemetry: fits into 32 byte payload (nRF24 max)
 struct __attribute__((packed)) TelemetryPacket
