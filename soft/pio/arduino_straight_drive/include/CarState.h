@@ -31,8 +31,3 @@ extern unsigned long manualExpireMs;
 extern float lastCmdLeft, lastCmdRight;
 extern bool autoResetYawOnMove;
 extern float autoResetThresholdDeg;
-
-// Functions implemented in car_main.cpp
-void drive(float left, float right);
-void resetYawAll(const __FlashStringHelper *reason);
-void printHelp();

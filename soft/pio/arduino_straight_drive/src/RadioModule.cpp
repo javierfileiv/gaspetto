@@ -3,16 +3,10 @@
 
 #include <RF24.h>
 #include <SPI.h>
+#include <config_radio.h>
 #include <cstring>
 
-#ifndef RADIO_CE_PIN
-#define RADIO_CE_PIN PB0
-#endif
-#ifndef RADIO_CSN_PIN
-#define RADIO_CSN_PIN PB1
-#endif
-
-static RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
+static RF24 radio(NRF24_CE, NRF24_CSN);
 static bool radioOk           = false;
 static bool minimalMode       = false;
 static RadioCmdCallback cmdCb = nullptr;
@@ -54,44 +48,35 @@ void radioService()
         radio.available(&pipeNum);
         uint8_t len = 0;
         if (radio.isPVariant())
-        { // still safe; use dynamic size API
+        {
             len = radio.getDynamicPayloadSize();
         }
         if (len == 0 || len > sizeof(CommandPacket))
         {
-            // Read & discard to clear FIFO
             uint8_t dump[32];
             radio.read(&dump, 32);
             continue;
         }
         CommandPacket cp{};
         radio.read(&cp, len);
-        if (len < sizeof(cp.text))
-            cp.text[len] = '\0';
-        else
-            cp.text[sizeof(cp.text) - 1] = '\0';
-        String tok = String(cp.text);
-        tok.trim();
-        if (!tok.length())
-            continue; // ignore empty/noise
         cmdRxCount++;
-        if (!minimalMode)
+
+        for (uint8_t i = 0; i < cp.count; i++)
         {
-            AckPayload ap{};
-            const char prefix[] = "ACK:";
-            size_t idx          = 0;
-            while (idx < sizeof(prefix) - 1 && idx < sizeof(ap.text) - 1)
+            uint8_t cmd = cp.commands[i];
+            if (!minimalMode)
             {
-                ap.text[idx] = prefix[idx];
-                idx++;
+                AckPayload ap{};
+                snprintf(ap.text, sizeof(ap.text), "ACK:%u", cmd);
+                radio.writeAckPayload(0, &ap, sizeof(ap));
             }
-            for (size_t i = 0; i < (size_t)tok.length() && idx < sizeof(ap.text) - 1; i++, idx++)
-                ap.text[idx] = tok.charAt(i);
-            ap.text[idx] = '\0';
-            radio.writeAckPayload(0, &ap, sizeof(ap));
+            if (cmdCb)
+            {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "B%u", cmd);
+                cmdCb(String(buf));
+            }
         }
-        if (cmdCb)
-            cmdCb(tok);
     }
 }
 
@@ -187,10 +172,8 @@ bool radioSendPing(const char *text)
     if (!radioOk)
         return false;
     CommandPacket cp{};
-    if (!text)
-        text = "ping";
-    for (size_t i = 0; i < sizeof(cp.text) - 1 && text[i]; ++i)
-        cp.text[i] = text[i];
+    cp.count = 0;
+    // No commands in ping packet
     radio.stopListening();
     radio.openWritingPipe(RADIO_ADDR_CMD);
     bool ok = radio.write(&cp, sizeof(cp));

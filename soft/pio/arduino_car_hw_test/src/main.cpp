@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <config_radio.h>
 #include <stdint.h> // For uint8_t type
 
 // nRF24L01 registers
@@ -42,10 +43,10 @@ void setup()
     Serial.println("GPIO, I2C and SPI Test Program Starting");
 
     // Initialize GPIO pins as outputs
-    pinMode(PIN_A_MOTOR_RIGHT, OUTPUT);
-    pinMode(PIN_B_MOTOR_RIGHT, OUTPUT);
-    pinMode(PIN_A_MOTOR_LEFT, OUTPUT);
-    pinMode(PIN_B_MOTOR_LEFT, OUTPUT);
+    pinMode(MOTOR_LEFT_BWD, OUTPUT);
+    pinMode(MOTOR_LEFT_FWD, OUTPUT);
+    pinMode(MOTOR_RIGHT_FWD, OUTPUT);
+    pinMode(MOTOR_RIGHT_BWD, OUTPUT);
     pinMode(PIN_LED, OUTPUT);
     pinMode(NRF24_CE, OUTPUT);
     pinMode(NRF24_CSN, OUTPUT);
@@ -53,10 +54,10 @@ void setup()
     // toggling gpios for some loops
 
     // Initialize all pins to LOW/inactive state
-    digitalWrite(PIN_A_MOTOR_RIGHT, LOW);
-    digitalWrite(PIN_B_MOTOR_RIGHT, LOW);
-    digitalWrite(PIN_A_MOTOR_LEFT, LOW);
-    digitalWrite(PIN_B_MOTOR_LEFT, LOW);
+    digitalWrite(MOTOR_LEFT_BWD, LOW);
+    digitalWrite(MOTOR_LEFT_FWD, LOW);
+    digitalWrite(MOTOR_RIGHT_FWD, LOW);
+    digitalWrite(MOTOR_RIGHT_BWD, LOW);
     digitalWrite(PIN_LED, HIGH); // disable LED on PC13
 
     digitalWrite(NRF24_CE, LOW);
@@ -144,22 +145,22 @@ void togglePins()
     pinState = !pinState;
 
     // PB10 - simple toggle (same as pinState)
-    digitalWrite(PIN_A_MOTOR_RIGHT, pinState);
+    digitalWrite(MOTOR_LEFT_BWD, pinState);
 
     // PB11 - opposite of pinState
-    digitalWrite(PIN_B_MOTOR_RIGHT, !pinState);
+    digitalWrite(MOTOR_LEFT_FWD, !pinState);
 
     // PB14 - toggle only every other time (double frequency)
     static bool pb14State = false;
     pb14State             = !pb14State;
-    digitalWrite(PIN_A_MOTOR_LEFT, pb14State);
+    digitalWrite(MOTOR_RIGHT_FWD, pb14State);
 
     // PB15 - pulse pattern (short HIGH pulse then LOW)
     if (pinState)
     {
-        digitalWrite(PIN_B_MOTOR_LEFT, HIGH);
+        digitalWrite(MOTOR_RIGHT_BWD, HIGH);
         delay(200); // 50ms pulse
-        digitalWrite(PIN_B_MOTOR_LEFT, LOW);
+        digitalWrite(MOTOR_RIGHT_BWD, LOW);
     }
 }
 
@@ -195,7 +196,7 @@ bool testMPU6050()
 void readMPU6050Data()
 {
     // Signal on PB10 that we're starting I2C communication
-    digitalWrite(PIN_A_MOTOR_RIGHT, HIGH);
+    digitalWrite(MOTOR_LEFT_BWD, HIGH);
 
     Serial.println("Reading MPU6050 data...");
 
@@ -218,7 +219,7 @@ void readMPU6050Data()
     Serial.println(accelZ);
 
     // Signal on PB10 that we're done with I2C communication
-    digitalWrite(PIN_A_MOTOR_RIGHT, LOW);
+    digitalWrite(MOTOR_LEFT_BWD, LOW);
 }
 
 // Helper function to read a register from nRF24L01
@@ -244,7 +245,7 @@ void writeNRF24Register(uint8_t reg, uint8_t value)
 bool testNRF24L01()
 {
     // Signal that we're starting SPI communication
-    digitalWrite(PIN_B_MOTOR_RIGHT, HIGH);
+    digitalWrite(MOTOR_LEFT_FWD, HIGH);
 
     Serial.println("Testing nRF24L01...");
 
@@ -278,7 +279,7 @@ bool testNRF24L01()
     }
 
     // Signal that we're done with SPI communication
-    digitalWrite(PIN_B_MOTOR_RIGHT, LOW);
+    digitalWrite(MOTOR_LEFT_FWD, LOW);
 
     return isValid;
 }

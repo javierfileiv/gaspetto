@@ -7,9 +7,6 @@
 
 #define PIN_WAKE_BUTTON PB12
 
-#define NRF24_CE PA3
-#define NRF24_CSN PA4
-
 #define I2C1_SCL_PIN PB6
 #define I2C1_SDA_PIN PB7
 #define I2C3_SCL_PIN PA8
