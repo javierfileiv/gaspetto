@@ -22,5 +22,5 @@ target_sources(arduino_framework_impl PRIVATE main.cpp)
 target_include_directories(arduino_framework_impl PRIVATE implementations/include)
 target_link_libraries(
   arduino_framework_impl arduino_framework_itf state_machine_framework_itf radio_controller_itf
-  shared_types
+  shared_types target_config_itf
 )

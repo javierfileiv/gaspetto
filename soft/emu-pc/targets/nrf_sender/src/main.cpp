@@ -2,20 +2,11 @@
 #include "CarEvents.h"
 #include "CommandPacket.h"
 #include "RF24.h"
+#include "config_radio.h"
 
 #include <Arduino.h>
 
-#ifdef ARDUINO_AVR_UNO
-#define CE_PIN 9
-#define CSN_PIN 10
-#else
-#define CE_PIN PB_15
-#define CSN_PIN PA_4
-#endif
-
-const uint8_t gbox_pipe_name[] = "_box_";
-const uint8_t gcar_pipe_name[] = "_car_";
-RF24 radio(CE_PIN, CSN_PIN);
+RF24 radio(NRF24_CE, NRF24_CSN);
 
 /* Forward declarations. */
 void printHelp();

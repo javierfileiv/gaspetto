@@ -1,1 +1,1 @@
-../../GCar_pio/include/pin_definitions.h
+../../../emu-pc/targets/gcar/include/pin_definitions.h

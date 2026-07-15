@@ -82,17 +82,6 @@
       }
     },
     {
-      "name": "nrf-debug",
-      "displayName": "NRF Sender Debug",
-      "description": "Debug build for NRF Sender target",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-nrf-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "NRF_SENDER": "ON"
-      }
-    },
-    {
       "name": "tests",
       "displayName": "Unit Tests",
       "description": "Build all unit tests",
@@ -111,8 +100,6 @@
     { "name": "car-debug", "configurePreset": "car-debug" },
     { "name": "box-release", "configurePreset": "box-release" },
     { "name": "box-debug", "configurePreset": "box-debug" },
-    { "name": "nrf-release", "configurePreset": "nrf-release" },
-    { "name": "nrf-debug", "configurePreset": "nrf-debug" },
     { "name": "tests", "configurePreset": "tests" }
   ]
 }

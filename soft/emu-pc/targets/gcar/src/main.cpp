@@ -24,7 +24,7 @@ extern Event getEmulatedEvent(void);
 #endif
 
 /* const int NRF_IRQ_PIN = PB0; */
-RF24 radio(CE_PIN, CSN_PIN);
+RF24 radio(NRF24_CE, NRF24_CSN);
 EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;

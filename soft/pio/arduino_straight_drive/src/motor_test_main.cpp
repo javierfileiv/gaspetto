@@ -5,7 +5,6 @@
 // NEW: "F<value>" for straight driving with IMU+PID
 
 #include "IMUOrientation.h"
-#include "pin_definitions.h"
 
 #include <Arduino.h>
 #include <PID_v1.h>
@@ -13,15 +12,10 @@
 #include <RadioProtocol.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <config_radio.h>
+#include <pin_definitions.h>
 
-#ifndef RADIO_CE_PIN
-#define RADIO_CE_PIN PB0
-#endif
-#ifndef RADIO_CSN_PIN
-#define RADIO_CSN_PIN PB1
-#endif
-
-RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
+RF24 radio(NRF24_CE, NRF24_CSN);
 bool radioOk = false;
 
 // IMU for straight driving
@@ -56,6 +50,32 @@ bool timedMovement               = false;
 
 // Forward declarations
 void sendTelemetry();
+void processCommand(const String &cmd);
+void processBinaryCommand(CommandId cmdId)
+{
+    switch (cmdId)
+    {
+    case CommandId::MOTOR_FORWARD:
+        processCommand("W100");
+        break;
+    case CommandId::MOTOR_BACKWARD:
+        processCommand("S100");
+        break;
+    case CommandId::MOTOR_TURN_LEFT:
+        processCommand("A50");
+        break;
+    case CommandId::MOTOR_TURN_RIGHT:
+        processCommand("D50");
+        break;
+    case CommandId::MOTOR_STOP:
+        processCommand("X0");
+        break;
+    default:
+        Serial.print(F("Unknown binary cmd: "));
+        Serial.println(static_cast<int>(cmdId));
+        break;
+    }
+}
 
 // Motor helper: DRV8871 style (two inputs per motor). One side PWM, other LOW.
 struct MotorPins
@@ -63,8 +83,8 @@ struct MotorPins
     uint8_t in1;
     uint8_t in2;
 };
-MotorPins motorLeft{PIN_A_MOTOR_LEFT, PIN_B_MOTOR_LEFT};
-MotorPins motorRight{PIN_A_MOTOR_RIGHT, PIN_B_MOTOR_RIGHT};
+MotorPins motorLeft{MOTOR_LEFT_BWD, MOTOR_LEFT_FWD};
+MotorPins motorRight{MOTOR_RIGHT_FWD, MOTOR_RIGHT_BWD};
 
 static inline void driveOne(const MotorPins &m, int pwmValue)
 {
@@ -675,24 +695,21 @@ void setup()
     while (!Serial && millis() < 3000)
     {
     }
-    Serial.println(F("Motor PWM Test Receiver"));
-    Serial.println(F("Commands: L<val>, R<val>, B<val>, F<val> (forward+PID), Z (reset yaw)"));
-    Serial.println(F(
-        "         Q<freq> (set PWM frequency), P (show PID), T<val> (tune PID), D (debug telemetry)"));
-    Serial.println(F(
-        "         M<ms> (set movement timer), K<val> (set Kp), I<val> (set Ki), V<val> (set Kd)"));
-    Serial.println(F(
-        "PID Movement: W<val> (forward), S<val> (backward), A<val> (left 90°), E<val> (right 90°)"));
-    Serial.println(F("         X (emergency stop all movement)"));
+    Serial.println(F("NRF24 Motor Test Receiver"));
+    Serial.println(F("Serial commands: L<val>, R<val>, B<val> (direct PWM)"));
+    Serial.println(F("PID Movement: W<val> forward, S<val> backward"));
+    Serial.println(F("  A<val> left 90deg, D<val> right 90deg, X stop"));
+    Serial.println(F("Radio expects binary CommandPacket (count + commands[])"));
+    Serial.println(F("Other: Q<freq> set PWM freq, P show PID, T<val> tune PID"));
+    Serial.println(F("  K<val> set Kp, I<val> set Ki, V<val> set Kd"));
+    Serial.println(F("  M<sec> movement timer, E send debug telemetry"));
     Serial.println(F("PWM range: -255 to +255 (optimized for 17Hz slow movement)"));
-    Serial.println(
-        F("WASDX controls: W30 forward, S30 backward, A50 left turn, E50 right turn, X stop"));
 
     // Setup motor pins
-    pinMode(PIN_A_MOTOR_LEFT, OUTPUT);
-    pinMode(PIN_B_MOTOR_LEFT, OUTPUT);
-    pinMode(PIN_A_MOTOR_RIGHT, OUTPUT);
-    pinMode(PIN_B_MOTOR_RIGHT, OUTPUT);
+    pinMode(MOTOR_LEFT_BWD, OUTPUT);
+    pinMode(MOTOR_LEFT_FWD, OUTPUT);
+    pinMode(MOTOR_RIGHT_FWD, OUTPUT);
+    pinMode(MOTOR_RIGHT_BWD, OUTPUT);
     pinMode(PIN_LED, OUTPUT);
 
 // Set 17Hz PWM frequency for slow movement
@@ -827,22 +844,23 @@ void loop()
 
             CommandPacket cp{};
             radio.read(&cp, len);
-            if (len < sizeof(cp.text))
-                cp.text[len] = '\0';
-            else
-                cp.text[sizeof(cp.text) - 1] = '\0';
 
-            String cmd = String(cp.text);
-            cmd.trim();
-            if (cmd.length() > 0)
+            Serial.print(F("RADIO: packet received, count="));
+            Serial.println(cp.count);
+
+            for (uint8_t i = 0; i < cp.count; i++)
             {
-                Serial.print(F("RADIO: "));
-                processCommand(cmd);
+                CommandId cmdId = static_cast<CommandId>(cp.commands[i]);
+                Serial.print(F("RADIO cmd "));
+                Serial.print(i);
+                Serial.print(F(": "));
+                Serial.println(static_cast<int>(cmdId));
 
-                // Send ACK
+                processBinaryCommand(cmdId);
+
+                // Send ACK with command id
                 AckPayload ap{};
-                String ack = "OK:" + cmd;
-                ack.toCharArray(ap.text, sizeof(ap.text));
+                snprintf(ap.text, sizeof(ap.text), "ACK:%d", static_cast<int>(cmdId));
                 radio.writeAckPayload(0, &ap, sizeof(ap));
             }
         }

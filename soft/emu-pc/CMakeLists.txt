@@ -30,6 +30,18 @@ option(BUILD_TESTS "Build unit tests" OFF)
 # Define global compile definitions before adding subdirectories
 add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG)
 
+# Interface library carrying the target-specific compile definition (GCAR / GBOX / NRF_SENDER) so
+# that all sub-libraries (radio_controller, arduino_framework, etc.) see the right -D flag.
+if(GCAR)
+  add_library(target_config_itf INTERFACE)
+  target_compile_definitions(target_config_itf INTERFACE GCAR)
+elseif(GBOX)
+  add_library(target_config_itf INTERFACE)
+  target_compile_definitions(target_config_itf INTERFACE GBOX)
+else()
+  add_library(target_config_itf INTERFACE)
+endif()
+
 # Dependencies must be added in order: state_machine_framework first (provides generic templates)
 # shared_types next (provides application-specific Event, StateId) then radio_controller and
 # arduino_framework

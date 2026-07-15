@@ -2,6 +2,7 @@
 #include <RF24.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <config_radio.h>
 
 #ifdef TEST_LED_ANIMATIONS
 #include <Adafruit_NeoPixel.h>
