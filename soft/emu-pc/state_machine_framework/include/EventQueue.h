@@ -4,7 +4,7 @@
 #include "config_event.h"
 
 #ifndef ARDUINO
-#include <cstdint>
+#include <stdint.h>
 #endif
 
 /**
