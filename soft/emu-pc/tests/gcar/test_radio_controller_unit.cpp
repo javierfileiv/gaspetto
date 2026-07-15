@@ -102,7 +102,9 @@ TEST_F(RadioControllerUnitTest, ProcessRadioDecodesCommandPacketIntoActionEvents
 
     EXPECT_EQ(e0.getEventId(), EventId::ACTION);
     EXPECT_EQ(e0.getPayload(), CommandId::MOTOR_FORWARD);
+    EXPECT_EQ(e1.getEventId(), EventId::ACTION);
     EXPECT_EQ(e1.getPayload(), CommandId::MOTOR_TURN_RIGHT);
+    EXPECT_EQ(e2.getEventId(), EventId::ACTION);
     EXPECT_EQ(e2.getPayload(), CommandId::MOTOR_STOP);
 }
 

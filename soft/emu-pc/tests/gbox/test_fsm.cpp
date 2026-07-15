@@ -251,7 +251,8 @@ TEST(GBoxFsmTest, InjectBoardPiecesHandlesUnknownPieceValue)
 {
     BoxTestRig rig;
 
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     board[0] = static_cast<BoxPieceId>(0xFF);
 
     rig.box.injectBoardPieces(board);

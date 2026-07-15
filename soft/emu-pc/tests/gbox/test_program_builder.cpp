@@ -3,11 +3,14 @@
 #include "Wire.h"
 #include "board_presets.h"
 
+#include <array>
+#include <cstring>
 #include <gtest/gtest.h>
 
 TEST(GBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -35,7 +38,8 @@ TEST(GBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
 
 TEST(GBoxProgramBuilderTest, RejectsEmptyBoard)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -48,7 +52,8 @@ TEST(GBoxProgramBuilderTest, RejectsEmptyBoard)
 
 TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
 {
-    BoxBoardPieces board = gbox_test::kOverflowBoardPieces;
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    std::memcpy(board, gbox_test::kOverflowBoardPieces, sizeof(board));
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -61,7 +66,8 @@ TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
 
 TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -76,7 +82,8 @@ TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
 
 TEST(GBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -90,7 +97,8 @@ TEST(GBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
 
 TEST(GBoxProgramBuilderTest, RejectsUnknownMainTokenValue)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -104,7 +112,8 @@ TEST(GBoxProgramBuilderTest, RejectsUnknownMainTokenValue)
 
 TEST(GBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece)
 {
-    BoxBoardPieces board = gbox_test::emptyBoardPieces();
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
     CommandPacket packet{};
     bool isEmpty = false;
 

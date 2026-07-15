@@ -2,7 +2,7 @@
 #define EVENT_H
 
 #ifndef ARDUINO
-#include <cstdint>
+#include <stdint.h>
 #else
 #include "Arduino.h"
 #endif

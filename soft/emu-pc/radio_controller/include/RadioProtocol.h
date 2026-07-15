@@ -1,6 +1,6 @@
 /* Simple NRF24L01 protocol definitions for command & telemetry + optional ACK payloads. */
 #pragma once
-#include <cstdint>
+#include <stdint.h>
 
 /*
  * 5-byte addresses (nRF24 treats them as char arrays; keep 5 chars + null for readability).

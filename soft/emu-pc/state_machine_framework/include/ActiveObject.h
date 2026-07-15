@@ -6,7 +6,7 @@
 #include "State.h"
 
 #ifndef ARDUINO
-#include <cstdint>
+#include <stdint.h>
 #endif
 
 /** @brief Callback type for low power mode. */
