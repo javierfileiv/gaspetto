@@ -4,8 +4,8 @@
 			"path": "soft/pio/arduino_box_hw_test"
 		},
 		{
-			"name": "GaspettoBox_pio",
-			"path": "soft/pio/GaspettoBox_pio"
+			"name": "GBox_pio",
+			"path": "soft/pio/GBox_pio"
 		}
 	],
 	"settings": {}

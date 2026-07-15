@@ -1,13 +1,13 @@
 #include "Adafruit_ADS1X15.h"
-#include "GaspettoBox.h"
+#include "GBox.h"
 #include "Wire.h"
 #include "board_presets.h"
 
 #include <gtest/gtest.h>
 
-TEST(GaspettoBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
+TEST(GBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -20,7 +20,7 @@ TEST(GaspettoBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
     board[15] = BoxPieceId::FORWARD;
     board[16] = BoxPieceId::STOP;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     ASSERT_TRUE(ok);
     ASSERT_FALSE(isEmpty);
@@ -33,78 +33,78 @@ TEST(GaspettoBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
     EXPECT_EQ(packet.commands[5], static_cast<uint8_t>(CommandId::MOTOR_STOP));
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsEmptyBoard)
+TEST(GBoxProgramBuilderTest, RejectsEmptyBoard)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_TRUE(isEmpty);
     EXPECT_EQ(packet.count, 0);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
+TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
 {
-    BoxBoardPieces board = gaspetto_box_test::kOverflowBoardPieces;
+    BoxBoardPieces board = gbox_test::kOverflowBoardPieces;
     CommandPacket packet{};
     bool isEmpty = false;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
     EXPECT_EQ(packet.count, BOX_MAX_PAYLOAD_COMMANDS);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
+TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
     board[0] = BoxPieceId::LOOP_CALL;
     board[14] = BoxPieceId::LOOP_CALL;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
+TEST(GBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
     board[0] = BoxPieceId::INVALID;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsUnknownMainTokenValue)
+TEST(GBoxProgramBuilderTest, RejectsUnknownMainTokenValue)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
     board[0] = static_cast<BoxPieceId>(0xFF);
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece)
+TEST(GBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece)
 {
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     CommandPacket packet{};
     bool isEmpty = false;
 
@@ -126,32 +126,32 @@ TEST(GaspettoBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece
     board[18] = BoxPieceId::STOP;
     board[19] = BoxPieceId::FORWARD;
 
-    const bool ok = GaspettoBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
     EXPECT_EQ(packet.count, BOX_MAX_PAYLOAD_COMMANDS);
 }
 
-TEST(GaspettoBoxProgramBuilderTest, MapsSlotsToExpectedAdsBusesAndAddresses)
+TEST(GBoxProgramBuilderTest, MapsSlotsToExpectedAdsBusesAndAddresses)
 {
     AdsRouteInfo route{};
 
     for (std::size_t slot = 0; slot < 16; ++slot) {
-        ASSERT_TRUE(GaspettoBox::routeForSlot(slot, route));
+        ASSERT_TRUE(GBox::routeForSlot(slot, route));
         EXPECT_FALSE(route.usesI2c3);
         EXPECT_EQ(route.address, static_cast<uint8_t>(0x48 + (slot / 4)));
         EXPECT_EQ(route.channel, static_cast<uint8_t>(slot % 4));
     }
 
     for (std::size_t slot = 16; slot < BOX_TOTAL_SLOTS; ++slot) {
-        ASSERT_TRUE(GaspettoBox::routeForSlot(slot, route));
+        ASSERT_TRUE(GBox::routeForSlot(slot, route));
         EXPECT_TRUE(route.usesI2c3);
         EXPECT_EQ(route.address, 0x4A);
         EXPECT_EQ(route.channel, static_cast<uint8_t>(slot - 16));
     }
 
-    EXPECT_FALSE(GaspettoBox::routeForSlot(BOX_TOTAL_SLOTS, route));
+    EXPECT_FALSE(GBox::routeForSlot(BOX_TOTAL_SLOTS, route));
 }
 
 TEST(AdafruitAdsEmulationTest, AsyncReadReturnsMuxSelectedI2c3RawValue)

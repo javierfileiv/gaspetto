@@ -48,8 +48,8 @@ target_link_libraries(
 add_test(NAME utest_car COMMAND utest_car)
 
 add_executable(
-  utest_box main.cpp gaspetto_box/test_program_builder.cpp gaspetto_box/test_fsm.cpp
-            gaspetto_box/test_button_interrupt.cpp mocks/mock_RF24.cpp
+  utest_box main.cpp gbox/test_program_builder.cpp gbox/test_fsm.cpp gbox/test_button_interrupt.cpp
+            mocks/mock_RF24.cpp
 )
 target_include_directories(utest_box PRIVATE ./ mocks)
 target_link_libraries(
@@ -57,8 +57,8 @@ target_link_libraries(
   gtest
   gmock
   pthread
-  gaspetto_box_impl
-  gaspetto_box_itf
+  gbox_impl
+  gbox_itf
   arduino_framework_itf
   arduino_framework_impl
   radio_controller_impl

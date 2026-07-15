@@ -33,7 +33,7 @@
 				"-B",
 				"${workspaceFolder}/build-box",
 				"-DCMAKE_BUILD_TYPE=Release",
-				"-DGASPETTO_BOX=ON"
+				"-DGBOX=ON"
 			],
 			"problemMatcher": [],
 			"hide": true
@@ -83,7 +83,7 @@
 				"--build",
 				"${workspaceFolder}/build-box",
 				"--target",
-				"gaspetto_box"
+				"gbox"
 			],
 			"dependsOn": [
 				"CMake Release Configure Box"
@@ -144,7 +144,7 @@
 				"-B",
 				"${workspaceFolder}/build-box",
 				"-DCMAKE_BUILD_TYPE=Debug",
-				"-DGASPETTO_BOX=ON"
+				"-DGBOX=ON"
 			],
 			"problemMatcher": [],
 			"hide": true
@@ -194,7 +194,7 @@
 				"--build",
 				"${workspaceFolder}/build-box",
 				"--target",
-				"gaspetto_box"
+				"gbox"
 			],
 			"dependsOn": [
 				"CMake Debug Configure Box"

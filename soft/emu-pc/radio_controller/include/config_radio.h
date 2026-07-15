@@ -3,10 +3,10 @@
 #include "Arduino.h"
 #include "RF24.h"
 
-const uint8_t gaspetto_box_pipe_name[] = "_box_";
+const uint8_t gbox_pipe_name[] = "_box_";
 const uint8_t gcar_pipe_name[] = "_car_";
 /* Log pipe from the Box. */
-const uint8_t gaspetto_box_log_pipe_name[] = "_logb";
+const uint8_t gbox_log_pipe_name[] = "_logb";
 /* Log pipe from the Car. */
 const uint8_t gcar_log_pipe_name[] = "_logc";
 

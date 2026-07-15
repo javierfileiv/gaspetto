@@ -5,7 +5,7 @@
 extern Event event;
 extern RF24 radio;
 
-void gaspetto_box_input_switch(char ch)
+void gbox_input_switch(char ch)
 {
     switch (ch) {
     case 'p':

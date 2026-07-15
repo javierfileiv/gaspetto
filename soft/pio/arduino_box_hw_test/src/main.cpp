@@ -405,7 +405,7 @@ void runI2CTests()
             continue;
         }
 
-        ads.setGain(GAIN_ONE); // ±4.096 V, matches GaspettoBox
+        ads.setGain(GAIN_ONE); // ±4.096 V, matches GBox
 
         uint16_t config = 0;
         bool configOk   = readAdsConfigRegister(entry.wire, entry.address, config);
@@ -511,7 +511,7 @@ void setTwoLeds(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, 
 
 void runScanAnimationTest()
 {
-    // Mirrors GaspettoBox scan: cyan bounce across 3 LEDs, 2 round-trips.
+    // Mirrors GBox scan: cyan bounce across 3 LEDs, 2 round-trips.
     for (int trip = 0; trip < 2; ++trip)
     {
         for (int i = 0; i < 3; ++i)
@@ -530,7 +530,7 @@ void runScanAnimationTest()
 
 void runSuccessAnimationTest()
 {
-    // Mirrors GaspettoBox success: green cascade then hold all green.
+    // Mirrors GBox success: green cascade then hold all green.
     leds.clear();
     for (int i = 0; i < 3; ++i)
     {
@@ -544,7 +544,7 @@ void runSuccessAnimationTest()
 
 void runBuildErrorAnimationTest()
 {
-    // Mirrors GaspettoBox build error: right LED red blink x3 then hold red.
+    // Mirrors GBox build error: right LED red blink x3 then hold red.
     for (int i = 0; i < 3; ++i)
     {
         setOneLed(kLedBuild, 150, 0, 0);
@@ -559,7 +559,7 @@ void runBuildErrorAnimationTest()
 
 void runEmptyBoardAnimationTest()
 {
-    // Mirrors GaspettoBox empty board: right LED amber blink x2 then hold amber.
+    // Mirrors GBox empty board: right LED amber blink x2 then hold amber.
     for (int i = 0; i < 2; ++i)
     {
         setOneLed(kLedBuild, 100, 60, 0);
@@ -574,7 +574,7 @@ void runEmptyBoardAnimationTest()
 
 void runRfErrorAnimationTest()
 {
-    // Mirrors GaspettoBox RF error: center red blink x3 then left green + center red.
+    // Mirrors GBox RF error: center red blink x3 then left green + center red.
     for (int i = 0; i < 3; ++i)
     {
         setOneLed(kLedRadio, 150, 0, 0);

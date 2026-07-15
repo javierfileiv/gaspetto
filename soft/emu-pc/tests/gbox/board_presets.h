@@ -1,10 +1,10 @@
 #pragma once
 
-#include "GaspettoBox.h"
+#include "GBox.h"
 
 #include <array>
 
-namespace gaspetto_box_test
+namespace gbox_test
 {
 inline BoxBoardPieces emptyBoardPieces()
 {
@@ -29,22 +29,22 @@ inline constexpr std::array<BoxPieceId, BOX_TOTAL_SLOTS> kOverflowBoardPieces = 
     BoxPieceId::TURN_LEFT, BoxPieceId::TURN_RIGHT, BoxPieceId::STOP,      BoxPieceId::FORWARD,
 };
 
-inline void injectBoardPieces(GaspettoBox &box, const BoxBoardPieces &boardPieces)
+inline void injectBoardPieces(GBox &box, const BoxBoardPieces &boardPieces)
 {
     box.injectBoardPieces(boardPieces);
 }
 
-inline void injectDemoBoard(GaspettoBox &box)
+inline void injectDemoBoard(GBox &box)
 {
     injectBoardPieces(box, kDemoBoardPieces);
 }
 
-inline void injectEmptyBoard(GaspettoBox &box)
+inline void injectEmptyBoard(GBox &box)
 {
     injectBoardPieces(box, emptyBoardPieces());
 }
 
-inline void injectOverflowBoard(GaspettoBox &box)
+inline void injectOverflowBoard(GBox &box)
 {
     injectBoardPieces(box, kOverflowBoardPieces);
 }

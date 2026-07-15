@@ -1,6 +1,6 @@
 #include "IdleState.h"
 
-#include "GaspettoBox.h"
+#include "GBox.h"
 
 void IdleState::enter()
 {
@@ -9,7 +9,7 @@ void IdleState::enter()
 
 void IdleState::processEvent(Event &evt)
 {
-    GaspettoBox *box = static_cast<GaspettoBox *>(active_object_);
+    GBox *box = static_cast<GBox *>(active_object_);
 
     switch (evt.getEventId()) {
     case EventId::BUTTON_PRESSED:

@@ -41,7 +41,7 @@ using testing::Return;
 
 static constexpr uint32_t PID_PERIOD_MS = 50;
 
-static const uint8_t *sys_writing_addr = gaspetto_box_pipe_name;
+static const uint8_t *sys_writing_addr = gbox_pipe_name;
 static const uint8_t *sys_reading_addr = gcar_pipe_name;
 
 namespace

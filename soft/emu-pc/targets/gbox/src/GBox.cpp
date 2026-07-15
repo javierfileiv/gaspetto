@@ -1,4 +1,4 @@
-#include "GaspettoBox.h"
+#include "GBox.h"
 
 #include "ActiveObject.h"
 #include "Arduino.h"
@@ -239,7 +239,7 @@ bool appendPieceCommand(CommandPacket &packet, BoxPieceId piece)
 }
 }
 
-GaspettoBox::GaspettoBox(Context &ctx)
+GBox::GBox(Context &ctx)
         : GenericActiveObject()
         , _ctx(ctx)
         , lastScan{}
@@ -254,12 +254,12 @@ GaspettoBox::GaspettoBox(Context &ctx)
     initMachine(StateId::PROCESSING, ctx.processingState);
 }
 
-void GaspettoBox::init(StateId initialStateId)
+void GBox::init(StateId initialStateId)
 {
     GenericActiveObject::init(initialStateId);
 }
 
-int GaspettoBox::postEvent(Event evt)
+int GBox::postEvent(Event evt)
 {
     if (_ctx.mainEventQueue) {
         _ctx.mainEventQueue->enqueue(evt);
@@ -268,7 +268,7 @@ int GaspettoBox::postEvent(Event evt)
     return -1;
 }
 
-void GaspettoBox::work()
+void GBox::work()
 {
     if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
@@ -279,7 +279,7 @@ void GaspettoBox::work()
     }
 }
 
-void GaspettoBox::enterLowPowerMode()
+void GBox::enterLowPowerMode()
 {
     prepareForStop();
 #ifdef LOW_POWER_MODE
@@ -297,7 +297,7 @@ void GaspettoBox::enterLowPowerMode()
 #endif
 }
 
-void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
+void GBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
 {
 #ifdef ARDUINO
     if (currentTime - lastDebounceTime_ > debounceDelay) {
@@ -318,8 +318,8 @@ void GaspettoBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
 #endif
 }
 
-bool GaspettoBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &packet,
-                                         bool &isEmpty)
+bool GBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &packet,
+                                  bool &isEmpty)
 {
     std::array<BoxPieceId, BOX_LOOP_SLOTS> loopPieces = {};
 
@@ -372,7 +372,7 @@ bool GaspettoBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, Comm
     return !isEmpty;
 }
 
-bool GaspettoBox::routeForSlot(std::size_t slot, AdsRouteInfo &route)
+bool GBox::routeForSlot(std::size_t slot, AdsRouteInfo &route)
 {
     for (const AdsDeviceConfig &device : kAdsDevices) {
         const std::size_t slotBase = static_cast<std::size_t>(device.slotBase);
@@ -388,7 +388,7 @@ bool GaspettoBox::routeForSlot(std::size_t slot, AdsRouteInfo &route)
     return false;
 }
 
-void GaspettoBox::initHardware()
+void GBox::initHardware()
 {
     if (initialized_) {
         return;
@@ -413,37 +413,37 @@ void GaspettoBox::initHardware()
         _ctx.radioController->init();
     }
     initialized_ = true;
-    logln("GaspettoBox: hardware initialized.");
+    logln("GBox: hardware initialized.");
 }
 
 #ifndef ARDUINO
 /* Used for command injection in emulation mode. */
-void GaspettoBox::injectBoardPieces(const BoxBoardPieces &boardPieces)
+void GBox::injectBoardPieces(const BoxBoardPieces &boardPieces)
 {
     for (std::size_t index = 0; index < BOX_TOTAL_SLOTS; ++index) {
         Adafruit_ADS1115::setRawValue(index,
                                       static_cast<int16_t>(rawValueForPiece(boardPieces[index])));
     }
-    logln("GaspettoBox: board pieces injected.");
+    logln("GBox: board pieces injected.");
 }
 
 /* Used for command injection in emulation mode. */
-void GaspettoBox::injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawValues)
+void GBox::injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawValues)
 {
     for (std::size_t index = 0; index < BOX_TOTAL_SLOTS; ++index) {
         Adafruit_ADS1115::setRawValue(index, static_cast<int16_t>(rawValues[index]));
     }
-    logln("GaspettoBox: raw ADC values injected.");
+    logln("GBox: raw ADC values injected.");
 }
 #endif
 
-void GaspettoBox::restoreFromStop()
+void GBox::restoreFromStop()
 {
     SystemClock_Config();
-    logln("GaspettoBox: wake-up sequence complete.");
+    logln("GBox: wake-up sequence complete.");
 }
 
-void GaspettoBox::SystemClock_Config()
+void GBox::SystemClock_Config()
 {
 #ifdef ARDUINO
     /* STM32 clocks must be restored here after STOP wake-up on target hardware. */
@@ -452,7 +452,7 @@ void GaspettoBox::SystemClock_Config()
 #endif
 }
 
-void GaspettoBox::configurePins()
+void GBox::configurePins()
 {
     pinMode(PIN_MOSFET_5V_LEDS, OUTPUT_OPEN_DRAIN);
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
@@ -466,21 +466,21 @@ void GaspettoBox::configurePins()
     pinMode(PIN_WAKE_BUTTON, INPUT_PULLUP);
 }
 
-void GaspettoBox::setSensorRailEnabled(bool enabled)
+void GBox::setSensorRailEnabled(bool enabled)
 {
     digitalWrite(PIN_MOSFET_3V3_SENSORS, enabled ? LOW : HIGH);
     log(enabled ? "3.3V sensor rail ON" : "3.3V sensor rail OFF");
     logln();
 }
 
-void GaspettoBox::setLedRailEnabled(bool enabled)
+void GBox::setLedRailEnabled(bool enabled)
 {
     digitalWrite(PIN_MOSFET_5V_LEDS, enabled ? LOW : HIGH);
     log(enabled ? "5V LED rail ON (PB14 pulled low)" : "5V LED rail OFF (PB14 released)");
     logln();
 }
 
-void GaspettoBox::blackoutLeds()
+void GBox::blackoutLeds()
 {
 #ifdef ARDUINO
     leds_.clear();
@@ -489,12 +489,12 @@ void GaspettoBox::blackoutLeds()
     logln("LEDs: blackout.");
 }
 
-void GaspettoBox::delayMs(int ms) const
+void GBox::delayMs(int ms) const
 {
     delay(ms);
 }
 
-void GaspettoBox::runScanAnimation()
+void GBox::runScanAnimation()
 {
     setLedRailEnabled(true);
     delayMs(50);
@@ -526,7 +526,7 @@ void GaspettoBox::runScanAnimation()
 #endif
 }
 
-void GaspettoBox::runSuccessAnimation()
+void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
 #ifdef ARDUINO
@@ -550,7 +550,7 @@ void GaspettoBox::runSuccessAnimation()
 #endif
 }
 
-void GaspettoBox::runBuildErrorAnimation()
+void GBox::runBuildErrorAnimation()
 {
     setLedRailEnabled(true);
 #ifdef ARDUINO
@@ -579,7 +579,7 @@ void GaspettoBox::runBuildErrorAnimation()
 #endif
 }
 
-void GaspettoBox::runEmptyBoardAnimation()
+void GBox::runEmptyBoardAnimation()
 {
     setLedRailEnabled(true);
 #ifdef ARDUINO
@@ -608,7 +608,7 @@ void GaspettoBox::runEmptyBoardAnimation()
 #endif
 }
 
-void GaspettoBox::runRfErrorAnimation()
+void GBox::runRfErrorAnimation()
 {
     setLedRailEnabled(true);
 #ifdef ARDUINO
@@ -638,7 +638,7 @@ void GaspettoBox::runRfErrorAnimation()
 #endif
 }
 
-void GaspettoBox::scanSlots()
+void GBox::scanSlots()
 {
     for (const AdsDeviceConfig &device : kAdsDevices) {
         Adafruit_ADS1115 ads;
@@ -767,7 +767,7 @@ void GaspettoBox::scanSlots()
     }
 }
 
-bool GaspettoBox::buildProgram(CommandPacket &packet, bool &isEmpty)
+bool GBox::buildProgram(CommandPacket &packet, bool &isEmpty)
 {
     BoxBoardPieces boardPieces = {};
 
@@ -791,7 +791,7 @@ bool GaspettoBox::buildProgram(CommandPacket &packet, bool &isEmpty)
     return true;
 }
 
-bool GaspettoBox::sendProgram(const CommandPacket &packet)
+bool GBox::sendProgram(const CommandPacket &packet)
 {
     if (_ctx.radioController == nullptr) {
         logln("Radio controller unavailable.");
@@ -805,15 +805,15 @@ bool GaspettoBox::sendProgram(const CommandPacket &packet)
     return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 }
 
-void GaspettoBox::prepareForStop()
+void GBox::prepareForStop()
 {
     blackoutLeds();
     setLedRailEnabled(false);
     setSensorRailEnabled(false);
-    logln("GaspettoBox: STOP mode armed.");
+    logln("GBox: STOP mode armed.");
 }
 
-uint16_t GaspettoBox::rawValueForPiece(BoxPieceId piece) const
+uint16_t GBox::rawValueForPiece(BoxPieceId piece) const
 {
     for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
         if (entry.piece == piece) {
@@ -824,7 +824,7 @@ uint16_t GaspettoBox::rawValueForPiece(BoxPieceId piece) const
     return 0;
 }
 
-BoxPieceId GaspettoBox::decodePiece(uint16_t rawValue) const
+BoxPieceId GBox::decodePiece(uint16_t rawValue) const
 {
     for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
         if (rawValue >= entry.minValue && rawValue <= entry.maxValue) {
@@ -835,7 +835,7 @@ BoxPieceId GaspettoBox::decodePiece(uint16_t rawValue) const
     return BoxPieceId::INVALID;
 }
 
-const char *GaspettoBox::pieceToString(BoxPieceId piece) const
+const char *GBox::pieceToString(BoxPieceId piece) const
 {
     switch (piece) {
     case BoxPieceId::EMPTY:
@@ -857,7 +857,7 @@ const char *GaspettoBox::pieceToString(BoxPieceId piece) const
     }
 }
 
-bool GaspettoBox::sendClearQueueCommand()
+bool GBox::sendClearQueueCommand()
 {
     if (_ctx.radioController == nullptr) {
         logln("Radio controller unavailable for clear queue command.");
@@ -875,18 +875,18 @@ bool GaspettoBox::sendClearQueueCommand()
     return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 }
 
-bool GaspettoBox::isCurrentlyScanning() const
+bool GBox::isCurrentlyScanning() const
 {
     return isScanning_;
 }
 
-void GaspettoBox::startScanning()
+void GBox::startScanning()
 {
     isScanning_ = true;
     logln("Scanning started.");
 }
 
-void GaspettoBox::interruptScanning()
+void GBox::interruptScanning()
 {
     isScanning_ = false;
     logln("Scanning interrupted by button press.");

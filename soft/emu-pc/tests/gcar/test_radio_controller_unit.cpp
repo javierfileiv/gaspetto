@@ -31,7 +31,7 @@ class RadioControllerUnitTest : public ::testing::Test {
 protected:
     EventQueue appQueue;
     StrictMock<MockRF24> rf{ 10000000 };
-    RadioController controller{ rf, &appQueue, gaspetto_box_pipe_name, gcar_pipe_name };
+    RadioController controller{ rf, &appQueue, gbox_pipe_name, gcar_pipe_name };
 
     static Event makeAction(CommandId cmd)
     {
@@ -179,7 +179,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetrySuccessUsesTelemetryPipeAndRestores
         EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(true));
         EXPECT_CALL(rf, _startListening());
         EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gaspetto_box_pipe_name));
+            EXPECT_TRUE(same5(addr, gbox_pipe_name));
         }));
     }
 
@@ -199,7 +199,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetryFailureStillRestoresCommandPipe)
         EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(false));
         EXPECT_CALL(rf, _startListening());
         EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gaspetto_box_pipe_name));
+            EXPECT_TRUE(same5(addr, gbox_pipe_name));
         }));
     }
 

@@ -1,5 +1,5 @@
 #include "Context.h"
-#include "GaspettoBox.h"
+#include "GBox.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
 #include "RadioController.h"
@@ -17,10 +17,10 @@ using testing::StrictMock;
 
 namespace
 {
-class TestableGaspettoBox : public GaspettoBox {
+class TestableGBox : public GBox {
 public:
-    explicit TestableGaspettoBox(Context &ctx)
-            : GaspettoBox(ctx)
+    explicit TestableGBox(Context &ctx)
+            : GBox(ctx)
     {
     }
 
@@ -43,10 +43,10 @@ struct BoxTestRig {
     StrictMock<MockRF24> mockRf24{ 10000000 };
     RadioController radioController;
     Context ctx;
-    TestableGaspettoBox box;
+    TestableGBox box;
 
     BoxTestRig()
-            : radioController(mockRf24, &eventQueue, gaspetto_box_pipe_name, gcar_pipe_name)
+            : radioController(mockRf24, &eventQueue, gbox_pipe_name, gcar_pipe_name)
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
@@ -59,7 +59,7 @@ struct BoxTestRig {
 /* ============================================================================ */
 /* Test: isCurrentlyScanning() returns correct state                           */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, IsCurrentlyScanningShouldReturnFalseByDefault)
+TEST(GBoxButtonInterruptTest, IsCurrentlyScanningShouldReturnFalseByDefault)
 {
     BoxTestRig rig;
 
@@ -69,13 +69,13 @@ TEST(GaspettoBoxButtonInterruptTest, IsCurrentlyScanningShouldReturnFalseByDefau
 /* ============================================================================ */
 /* Test: Button interrupt during processing sends clear queue command         */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, ButtonPressedDuringProcessingSendsClearQueueCommand)
+TEST(GBoxButtonInterruptTest, ButtonPressedDuringProcessingSendsClearQueueCommand)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     /* First button press starts processing */
     {
@@ -94,11 +94,11 @@ TEST(GaspettoBoxButtonInterruptTest, ButtonPressedDuringProcessingSendsClearQueu
 /* ============================================================================ */
 /* Test: sendClearQueueCommand() creates correct packet with QUEUE_CLEAR      */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
+TEST(GBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
 {
     BoxTestRig rig;
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     InSequence seq;
     EXPECT_CALL(rig.mockRf24, _stopListening());
@@ -121,7 +121,7 @@ TEST(GaspettoBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
 /* ============================================================================ */
 /* Test: sendClearQueueCommand() returns false when radio controller is null  */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, SendClearQueueCommandReturnsFalseWhenRadioNull)
+TEST(GBoxButtonInterruptTest, SendClearQueueCommandReturnsFalseWhenRadioNull)
 {
     EventQueue eventQueue;
     TimeredEventQueue timeredEventQueue;
@@ -129,7 +129,7 @@ TEST(GaspettoBoxButtonInterruptTest, SendClearQueueCommandReturnsFalseWhenRadioN
     ProcessingState processingState;
     Context ctx{ &eventQueue, &timeredEventQueue, nullptr, &idleState, &processingState };
 
-    TestableGaspettoBox box(ctx);
+    TestableGBox box(ctx);
     box.setLowPowerModeCallback([]() {});
     box.init(StateId::IDLE);
 
@@ -141,7 +141,7 @@ TEST(GaspettoBoxButtonInterruptTest, SendClearQueueCommandReturnsFalseWhenRadioN
 /* ============================================================================ */
 /* Test: interruptScanning() sets scanning flag to false                       */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, InterruptScanningSetsFlagToFalse)
+TEST(GBoxButtonInterruptTest, InterruptScanningSetsFlagToFalse)
 {
     BoxTestRig rig;
 
@@ -161,7 +161,7 @@ TEST(GaspettoBoxButtonInterruptTest, InterruptScanningSetsFlagToFalse)
     EXPECT_FALSE(rig.box.isCurrentlyScanning());
 }
 
-TEST(GaspettoBoxButtonInterruptTest, ProcessingStateButtonPressInterruptsScanAndClearsQueue)
+TEST(GBoxButtonInterruptTest, ProcessingStateButtonPressInterruptsScanAndClearsQueue)
 {
     BoxTestRig rig;
     rig.box.startScanning();
@@ -180,7 +180,7 @@ TEST(GaspettoBoxButtonInterruptTest, ProcessingStateButtonPressInterruptsScanAnd
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxButtonInterruptTest, ProcessingStateIgnoresNonButtonInterruptEvent)
+TEST(GBoxButtonInterruptTest, ProcessingStateIgnoresNonButtonInterruptEvent)
 {
     BoxTestRig rig;
 
@@ -197,13 +197,13 @@ TEST(GaspettoBoxButtonInterruptTest, ProcessingStateIgnoresNonButtonInterruptEve
 /* ============================================================================ */
 /* Test: Button press in idle state transitions to processing (wake-up)       */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, ButtonPressInIdleTransitionsToProcessing)
+TEST(GBoxButtonInterruptTest, ButtonPressInIdleTransitionsToProcessing)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -222,11 +222,11 @@ TEST(GaspettoBoxButtonInterruptTest, ButtonPressInIdleTransitionsToProcessing)
 /* ============================================================================ */
 /* Test: Multiple button presses                                              */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
+TEST(GBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
 {
     BoxTestRig rig;
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     /* First button press */
     {
@@ -242,7 +242,7 @@ TEST(GaspettoBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
     /* Second button press - re-inject board since it was processed */
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -260,13 +260,13 @@ TEST(GaspettoBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
 /* ============================================================================ */
 /* Test: Empty board with button press                                        */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, EmptyBoardWithButtonPressDoesNotSend)
+TEST(GBoxButtonInterruptTest, EmptyBoardWithButtonPressDoesNotSend)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectEmptyBoard(rig.box);
+    gbox_test::injectEmptyBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
     EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
@@ -281,13 +281,13 @@ TEST(GaspettoBoxButtonInterruptTest, EmptyBoardWithButtonPressDoesNotSend)
 /* ============================================================================ */
 /* Test: Radio failure during normal operation                                */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, RadioFailureDuringNormalOperation)
+TEST(GBoxButtonInterruptTest, RadioFailureDuringNormalOperation)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -305,7 +305,7 @@ TEST(GaspettoBoxButtonInterruptTest, RadioFailureDuringNormalOperation)
 /* ============================================================================ */
 /* Test: Clear queue command sends QUEUE_CLEAR first, then MOTOR_STOP        */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, ClearQueueCommandOrderIsCorrect)
+TEST(GBoxButtonInterruptTest, ClearQueueCommandOrderIsCorrect)
 {
     BoxTestRig rig;
 
@@ -328,13 +328,13 @@ TEST(GaspettoBoxButtonInterruptTest, ClearQueueCommandOrderIsCorrect)
 /* ============================================================================ */
 /* Test: Interrupted scan returns to idle                                     */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, InterruptedScanTransitionsToIdle)
+TEST(GBoxButtonInterruptTest, InterruptedScanTransitionsToIdle)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -352,13 +352,13 @@ TEST(GaspettoBoxButtonInterruptTest, InterruptedScanTransitionsToIdle)
 /* ============================================================================ */
 /* Test: Overflow board with button press                                     */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, OverflowBoardWithButtonPressFails)
+TEST(GBoxButtonInterruptTest, OverflowBoardWithButtonPressFails)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectOverflowBoard(rig.box);
+    gbox_test::injectOverflowBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
     EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
@@ -373,7 +373,7 @@ TEST(GaspettoBoxButtonInterruptTest, OverflowBoardWithButtonPressFails)
 /* ============================================================================ */
 /* Test: Clear queue command includes both QUEUE_CLEAR and MOTOR_STOP         */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, ClearQueueCommandIncludesBothCommands)
+TEST(GBoxButtonInterruptTest, ClearQueueCommandIncludesBothCommands)
 {
     BoxTestRig rig;
 
@@ -402,11 +402,11 @@ TEST(GaspettoBoxButtonInterruptTest, ClearQueueCommandIncludesBothCommands)
 /* ============================================================================ */
 /* Test: Processing state handles button press event                          */
 /* ============================================================================ */
-TEST(GaspettoBoxButtonInterruptTest, ProcessingStateHandlesButtonPressEvent)
+TEST(GBoxButtonInterruptTest, ProcessingStateHandlesButtonPressEvent)
 {
     BoxTestRig rig;
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     /* Transition to processing */
     {

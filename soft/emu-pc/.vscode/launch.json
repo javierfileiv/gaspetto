@@ -25,7 +25,7 @@
             "name": "Debug Gaspetto Box Program",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-box/targets/gaspetto_box/gaspetto_box",
+            "program": "${workspaceFolder}/build-box/targets/gbox/gbox",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build-box/",

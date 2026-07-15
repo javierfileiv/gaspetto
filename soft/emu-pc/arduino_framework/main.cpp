@@ -49,8 +49,8 @@ static void keyboardInput(void)
             ISR();
 #endif
 #endif
-#ifdef GASPETTO_BOX
-            gaspetto_box_input_switch(ch);
+#ifdef GBOX
+            gbox_input_switch(ch);
             ISR();
 #endif
 #if NRF_SENDER

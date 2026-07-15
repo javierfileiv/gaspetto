@@ -1,5 +1,5 @@
 #include "Context.h"
-#include "GaspettoBox.h"
+#include "GBox.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
 #include "RadioController.h"
@@ -18,10 +18,10 @@ using testing::StrictMock;
 
 namespace
 {
-class TestableGaspettoBox : public GaspettoBox {
+class TestableGBox : public GBox {
 public:
-    explicit TestableGaspettoBox(Context &ctx)
-            : GaspettoBox(ctx)
+    explicit TestableGBox(Context &ctx)
+            : GBox(ctx)
     {
     }
 
@@ -61,10 +61,10 @@ struct BoxTestRig {
     StrictMock<MockRF24> mockRf24{ 10000000 };
     RadioController radioController;
     Context ctx;
-    TestableGaspettoBox box;
+    TestableGBox box;
 
     BoxTestRig()
-            : radioController(mockRf24, &eventQueue, gaspetto_box_pipe_name, gcar_pipe_name)
+            : radioController(mockRf24, &eventQueue, gbox_pipe_name, gcar_pipe_name)
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
@@ -74,13 +74,13 @@ struct BoxTestRig {
 };
 }
 
-TEST(GaspettoBoxFsmTest, ButtonPressRunsProcessingAndReturnsToIdle)
+TEST(GBoxFsmTest, ButtonPressRunsProcessingAndReturnsToIdle)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -95,13 +95,13 @@ TEST(GaspettoBoxFsmTest, ButtonPressRunsProcessingAndReturnsToIdle)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, EmptyBoardStaysIdleWithoutRadioSend)
+TEST(GBoxFsmTest, EmptyBoardStaysIdleWithoutRadioSend)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectEmptyBoard(rig.box);
+    gbox_test::injectEmptyBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
     EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
@@ -113,13 +113,13 @@ TEST(GaspettoBoxFsmTest, EmptyBoardStaysIdleWithoutRadioSend)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, RadioFailureStillReturnsToIdle)
+TEST(GBoxFsmTest, RadioFailureStillReturnsToIdle)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectDemoBoard(rig.box);
+    gbox_test::injectDemoBoard(rig.box);
 
     {
         InSequence seq;
@@ -134,13 +134,13 @@ TEST(GaspettoBoxFsmTest, RadioFailureStillReturnsToIdle)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, OverflowBoardBuildFailsWithoutRadioSend)
+TEST(GBoxFsmTest, OverflowBoardBuildFailsWithoutRadioSend)
 {
     BoxTestRig rig;
 
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
-    gaspetto_box_test::injectOverflowBoard(rig.box);
+    gbox_test::injectOverflowBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
     EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
@@ -152,7 +152,7 @@ TEST(GaspettoBoxFsmTest, OverflowBoardBuildFailsWithoutRadioSend)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, InitHardwareNotTwice)
+TEST(GBoxFsmTest, InitHardwareNotTwice)
 {
     BoxTestRig rig;
 
@@ -170,14 +170,14 @@ TEST(GaspettoBoxFsmTest, InitHardwareNotTwice)
     rig.box.initHardware();
 }
 
-TEST(GaspettoBoxFsmTest, SendProgramReturnsFalseWhenRadioControllerMissing)
+TEST(GBoxFsmTest, SendProgramReturnsFalseWhenRadioControllerMissing)
 {
     EventQueue eventQueue;
     TimeredEventQueue timeredEventQueue;
     IdleState idleState;
     ProcessingState processingState;
     Context ctx{ &eventQueue, &timeredEventQueue, nullptr, &idleState, &processingState };
-    TestableGaspettoBox box(ctx);
+    TestableGBox box(ctx);
 
     CommandPacket packet{};
     packet.count = 1;
@@ -186,18 +186,18 @@ TEST(GaspettoBoxFsmTest, SendProgramReturnsFalseWhenRadioControllerMissing)
     EXPECT_FALSE(box.sendProgram(packet));
 }
 
-TEST(GaspettoBoxFsmTest, PostEventFailsWhenQueueMissing)
+TEST(GBoxFsmTest, PostEventFailsWhenQueueMissing)
 {
     TimeredEventQueue timeredEventQueue;
     IdleState idleState;
     ProcessingState processingState;
     Context ctx{ nullptr, &timeredEventQueue, nullptr, &idleState, &processingState };
-    TestableGaspettoBox box(ctx);
+    TestableGBox box(ctx);
 
     EXPECT_EQ(box.postEvent(makeButtonPressedEvent()), -1);
 }
 
-TEST(GaspettoBoxFsmTest, DebouncePathHandlesFullQueueInEmulation)
+TEST(GBoxFsmTest, DebouncePathHandlesFullQueueInEmulation)
 {
     BoxTestRig rig;
 
@@ -212,7 +212,7 @@ TEST(GaspettoBoxFsmTest, DebouncePathHandlesFullQueueInEmulation)
     EXPECT_TRUE(rig.eventQueue.IsFull());
 }
 
-TEST(GaspettoBoxFsmTest, DebouncePathEnqueuesWhenQueueHasRoom)
+TEST(GBoxFsmTest, DebouncePathEnqueuesWhenQueueHasRoom)
 {
     BoxTestRig rig;
 
@@ -227,7 +227,7 @@ TEST(GaspettoBoxFsmTest, DebouncePathEnqueuesWhenQueueHasRoom)
     EXPECT_EQ(dequeued.getEventId(), EventId::BUTTON_PRESSED);
 }
 
-TEST(GaspettoBoxFsmTest, InjectRawAdcValuesCanProduceInvalidPieces)
+TEST(GBoxFsmTest, InjectRawAdcValuesCanProduceInvalidPieces)
 {
     BoxTestRig rig;
 
@@ -247,11 +247,11 @@ TEST(GaspettoBoxFsmTest, InjectRawAdcValuesCanProduceInvalidPieces)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, InjectBoardPiecesHandlesUnknownPieceValue)
+TEST(GBoxFsmTest, InjectBoardPiecesHandlesUnknownPieceValue)
 {
     BoxTestRig rig;
 
-    BoxBoardPieces board = gaspetto_box_test::emptyBoardPieces();
+    BoxBoardPieces board = gbox_test::emptyBoardPieces();
     board[0] = static_cast<BoxPieceId>(0xFF);
 
     rig.box.injectBoardPieces(board);
@@ -266,20 +266,20 @@ TEST(GaspettoBoxFsmTest, InjectBoardPiecesHandlesUnknownPieceValue)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, BaseDelayPathIsExercisedByConcreteBox)
+TEST(GBoxFsmTest, BaseDelayPathIsExercisedByConcreteBox)
 {
     EventQueue eventQueue;
     TimeredEventQueue timeredEventQueue;
     IdleState idleState;
     ProcessingState processingState;
     Context ctx{ &eventQueue, &timeredEventQueue, nullptr, &idleState, &processingState };
-    GaspettoBox box(ctx);
+    GBox box(ctx);
 
     /* Uses base delayMs() implementation (no test override). */
     box.runScanAnimation();
 }
 
-TEST(GaspettoBoxFsmTest, IdleStateIgnoresNonButtonEvents)
+TEST(GBoxFsmTest, IdleStateIgnoresNonButtonEvents)
 {
     BoxTestRig rig;
 
@@ -296,7 +296,7 @@ TEST(GaspettoBoxFsmTest, IdleStateIgnoresNonButtonEvents)
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, AdsBeginFailurePathProducesBuildErrorWithoutRadioSend)
+TEST(GBoxFsmTest, AdsBeginFailurePathProducesBuildErrorWithoutRadioSend)
 {
     BoxTestRig rig;
 
@@ -314,7 +314,7 @@ TEST(GaspettoBoxFsmTest, AdsBeginFailurePathProducesBuildErrorWithoutRadioSend)
     unsetenv("ADS_BEGIN_FAIL");
 }
 
-TEST(GaspettoBoxFsmTest, NegativeAdsSamplesTriggerRecoveryAndBuildErrorWithoutRadioSend)
+TEST(GBoxFsmTest, NegativeAdsSamplesTriggerRecoveryAndBuildErrorWithoutRadioSend)
 {
     BoxTestRig rig;
     ScopedEnvFlag forceNegativeRaw("ADS_FORCE_NEGATIVE_RAW");
@@ -329,7 +329,7 @@ TEST(GaspettoBoxFsmTest, NegativeAdsSamplesTriggerRecoveryAndBuildErrorWithoutRa
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
 }
 
-TEST(GaspettoBoxFsmTest, StuckAdsConversionTriggersTimeoutRecoveryAndBuildErrorWithoutRadioSend)
+TEST(GBoxFsmTest, StuckAdsConversionTriggersTimeoutRecoveryAndBuildErrorWithoutRadioSend)
 {
     BoxTestRig rig;
     ScopedEnvFlag stuckConversion("ADS_CONVERSION_STUCK");

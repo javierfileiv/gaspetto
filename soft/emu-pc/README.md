@@ -41,11 +41,11 @@ emu-pc/
 │   ├── gcar/      # Car firmware
 │   │   ├── movement_controller/  # Motor + IMU control with PID
 │   │   └── src/           # State implementations
-    ├── gaspetto_box/      # Box firmware (GaspettoBox + states + pin defs)
+    ├── gbox/      # Box firmware (GBox + states + pin defs)
 │   └── nrf_sender/        # Radio test utility
 └── tests/                 # Google Test unit tests
     ├── gcar/      # Car-specific tests
-    ├── gaspetto_box/      # Box-specific tests (program builder)
+    ├── gbox/      # Box-specific tests (program builder)
     └── mocks/             # GMock implementations + Arduino stubs
 ```
 
@@ -75,7 +75,7 @@ cmake --build build-tests --target utest_box
 cmake --preset car-release && cmake --build build-car --target gcar
 
 # Box
-cmake --preset box-release && cmake --build build-box --target gaspetto_box
+cmake --preset box-release && cmake --build build-box --target gbox
 ```
 
 Debug presets (`car-debug`, `box-debug`, `nrf-debug`) and NRF sender targets follow the same pattern.
@@ -109,7 +109,7 @@ Low-power STOP mode is emulated on PC (`SwitchToLowPowerMode`). On STM32 PIO bui
 | `GASPETTO_LOG` | Debug logging to Serial |
 | `NRF_LOG` | NRF24 debug logging |
 
-Box-only tuning defines (`GASPETTO_ADC_THRESHOLD_*`, `GASPETTO_I2C_CLOCK_HZ`, etc.) are documented as comments in `soft/pio/GaspettoBox_pio/platformio.ini`.
+Box-only tuning defines (`GASPETTO_ADC_THRESHOLD_*`, `GASPETTO_I2C_CLOCK_HZ`, etc.) are documented as comments in `soft/pio/GBox_pio/platformio.ini`.
 
 ## Running tests
 
@@ -120,7 +120,7 @@ Box-only tuning defines (`GASPETTO_ADC_THRESHOLD_*`, `GASPETTO_I2C_CLOCK_HZ`, et
 
 # filter a suite
 ./build-tests/tests/utest_car --gtest_filter="MovementControllerTest.*"
-./build-tests/tests/utest_box --gtest_filter="GaspettoBoxProgramBuilderTest.*"
+./build-tests/tests/utest_box --gtest_filter="GBoxProgramBuilderTest.*"
 
 # list all tests
 ./build-tests/tests/utest_car --gtest_list_tests
@@ -234,7 +234,7 @@ The Gaspetto Box uses a 3-LED NeoPixel strip (WS2812B daisy chain on pin PC_14) 
 
 ### Program Build Algorithm
 
-`GaspettoBox::buildProgramFromPieces()` (pure static, also tested in `utest_box`):
+`GBox::buildProgramFromPieces()` (pure static, also tested in `utest_box`):
 
 1. Iterate main slots 0–13, appending each non-EMPTY piece as a command.
 2. On `LOOP_CALL`: inline all non-EMPTY loop slots 14–19 at that position.
@@ -247,8 +247,8 @@ The resulting `CommandPacket` (32 bytes, packed) is sent via RF24 to the car.
 ### Running the Box Emulator
 
 ```bash
-cmake --preset box-release && cmake --build build-box --target gaspetto_box
-./build-box/targets/gaspetto_box/gaspetto_box
+cmake --preset box-release && cmake --build build-box --target gbox
+./build-box/targets/gbox/gbox
 ```
 
 ## IMU CSV Playback In PC Emulation
@@ -279,15 +279,15 @@ Lines starting with `#` and a single header row are allowed. Units match the Ada
 ## Gaspetto Box PC emulator
 
 ```bash
-cmake --preset box-release && cmake --build build-box --target gaspetto_box
-./build-box/targets/gaspetto_box/gaspetto_box
+cmake --preset box-release && cmake --build build-box --target gbox
+./build-box/targets/gbox/gbox
 ```
 
 ### State machine
 
 ```
                   ┌──────────────────────────────────────┐
-                  │          GaspettoBox (Active Object)  │
+                  │          GBox (Active Object)  │
   ┌───────────────▼──────────┐       ┌────────────────────▼──────┐
   │         IdleState         │       │      ProcessingState       │
   │  enter() → low power      │       │  scan → build → send       │
@@ -344,7 +344,7 @@ After success or error animations, the active LED holds for **60 seconds** befor
 
 ### Program build algorithm
 
-`GaspettoBox::buildProgramFromPieces()` (tested in `utest_box`):
+`GBox::buildProgramFromPieces()` (tested in `utest_box`):
 
 1. Iterate main slots 0–13; append non-`EMPTY` pieces.
 2. On `LOOP_CALL`, inline non-`EMPTY` loop slots 14–19.

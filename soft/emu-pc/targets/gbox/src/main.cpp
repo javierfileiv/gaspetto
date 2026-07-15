@@ -1,7 +1,7 @@
 #include "Arduino.h"
 #include "CarEvents.h"
 #include "EventQueue.h"
-#include "GaspettoBox.h"
+#include "GBox.h"
 #include "IdleState.h"
 #include "Log.h"
 #include "ProcessingState.h"
@@ -30,11 +30,11 @@ IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
 EventQueue eventQueue;
-RadioController radioController(radio, &eventQueue, gaspetto_box_pipe_name, gcar_pipe_name);
+RadioController radioController(radio, &eventQueue, gbox_pipe_name, gcar_pipe_name);
 Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };
-GaspettoBox gaspetto_box(context);
+GBox gbox(context);
 Log mainLog;
 
 #ifdef ARDUINO
@@ -210,14 +210,14 @@ void handleUsbMaintenanceCommands()
 void wakeButton()
 {
     Event evt(EventId::BUTTON_PRESSED);
-    gaspetto_box.debounceAndEnqueue(evt, millis());
+    gbox.debounceAndEnqueue(evt, millis());
 }
 #else
 /* Button press simulation thread. */
 void ISR(void)
 {
     Event evt = getEmulatedEvent();
-    gaspetto_box.debounceAndEnqueue(evt, millis());
+    gbox.debounceAndEnqueue(evt, millis());
 }
 #endif /* ARDUINO */
 
@@ -243,7 +243,7 @@ void setup()
 
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
-    Log::attachNrf24(radio, gaspetto_box_log_pipe_name, gaspetto_box_pipe_name);
+    Log::attachNrf24(radio, gbox_log_pipe_name, gbox_pipe_name);
 #endif
 #ifdef ARDUINO
     /* Wait for CDC USB enumeration on Arduino before printing. */
@@ -251,7 +251,7 @@ void setup()
     while (!Serial && millis() < deadline) {
         delay(10);
     }
-    mainLog.logln("GaspettoBox BlackPill boot");
+    mainLog.logln("GBox BlackPill boot");
     mainLog.logln("USB commands: dfu, reboot-dfu, help");
 #else
     mainLog.logln("Gaspetto Box Initialized");
@@ -259,12 +259,12 @@ void setup()
     mainLog.logln("Commands: P wake, F fail next RF TX\n");
 #endif /* ARDUINO */
 
-    gaspetto_box.initHardware();
-    /* Initialize the GaspettoBox state machine. */
+    gbox.initHardware();
+    /* Initialize the GBox state machine. */
 #ifndef ARDUINO
-    gaspetto_box.setLowPowerModeCallback(enter_low_power_mode);
+    gbox.setLowPowerModeCallback(enter_low_power_mode);
 #endif
-    gaspetto_box.init(StateId::IDLE);
+    gbox.init(StateId::IDLE);
 
 #ifdef ARDUINO
     /* Set up ISR for wake button. */
@@ -278,5 +278,5 @@ void setup()
 void loop()
 {
     handleUsbMaintenanceCommands();
-    gaspetto_box.work();
+    gbox.work();
 }

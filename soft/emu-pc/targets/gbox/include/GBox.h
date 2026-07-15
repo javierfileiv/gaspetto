@@ -39,13 +39,13 @@ struct AdsRouteInfo {
     uint8_t channel;
 };
 
-class GaspettoBox : public GenericActiveObject<StateId, Event, BOX_MAX_STATES> {
+class GBox : public GenericActiveObject<StateId, Event, BOX_MAX_STATES> {
 public:
-    /** GaspettoBox(): Constructor for the GaspettoBox class.
+    /** GBox(): Constructor for the GBox class.
      *  @ctx: Reference to the Context instance containing dependencies.
      */
-    GaspettoBox(Context &ctx);
-    /** Init(): Initialize the GaspettoBox state machine.
+    GBox(Context &ctx);
+    /** Init(): Initialize the GBox state machine.
      *  @initialStateId: The initial state ID to start the state machine.
      */
     void init(StateId initialStateId = StateId::IDLE);

@@ -20,7 +20,7 @@
 using testing::_;
 using testing::Eq;
 
-static const uint8_t *test_writing_addr = gaspetto_box_pipe_name;
+static const uint8_t *test_writing_addr = gbox_pipe_name;
 static const uint8_t *test_reading_addr = gcar_pipe_name;
 
 extern bool low_power_mode;
