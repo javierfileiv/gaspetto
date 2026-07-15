@@ -7,12 +7,12 @@ add_library(arduino_framework_impl STATIC Serial.cpp Wire.cpp Arduino.cpp main.c
 # Always include emulation sources so all targets link millis, micros, delay, getEmulatedEvent, etc.
 target_sources(arduino_framework_impl PRIVATE RF24/RF24.cpp HardwareTimer/HardwareTimer.cpp)
 # Set a variable to indicate the current build target for arduino_framework
-if(GASPETTO_CAR)
-  target_compile_definitions(arduino_framework_impl PRIVATE GASPETTO_CAR)
-  target_sources(arduino_framework_impl PRIVATE implementations/src/gaspetto_car.cpp)
-elseif(GASPETTO_BOX)
-  target_compile_definitions(arduino_framework_impl PRIVATE GASPETTO_BOX)
-  target_sources(arduino_framework_impl PRIVATE implementations/src/gaspetto_box.cpp)
+if(GCAR)
+  target_compile_definitions(arduino_framework_impl PRIVATE GCAR)
+  target_sources(arduino_framework_impl PRIVATE implementations/src/gcar.cpp)
+elseif(GBOX)
+  target_compile_definitions(arduino_framework_impl PRIVATE GBOX)
+  target_sources(arduino_framework_impl PRIVATE implementations/src/gbox.cpp)
 elseif(NRF_SENDER)
   target_compile_definitions(arduino_framework_impl PRIVATE NRF_SENDER)
   target_sources(arduino_framework_impl PRIVATE implementations/src/nrf_sender.cpp)

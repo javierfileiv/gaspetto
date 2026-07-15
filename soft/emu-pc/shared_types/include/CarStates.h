@@ -8,7 +8,7 @@
 #endif
 
 /**
- * @brief State identifiers for GaspettoCar FSM.
+ * @brief State identifiers for GCar FSM.
  * @note Add new states before MAX_STATE_ID.
  */
 enum class StateId : uint8_t {

@@ -19,13 +19,13 @@ This folder contains separate test programs to find the minimum PWM values where
 
 ```bash
 # Build receiver (STM32F411)
-platformio run --environment motor_test
+platformio run --environment arduino_straight_drive
 
 # Build sender (Arduino Uno)
 platformio run --environment motor_test_sender
 
 # Upload receiver
-platformio run --environment motor_test --target upload
+platformio run --environment arduino_straight_drive --target upload
 
 # Upload sender
 platformio run --environment motor_test_sender --target upload

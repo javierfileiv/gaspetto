@@ -12,7 +12,7 @@ Gaspetto is an open-source robotics project inspired by Cubetto, with:
 ## Repository Layout
 
 - `soft/emu-pc`: host-side CMake project with GoogleTest-based tests and coverage
-- `soft/pio`: PlatformIO firmware projects (`GaspettoCar_pio`, `GaspettoBox_pio`, `NrfSender_pio`, hardware test apps)
+- `soft/pio`: PlatformIO firmware projects (`GCar_pio`, `GBox_pio`, `NrfSender_pio`, hardware test apps)
 - `tools`: helper scripts used locally and in CI
 - `.github/workflows`: CI workflows
 

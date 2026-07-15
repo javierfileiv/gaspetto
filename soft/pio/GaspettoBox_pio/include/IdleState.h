@@ -1,1 +1,0 @@
-../../../emu-pc/targets/gaspetto_box/include/IdleState.h
