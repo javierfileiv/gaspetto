@@ -43,6 +43,11 @@ public:
         return lastGyroZDeg;
     }
 
+    void zeroYaw() override
+    {
+        yawDeg = 0.0f;
+    }
+
 private:
     Adafruit_MPU6050 mpu;
     Offsets offsets;
