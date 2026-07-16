@@ -2,6 +2,7 @@
 #include "CarEvents.h"
 #include "CommandPacket.h"
 #include "RF24.h"
+#include "RadioProtocol.h"
 #include "config_radio.h"
 
 #include <Arduino.h>
@@ -10,6 +11,7 @@ RF24 radio(NRF24_CE, NRF24_CSN);
 
 /* Forward declarations. */
 void printHelp();
+void displayTelemetry(const TelemetryPacket &t);
 
 void setup()
 {
@@ -31,7 +33,6 @@ void setup()
     /* Support CommandPacket (32 bytes) for multi-command programs. */
     radio.setPayloadSize(sizeof(CommandPacket));
     radio.openWritingPipe(gcar_pipe_name);
-    radio.openReadingPipe(1, gbox_pipe_name);
     radio.openReadingPipe(2, gcar_telemetry_pipe_name);
     radio.powerUp();
     radio.printDetails();
@@ -99,6 +100,16 @@ void clearProgram()
 
 void loop()
 {
+    /* Drain RX FIFO: check for incoming telemetry from GCar (pipe 2 = _tel_). */
+    uint8_t pipe;
+    while (radio.available(&pipe)) {
+        TelemetryPacket telemetry;
+        radio.read(&telemetry, sizeof(telemetry));
+        if (pipe == 2) {
+            displayTelemetry(telemetry);
+        }
+    }
+
     if (Serial.available()) {
         char ch = Serial.read();
         switch (ch) {
@@ -170,4 +181,25 @@ void printHelp()
     Serial.println("  -: Clear program");
     Serial.println("  ?: Print this help");
     Serial.println("========================================\n");
+}
+
+void displayTelemetry(const TelemetryPacket &t)
+{
+    Serial.print(F("TLM yaw="));
+    Serial.print(t.yaw, 1);
+    Serial.print(F(" tgt="));
+    Serial.print(t.targetYaw, 1);
+    Serial.print(F(" err="));
+    Serial.print(t.err, 2);
+    Serial.print(F(" imu state="));
+    Serial.print(t.imuOk);
+    Serial.print(F(" kp="));
+    Serial.print(t.kp, 2);
+    Serial.print(F(" ki="));
+    Serial.print(t.ki, 4);
+    Serial.print(F(" kd="));
+    Serial.print(t.kd, 4);
+    Serial.print(F(" freq="));
+    Serial.print(t.pwmFreq, 0);
+    Serial.println(F("Hz"));
 }
