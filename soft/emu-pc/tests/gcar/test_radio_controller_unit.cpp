@@ -175,7 +175,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetrySuccessUsesTelemetryPipeAndRestores
     {
         InSequence seq;
         EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, RADIO_ADDR_TLM));
+            EXPECT_TRUE(same5(addr, gcar_telemetry_pipe_name));
         }));
         EXPECT_CALL(rf, _stopListening());
         EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(true));
@@ -195,7 +195,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetryFailureStillRestoresCommandPipe)
     {
         InSequence seq;
         EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, RADIO_ADDR_TLM));
+            EXPECT_TRUE(same5(addr, gcar_telemetry_pipe_name));
         }));
         EXPECT_CALL(rf, _stopListening());
         EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(false));

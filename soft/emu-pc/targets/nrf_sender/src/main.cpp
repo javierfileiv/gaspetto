@@ -32,6 +32,7 @@ void setup()
     radio.setPayloadSize(sizeof(CommandPacket));
     radio.openWritingPipe(gcar_pipe_name);
     radio.openReadingPipe(1, gbox_pipe_name);
+    radio.openReadingPipe(2, gcar_telemetry_pipe_name);
     radio.powerUp();
     radio.printDetails();
     radio.printPrettyDetails();
