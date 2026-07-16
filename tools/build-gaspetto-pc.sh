@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EMU_PC_DIR="$PROJECT_ROOT/soft/emu-pc"
 NUM_CORES="$(nproc)"
-SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-5}"
+SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-2}"
 
 echo -e "${BLUE}Building Gaspetto emu-pc targets (release + debug)${NC}"
 echo "Project root: $PROJECT_ROOT"
