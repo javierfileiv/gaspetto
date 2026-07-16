@@ -8,6 +8,7 @@ class TwoWire; // Forward declaration for testing
 #else
 #include <Wire.h>
 #endif
+#define IMU_I2C_ADDR 0x68
 
 class IMUOrientationInterface {
 public:
@@ -18,7 +19,13 @@ public:
 
     virtual ~IMUOrientationInterface() = default;
 
-    virtual bool begin(uint8_t addr = 0x68, TwoWire *theWire = nullptr) = 0;
+    virtual bool begin(uint8_t addr = 0x68, TwoWire *theWire =
+#ifdef ARDUINO
+                                                    &Wire
+#else
+                                                    nullptr
+#endif
+                       ) = 0;
     virtual void calibrate(bool print = true) = 0;
     virtual void update() = 0;
 
