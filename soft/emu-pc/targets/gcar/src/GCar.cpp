@@ -28,22 +28,22 @@ GCar::GCar(Context &ctx)
 
 void GCar::init(StateId initialStateId)
 {
-    logln(F("GCar: checking movement controller"));
+    LOGLN(F("GCar: checking movement controller"));
     G_ASSERT(_ctx.movementController);
-    logln(F("GCar: init movement controller"));
+    LOGLN(F("GCar: init movement controller"));
     _ctx.movementController->init(_ctx.pwm_freq);
 #ifdef USE_RADIO_CONTROLLER
-    logln(F("GCar: init radio controller"));
+    LOGLN(F("GCar: init radio controller"));
     G_ASSERT(_ctx.radioController);
     _ctx.radioController->init();
 #else
-    logln(F("GCar: timered event queue mode"));
+    LOGLN(F("GCar: timered event queue mode"));
     G_ASSERT(_ctx.timeredEventQueue);
 #endif
 
-    logln(F("GCar: init state machine"));
+    LOGLN(F("GCar: init state machine"));
     CarActiveObject::init(initialStateId);
-    logln(F("GCar: state machine ready"));
+    LOGLN(F("GCar: state machine ready"));
 }
 
 void GCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
@@ -76,25 +76,25 @@ bool GCar::isTargetReached(void)
 int GCar::postEvent(Event evt)
 {
     if (!_ctx.mainEventQueue) {
-        logln(F("GCar RX: main event queue unavailable."));
+        LOGLN(F("GCar RX: main event queue unavailable."));
         return -1;
     }
 
-    log(F("GCar RX: "));
-    log(eventIdToString(evt.getEventId()));
+    LOG(F("GCar RX: "));
+    LOG(eventIdToString(evt.getEventId()));
     if (evt.getEventId() == EventId::ACTION) {
-        log(F(" "));
-        log(commandIdToString(evt.getPayload()));
+        LOG(F(" "));
+        LOG(commandIdToString(evt.getPayload()));
     }
 
     if (_ctx.mainEventQueue->IsFull()) {
-        logln(F(" dropped; queue full."));
+        LOGLN(F(" dropped; queue full."));
         return -1;
     }
 
     _ctx.mainEventQueue->enqueue(evt);
-    log(F(" queued; queue size="));
-    logln(static_cast<int>(_ctx.mainEventQueue->GetSize()));
+    LOG(F(" queued; queue size="));
+    LOGLN(static_cast<int>(_ctx.mainEventQueue->GetSize()));
     return 0;
 }
 
@@ -114,17 +114,17 @@ void GCar::work(void)
 
         StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
         _ctx.mainEventQueue->dequeue(evt);
-        log(F("GCar RX: processing "));
-        log(eventIdToString(evt.getEventId()));
+        LOG(F("GCar RX: processing "));
+        LOG(eventIdToString(evt.getEventId()));
         if (evt.getEventId() == EventId::ACTION) {
-            log(F(" "));
-            log(commandIdToString(evt.getPayload()));
+            LOG(F(" "));
+            LOG(commandIdToString(evt.getPayload()));
         }
-        logln();
+        LOGLN();
         currentState->processEvent(evt);
     }
     if (getCurrentStateId() != StateId::IDLE && isTargetReached()) {
-        logln(F("Target reached. Transitioning to IDLE state."));
+        LOGLN(F("Target reached. Transitioning to IDLE state."));
         transitionTo(StateId::IDLE);
     }
 }
@@ -133,7 +133,7 @@ void GCar::enterLowPowerMode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    logln("Entering low-power mode...\n");
+    LOGLN("Entering low-power mode...\n");
     if (lowPowerCallback_) {
         lowPowerCallback_();
     }

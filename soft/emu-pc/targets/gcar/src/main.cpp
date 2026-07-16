@@ -40,7 +40,6 @@ Context context = {
     &idleState,  &processingState,       MOTOR_FREQ,
 };
 GCar gcar(context);
-Log mainLog;
 
 void ISR(void)
 {
@@ -54,7 +53,7 @@ void enter_low_power_mode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    mainLog.logln("Entering low-power mode...\n");
+    LOGLN("Entering low-power mode...\n");
     SwitchToLowPowerMode();
 #else
     /*  Implement low-power mode for Arduino. */
@@ -75,14 +74,14 @@ void setup()
         /* Wait for serial port to connect. Needed for native USB port only */
     }
 #endif
-    mainLog.logln();
-    mainLog.logln(F("GCar boot"));
+    LOGLN();
+    LOGLN(F("GCar boot"));
 
     /* Initialize the GCar state machine. */
     gcar.setLowPowerModeCallback(enter_low_power_mode);
-    mainLog.logln(F("GCar init begin"));
+    LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
-    mainLog.logln(F("GCar init done"));
+    LOGLN(F("GCar init done"));
 
 #ifdef USE_RADIO_CONTROLLER
     /* Set up telemetry callback to send IMU/PID data via radio */
@@ -103,7 +102,7 @@ void setup()
     timeredEventQueue.scheduleEventDelayed(21000,
                                            Event(EventId::ACTION, CommandId::MOTOR_TURN_LEFT));
     timeredEventQueue.scheduleEventDelayed(24000, Event(EventId::ACTION, CommandId::MOTOR_STOP));
-    mainLog.logln(F("Timered test sequence scheduled"));
+    LOGLN(F("Timered test sequence scheduled"));
 #endif /* USE_RADIO_CONTROLLER */
 }
 

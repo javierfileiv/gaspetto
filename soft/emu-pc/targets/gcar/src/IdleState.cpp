@@ -20,39 +20,39 @@ void IdleState::processEvent(Event &evt)
         case CommandId::MOTOR_FORWARD:
             car->setMotorStraightDrive(INITIAL_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
-            logln("Transition to PROCESSING (Move Forward)");
+            LOGLN("Transition to PROCESSING (Move Forward)");
             break;
         case CommandId::MOTOR_BACKWARD:
             car->setMotorStraightDrive(-INITIAL_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
-            logln(F("Transition to PROCESSING (Move Backward)"));
+            LOGLN(F("Transition to PROCESSING (Move Backward)"));
             break;
         case CommandId::MOTOR_TURN_LEFT:
             car->setMotorTurnInPlace(-90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
-            logln(F("Transition to PROCESSING (Turn Left)"));
+            LOGLN(F("Transition to PROCESSING (Turn Left)"));
             break;
         case CommandId::MOTOR_TURN_RIGHT:
             car->setMotorTurnInPlace(90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
-            logln(F("Transition to PROCESSING (Turn Right)"));
+            LOGLN(F("Transition to PROCESSING (Turn Right)"));
             break;
         case CommandId::QUEUE_CLEAR:
             car->clearEventQueue();
-            logln(F("IdleState: Queue clear command received. Clearing queue."));
+            LOGLN(F("IdleState: Queue clear command received. Clearing queue."));
             /* Fall through to default to re-enter sleep state. */
         default:
             /* Re-set state to enter low power. */
             car->stopBothMotors();
-            log(F("IdleState: Re enter sleep state. Stop or unhandled ACTION command: "));
-            logln(commandIdToString(evt.getPayload()));
+            LOG(F("IdleState: Re enter sleep state. Stop or unhandled ACTION command: "));
+            LOGLN(commandIdToString(evt.getPayload()));
             car->transitionTo(StateId::IDLE);
             break;
         }
         break;
     default:
-        log(F("IdleState: Unhandled event ID: "));
-        logln(eventIdToString(evt.getEventId()));
+        LOG(F("IdleState: Unhandled event ID: "));
+        LOGLN(eventIdToString(evt.getEventId()));
 #ifdef ARDUINO
         while (1)
             ;

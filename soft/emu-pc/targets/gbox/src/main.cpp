@@ -35,7 +35,6 @@ Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };
 GBox gbox(context);
-Log mainLog;
 
 #ifdef ARDUINO
 namespace
@@ -173,13 +172,13 @@ void handleUsbMaintenanceCommands()
                 const char *command = &commandBuffer[start];
                 if (commandEqualsIgnoreCase(command, "dfu") ||
                     commandEqualsIgnoreCase(command, "reboot-dfu")) {
-                    mainLog.logln("Entering STM32 DFU bootloader...");
+                    LOGLN("Entering STM32 DFU bootloader...");
                     resetIntoDfuBootloader();
                 } else if (commandEqualsIgnoreCase(command, "help")) {
-                    mainLog.logln("USB commands: dfu, reboot-dfu, help");
+                    LOGLN("USB commands: dfu, reboot-dfu, help");
                 } else {
-                    mainLog.log("Unknown USB command: ");
-                    mainLog.logln(command);
+                    LOG("Unknown USB command: ");
+                    LOGLN(command);
                 }
             }
 
@@ -191,7 +190,7 @@ void handleUsbMaintenanceCommands()
         if (commandLength + 1 >= kUsbCommandBufferSize) {
             commandLength = 0;
             commandBuffer[0] = '\0';
-            mainLog.logln("USB command too long; buffer cleared.");
+            LOGLN("USB command too long; buffer cleared.");
             continue;
         }
 
@@ -225,7 +224,7 @@ void enter_low_power_mode()
 {
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    mainLog.logln("Entering low-power mode...\n");
+    LOGLN("Entering low-power mode...\n");
     SwitchToLowPowerMode();
 #else
     HAL_SuspendTick();
@@ -251,12 +250,12 @@ void setup()
     while (!Serial && millis() < deadline) {
         delay(10);
     }
-    mainLog.logln("GBox BlackPill boot");
-    mainLog.logln("USB commands: dfu, reboot-dfu, help");
+    LOGLN("GBox BlackPill boot");
+    LOGLN("USB commands: dfu, reboot-dfu, help");
 #else
-    mainLog.logln("Gaspetto Box Initialized");
-    mainLog.logln("Starting up...");
-    mainLog.logln("Commands: P wake, F fail next RF TX\n");
+    LOGLN("Gaspetto Box Initialized");
+    LOGLN("Starting up...");
+    LOGLN("Commands: P wake, F fail next RF TX\n");
 #endif /* ARDUINO */
 
     gbox.initHardware();

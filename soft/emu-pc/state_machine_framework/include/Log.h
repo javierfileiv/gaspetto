@@ -14,6 +14,7 @@
 #include "Serial.h"
 
 #include <iostream>
+#include <string>
 #endif
 
 #ifdef ARDUINO
@@ -131,20 +132,23 @@ inline Print &output()
 class Log {
 public:
 #ifndef ARDUINO
-    template <typename T> void log(const T &data)
+    template <typename T> static void log(const T &data)
     {
 #ifdef GASPETTO_LOG
         std::cout << data;
 #endif
     }
 
-    template <typename T> void print(const T &data, int base)
+    template <typename T> static void log(const T &data, int base)
     {
-        if (base == HEX)
+#ifdef GASPETTO_LOG
+        if (base == HEX) {
             std::cout << std::hex << std::uppercase << (int)data << std::dec;
-        else if (base == OCT)
+            std::cout << std::flush;
+        } else if (base == OCT) {
             std::cout << std::oct << (int)data << std::dec;
-        else if (base == BIN) {
+            std::cout << std::flush;
+        } else if (base == BIN) {
             unsigned int v = static_cast<unsigned int>(data);
             std::string s;
             do {
@@ -152,29 +156,28 @@ public:
                 v /= 2;
             } while (v);
             std::cout << s;
-        } else
+            std::cout << std::flush;
+        } else {
             std::cout << (int)data;
+            std::cout << std::flush;
+        }
+#endif
     }
 
     /* Print new line without arguments. */
-    void logln()
+    static void logln()
     {
 #ifdef GASPETTO_LOG
-        std::cout << std::endl;
+        std::cout << std::endl << std::flush;
+        std::cout << std::flush;
 #endif
     }
 
-    template <typename T> void logln(const T &data)
+    template <typename T> static void logln(const T &data)
     {
 #ifdef GASPETTO_LOG
         std::cout << data << std::endl;
-#endif
-    }
-
-    template <typename T> void log(const T &data, int base)
-    {
-#ifdef GASPETTO_LOG
-        print(data, base);
+        std::cout << std::flush;
 #endif
     }
 #else /* ARDUINO */
@@ -186,28 +189,28 @@ public:
     }
 #endif
 
-    template <typename T> void log(const T &data)
+    template <typename T> static void log(const T &data)
     {
 #ifdef GASPETTO_LOG
         gaspetto_log::output().print(data);
 #endif
     }
 
-    template <typename T> void log(const T &data, int base)
+    template <typename T> static void log(const T &data, int base)
     {
 #ifdef GASPETTO_LOG
         gaspetto_log::output().print(data, base);
 #endif
     }
 
-    template <typename T> void logln(const T &data)
+    template <typename T> static void logln(const T &data)
     {
 #ifdef GASPETTO_LOG
         gaspetto_log::output().println(data);
 #endif
     }
 
-    void logln(void)
+    static void logln(void)
     {
 #ifdef GASPETTO_LOG
         gaspetto_log::output().println();
@@ -215,4 +218,8 @@ public:
     }
 #endif /* ARDUINO */
 };
+
+#define LOG(...) Log::log(__VA_ARGS__)
+#define LOGLN(...) Log::logln(__VA_ARGS__)
+
 #endif /* LOG_H */
