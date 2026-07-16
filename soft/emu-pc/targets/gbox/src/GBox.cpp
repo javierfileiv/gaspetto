@@ -284,7 +284,7 @@ void GBox::enterLowPowerMode()
     prepareForStop();
 #ifdef LOW_POWER_MODE
 #ifndef ARDUINO
-    logln("Entering low-power mode...\n");
+    LOGLN("Entering low-power mode...\n");
     if (lowPowerCallback_) {
         lowPowerCallback_();
     }
@@ -304,16 +304,16 @@ void GBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         lastDebounceTime_ = currentTime;
         if (!_ctx.mainEventQueue->IsFull()) {
             _ctx.mainEventQueue->enqueue(evt);
-            logln("Exiting low-power mode...\n");
+            LOGLN("Exiting low-power mode...\n");
         } else {
-            logln("Event queue is full! Unable to enqueue event.\n");
+            LOGLN("Event queue is full! Unable to enqueue event.\n");
         }
     }
 #else
     if (!_ctx.mainEventQueue->IsFull()) {
         postEvent(evt);
     } else {
-        logln("Event queue is full! Unable to enqueue event.\n");
+        LOGLN("Event queue is full! Unable to enqueue event.\n");
     }
 #endif
 }
@@ -413,7 +413,7 @@ void GBox::initHardware()
         _ctx.radioController->init();
     }
     initialized_ = true;
-    logln("GBox: hardware initialized.");
+    LOGLN("GBox: hardware initialized.");
 }
 
 #ifndef ARDUINO
@@ -424,7 +424,7 @@ void GBox::injectBoardPieces(const BoxBoardPieces &boardPieces)
         Adafruit_ADS1115::setRawValue(index,
                                       static_cast<int16_t>(rawValueForPiece(boardPieces[index])));
     }
-    logln("GBox: board pieces injected.");
+    LOGLN("GBox: board pieces injected.");
 }
 
 /* Used for command injection in emulation mode. */
@@ -433,14 +433,14 @@ void GBox::injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawVa
     for (std::size_t index = 0; index < BOX_TOTAL_SLOTS; ++index) {
         Adafruit_ADS1115::setRawValue(index, static_cast<int16_t>(rawValues[index]));
     }
-    logln("GBox: raw ADC values injected.");
+    LOGLN("GBox: raw ADC values injected.");
 }
 #endif
 
 void GBox::restoreFromStop()
 {
     SystemClock_Config();
-    logln("GBox: wake-up sequence complete.");
+    LOGLN("GBox: wake-up sequence complete.");
 }
 
 void GBox::SystemClock_Config()
@@ -448,7 +448,7 @@ void GBox::SystemClock_Config()
 #ifdef ARDUINO
     /* STM32 clocks must be restored here after STOP wake-up on target hardware. */
 #else
-    logln("SystemClock_Config(): emulated clock tree restored after STOP.");
+    LOGLN("SystemClock_Config(): emulated clock tree restored after STOP.");
 #endif
 }
 
@@ -469,15 +469,15 @@ void GBox::configurePins()
 void GBox::setSensorRailEnabled(bool enabled)
 {
     digitalWrite(PIN_MOSFET_3V3_SENSORS, enabled ? LOW : HIGH);
-    log(enabled ? "3.3V sensor rail ON" : "3.3V sensor rail OFF");
-    logln();
+    LOG(enabled ? "3.3V sensor rail ON" : "3.3V sensor rail OFF");
+    LOGLN();
 }
 
 void GBox::setLedRailEnabled(bool enabled)
 {
     digitalWrite(PIN_MOSFET_5V_LEDS, enabled ? LOW : HIGH);
-    log(enabled ? "5V LED rail ON (PB14 pulled low)" : "5V LED rail OFF (PB14 released)");
-    logln();
+    LOG(enabled ? "5V LED rail ON (PB14 pulled low)" : "5V LED rail OFF (PB14 released)");
+    LOGLN();
 }
 
 void GBox::blackoutLeds()
@@ -486,7 +486,7 @@ void GBox::blackoutLeds()
     leds_.clear();
     leds_.show();
 #endif
-    logln("LEDs: blackout.");
+    LOGLN("LEDs: blackout.");
 }
 
 void GBox::delayMs(int ms) const
@@ -518,9 +518,9 @@ void GBox::runScanAnimation()
     blackoutLeds();
 #else
     for (std::size_t slot = 0; slot < BOX_LED_SLOTS; ++slot) {
-        log("LED scanner CYAN slot (Scan animation) ");
-        log(static_cast<int>(slot) + 1);
-        logln();
+        LOG("LED scanner CYAN slot (Scan animation) ");
+        LOG(static_cast<int>(slot) + 1);
+        LOGLN();
         delayMs(15);
     }
 #endif
@@ -540,9 +540,9 @@ void GBox::runSuccessAnimation()
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
     for (int pulse = 0; pulse < 3; ++pulse) {
-        log("LED pulse GREEN step (Success animation) ");
-        log(pulse + 1);
-        logln();
+        LOG("LED pulse GREEN step (Success animation) ");
+        LOG(pulse + 1);
+        LOGLN();
         delayMs(70);
     }
     blackoutLeds();
@@ -567,11 +567,11 @@ void GBox::runBuildErrorAnimation()
     leds_.show();
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
-    logln("LED build error: LED2 blinks red (Build error animation).");
+    LOGLN("LED build error: LED2 blinks red (Build error animation).");
     for (int blink = 0; blink < 3; ++blink) {
-        log("LED blink RED (build) step (Build error animation) ");
-        log(blink + 1);
-        logln();
+        LOG("LED blink RED (build) step (Build error animation) ");
+        LOG(blink + 1);
+        LOGLN();
         delayMs(90);
     }
     blackoutLeds();
@@ -596,11 +596,11 @@ void GBox::runEmptyBoardAnimation()
     leds_.show();
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
-    logln("LED empty board: LED2 blinks amber.");
+    LOGLN("LED empty board: LED2 blinks amber.");
     for (int blink = 0; blink < 2; ++blink) {
-        log("LED blink AMBER (empty) step ");
-        log(blink + 1);
-        logln();
+        LOG("LED blink AMBER (empty) step ");
+        LOG(blink + 1);
+        LOGLN();
         delayMs(200);
     }
     blackoutLeds();
@@ -626,11 +626,11 @@ void GBox::runRfErrorAnimation()
     leds_.show();
     delayMs(60000); /* Hold result visible ~1min before STOP. */
 #else
-    logln("LED radio error: LED1 blinks red.");
+    LOGLN("LED radio error: LED1 blinks red.");
     for (int blink = 0; blink < 3; ++blink) {
-        log("LED blink RED (radio) step ");
-        log(blink + 1);
-        logln();
+        LOG("LED blink RED (radio) step ");
+        LOG(blink + 1);
+        LOGLN();
         delayMs(90);
     }
     blackoutLeds();
@@ -645,11 +645,11 @@ void GBox::scanSlots()
         TwoWire &deviceWire = wireForAdsBus(device.bus);
 
         if (!ads.begin(device.address, &deviceWire)) {
-            log("ADS init failed [");
-            log(busName(device.bus));
-            log(" addr=0x");
-            log(device.address, HEX);
-            logln("]");
+            LOG("ADS init failed [");
+            LOG(busName(device.bus));
+            LOG(" addr=0x");
+            LOG(device.address, HEX);
+            LOGLN("]");
             for (uint8_t channel = 0; channel < kChannelsPerAds; ++channel) {
                 const std::size_t slot = static_cast<std::size_t>(device.slotBase) + channel;
                 lastScan[slot].rawValue = 0;
@@ -700,29 +700,29 @@ void GBox::scanSlots()
                 }
 
                 if (recoveryAttempt < kAdcReadRecoveryRetries) {
-                    log("ADC retry [");
-                    log(busName(device.bus));
-                    log(" addr=0x");
-                    log(device.address, HEX);
-                    log(" ch=");
-                    log(static_cast<int>(channel));
-                    log("] valid=");
-                    log(validSamples);
-                    log("/");
-                    log(kAdcSamplesPerChannel);
-                    log(" timeouts=");
-                    log(timeoutCount);
-                    log(" negatives=");
-                    log(negativeCount);
-                    logln();
+                    LOG("ADC retry [");
+                    LOG(busName(device.bus));
+                    LOG(" addr=0x");
+                    LOG(device.address, HEX);
+                    LOG(" ch=");
+                    LOG(static_cast<int>(channel));
+                    LOG("] valid=");
+                    LOG(validSamples);
+                    LOG("/");
+                    LOG(kAdcSamplesPerChannel);
+                    LOG(" timeouts=");
+                    LOG(timeoutCount);
+                    LOG(" negatives=");
+                    LOG(negativeCount);
+                    LOGLN();
 
                     recoverAdsBus(device.bus);
                     if (!ads.begin(device.address, &deviceWire)) {
-                        log("ADS re-init failed [");
-                        log(busName(device.bus));
-                        log(" addr=0x");
-                        log(device.address, HEX);
-                        logln("]");
+                        LOG("ADS re-init failed [");
+                        LOG(busName(device.bus));
+                        LOG(" addr=0x");
+                        LOG(device.address, HEX);
+                        LOGLN("]");
                         break;
                     }
                     ads.setGain(GAIN_ONE);
@@ -732,36 +732,36 @@ void GBox::scanSlots()
             lastScan[slot].rawValue = readOk ? rawU16 : 0;
             lastScan[slot].piece = readOk ? decodePiece(rawU16) : BoxPieceId::INVALID;
 
-            log("Scan slot ");
-            log(static_cast<int>(slot) + 1);
-            log(" [");
-            log(busName(device.bus));
-            log(" addr=0x");
-            log(device.address, HEX);
-            log(" ch=");
-            log(static_cast<int>(channel));
-            log("]");
+            LOG("Scan slot ");
+            LOG(static_cast<int>(slot) + 1);
+            LOG(" [");
+            LOG(busName(device.bus));
+            LOG(" addr=0x");
+            LOG(device.address, HEX);
+            LOG(" ch=");
+            LOG(static_cast<int>(channel));
+            LOG("]");
             if (readOk) {
-                log(": ADC(avg)=");
-                log(lastScan[slot].rawValue);
-                log(" samples=");
-                log(bestValidSamples);
-                log("/");
-                log(kAdcSamplesPerChannel);
-                log(" attempt=");
-                log(attemptUsed + 1);
-                log(" => ");
-                logln(pieceToString(lastScan[slot].piece));
+                LOG(": ADC(avg)=");
+                LOG(lastScan[slot].rawValue);
+                LOG(" samples=");
+                LOG(bestValidSamples);
+                LOG("/");
+                LOG(kAdcSamplesPerChannel);
+                LOG(" attempt=");
+                LOG(attemptUsed + 1);
+                LOG(" => ");
+                LOGLN(pieceToString(lastScan[slot].piece));
             } else {
-                log(": ADC read failed valid=");
-                log(bestValidSamples);
-                log("/");
-                log(kAdcSamplesPerChannel);
-                log(" timeouts=");
-                log(timeoutCount);
-                log(" negatives=");
-                log(negativeCount);
-                logln(" => INVALID");
+                LOG(": ADC read failed valid=");
+                LOG(bestValidSamples);
+                LOG("/");
+                LOG(kAdcSamplesPerChannel);
+                LOG(" timeouts=");
+                LOG(timeoutCount);
+                LOG(" negatives=");
+                LOG(negativeCount);
+                LOGLN(" => INVALID");
             }
         }
     }
@@ -778,29 +778,29 @@ bool GBox::buildProgram(CommandPacket &packet, bool &isEmpty)
     const bool built = buildProgramFromPieces(boardPieces, packet, isEmpty);
     if (!built) {
         if (isEmpty) {
-            logln("Board scan produced an empty payload.");
+            LOGLN("Board scan produced an empty payload.");
         } else {
-            logln("Program build failed due to invalid token or payload overflow.");
+            LOGLN("Program build failed due to invalid token or payload overflow.");
         }
         return false;
     }
 
-    log("Program payload count: ");
-    log(packet.count);
-    logln();
+    LOG("Program payload count: ");
+    LOG(packet.count);
+    LOGLN();
     return true;
 }
 
 bool GBox::sendProgram(const CommandPacket &packet)
 {
     if (_ctx.radioController == nullptr) {
-        logln("Radio controller unavailable.");
+        LOGLN("Radio controller unavailable.");
         return false;
     }
 
-    log("Sending program with ");
-    log(packet.count);
-    logln(" commands.");
+    LOG("Sending program with ");
+    LOG(packet.count);
+    LOGLN(" commands.");
 
     return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 }
@@ -810,7 +810,7 @@ void GBox::prepareForStop()
     blackoutLeds();
     setLedRailEnabled(false);
     setSensorRailEnabled(false);
-    logln("GBox: STOP mode armed.");
+    LOGLN("GBox: STOP mode armed.");
 }
 
 uint16_t GBox::rawValueForPiece(BoxPieceId piece) const
@@ -860,7 +860,7 @@ const char *GBox::pieceToString(BoxPieceId piece) const
 bool GBox::sendClearQueueCommand()
 {
     if (_ctx.radioController == nullptr) {
-        logln("Radio controller unavailable for clear queue command.");
+        LOGLN("Radio controller unavailable for clear queue command.");
         return false;
     }
 
@@ -869,8 +869,8 @@ bool GBox::sendClearQueueCommand()
     packet.commands[0] = static_cast<uint8_t>(CommandId::QUEUE_CLEAR);
     packet.commands[1] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
 
-    log("Sending clear queue command with MOTOR_STOP.");
-    logln();
+    LOG("Sending clear queue command with MOTOR_STOP.");
+    LOGLN();
 
     return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 }
@@ -883,11 +883,11 @@ bool GBox::isCurrentlyScanning() const
 void GBox::startScanning()
 {
     isScanning_ = true;
-    logln("Scanning started.");
+    LOGLN("Scanning started.");
 }
 
 void GBox::interruptScanning()
 {
     isScanning_ = false;
-    logln("Scanning interrupted by button press.");
+    LOGLN("Scanning interrupted by button press.");
 }
