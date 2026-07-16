@@ -1,3 +1,6 @@
+#include "Log.h"
+#include "__assert.h"
+
 #include <Arduino.h>
 #include <MovementController.h>
 #include <PID_v1.h>
@@ -61,6 +64,12 @@ MovementController::MovementController(MotorControlInterface &motorControl,
 void MovementController::init(uint32_t pwm_freq)
 {
     imuOk = _imu.begin();
+    if (imuOk) {
+        LOGLN("IMU init OK");
+    }
+    G_ASSERT_MSG(imuOk, "IMU init FAILED");
+    _imu.zeroYaw();
+    _imu.calibrate();
     _motorControl.init(pwm_freq);
 
     /* Configure PID (20 Hz like test implementation). */
