@@ -26,6 +26,7 @@ public:
     virtual float pitch() const = 0;
     virtual float yaw() const = 0;
     virtual float gyroZDeg() const = 0;
+    virtual void zeroYaw() = 0;
 };
 
 #endif // IMU_ORIENTATION_INTERFACE_H
