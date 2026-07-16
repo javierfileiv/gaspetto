@@ -283,7 +283,7 @@ TEST_F(PIDMovementTest, TelemetryCallbackRunsAtConfiguredInterval)
     gTelemetryCounter = nullptr;
 }
 
-TEST(MovementControllerInitBranchTest, InitFailsWhenImuBeginFailsAndMovementStaysIdle)
+TEST(MovementControllerInitBranchTest, InitFailsWhenImuBeginFailsHalts)
 {
     NiceMock<MockArduino> mockArduino;
     NiceMock<MockIMUOrientation> mockIMU;
@@ -292,17 +292,7 @@ TEST(MovementControllerInitBranchTest, InitFailsWhenImuBeginFailsAndMovementStay
 
     ON_CALL(mockIMU, _begin(_, _)).WillByDefault(Return(false));
 
-    movementController.init(PWM_FREQ);
-    movementController.startStraightDriving(50.0f, 1000);
-    movementController.startTurningInPlace(90.0f, 25.0f, 1000);
-    movementController.updateMovement();
-
-    EXPECT_FALSE(movementController.isMoving());
-    EXPECT_FALSE(movementController.isImuOk());
-
-    TelemetryPacket telemetry = movementController.buildTelemetryPacket();
-    EXPECT_EQ(telemetry.imuOk, 0);
-    EXPECT_FLOAT_EQ(telemetry.yaw, 0.0f);
+    EXPECT_DEATH(movementController.init(PWM_FREQ), "Assertion.*imuOk");
 }
 
 TEST_F(PIDMovementTest, UpdateMovementReturnsEarlyWhenIdle)

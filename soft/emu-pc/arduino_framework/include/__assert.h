@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #else /* ARDUINO */
+#include "Log.h"
 #ifndef assert
 #define assert(x)                                  \
     do {                                           \
@@ -27,4 +28,14 @@
 
 #ifndef G_ASSERT
 #define G_ASSERT(x) assert(x)
+#endif
+
+#ifndef G_ASSERT_MSG
+#define G_ASSERT_MSG(x, msg) \
+    do {                     \
+        if (!(x)) {          \
+            LOGLN(msg);      \
+            assert(x);       \
+        }                    \
+    } while (0)
 #endif
