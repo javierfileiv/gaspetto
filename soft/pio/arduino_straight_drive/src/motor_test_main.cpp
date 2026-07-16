@@ -790,7 +790,7 @@ void sendTelemetry()
 
     // Update radio address for telemetry and send
     radio.stopListening();
-    radio.openWritingPipe(RADIO_ADDR_TLM);
+    radio.openWritingPipe(gcar_telemetry_pipe_name);
 
     bool result = radio.write(&telemetry, sizeof(telemetry));
 

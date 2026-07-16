@@ -9,6 +9,8 @@ const uint8_t gcar_pipe_name[] = "_car_";
 const uint8_t gbox_log_pipe_name[] = "_logb";
 /* Log pipe from the Car. */
 const uint8_t gcar_log_pipe_name[] = "_logc";
+/* Telemetry pipe from the Car. */
+const uint8_t gcar_telemetry_pipe_name[] = "_tel_";
 
 const uint32_t PA_LEVEL = RF24_PA_LOW; /* Power Amplifier level */
 const rf24_datarate_e DATA_RATE = RF24_1MBPS; /* Data rate for RF24 communication */

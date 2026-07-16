@@ -13,7 +13,6 @@
 // Use 5 non-null bytes (no embedded 0) for robust addressing. Last element of the 6-byte array
 // is unused/for readability only; RF24 uses first 5 bytes.
 static const uint8_t RADIO_ADDR_CMD[6] = {'C', 'M', 'D', 'C', '1', '\0'}; // Commands TO vehicle
-static const uint8_t RADIO_ADDR_TLM[6] = {'T', 'L', 'M', 'T', '1', '\0'}; // Telemetry FROM vehicle
 
 // Telemetry: fits into 32 byte payload (nRF24 max)
 struct __attribute__((packed)) TelemetryPacket

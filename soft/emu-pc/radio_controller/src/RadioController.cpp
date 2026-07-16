@@ -161,7 +161,7 @@ bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 {
     bool result = false;
     /* Switch to telemetry address for transmission. */
-    _radio.openWritingPipe(RADIO_ADDR_TLM);
+    _radio.openWritingPipe(gcar_telemetry_pipe_name);
     result = sendBuffer(&telemetry, sizeof(telemetry));
     /* Restore command pipe and resume listening. */
     _radio.openWritingPipe(writing_addr);
@@ -201,6 +201,8 @@ void RadioController::decodeCommandPacket(const CommandPacket &packet)
         LOG(F("] "));
         LOG(commandIdToString(cmdId));
 
+        if (cmdId == CommandId::NONE)
+            continue;
         Event evt(EventId::ACTION, cmdId);
         gaspettoQueue->enqueue(evt);
         LOG(F(" queued; app queue size="));

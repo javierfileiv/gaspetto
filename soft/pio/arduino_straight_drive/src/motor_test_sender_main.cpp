@@ -60,7 +60,7 @@ void setup()
         radio.enableAckPayload();
 
         // Set up for telemetry reception
-        radio.openReadingPipe(1, RADIO_ADDR_TLM);
+        radio.openReadingPipe(1, gcar_telemetry_pipe_name);
         radio.startListening();
 
         radioOk = true;
