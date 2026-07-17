@@ -57,9 +57,8 @@ TEST_F(RealMotorControlTest, InitSetSpeedAndStopExercisesPwmPaths)
     MotorControl motor(1, 2, 3, 4);
 
     EXPECT_CALL(mockArduino, pinMode(_, _)).Times(4);
-    EXPECT_CALL(mockArduino, hw_timer_pause()).Times(2);
-    EXPECT_CALL(mockArduino, setPWM(_, _, _, _)).Times(4);
-    EXPECT_CALL(mockArduino, setCaptureCompare(_, _, _)).Times(AtLeast(16));
+    EXPECT_CALL(mockArduino, analogWriteFrequency(_)).Times(1);
+    EXPECT_CALL(mockArduino, analogWrite(_, _)).Times(AtLeast(12));
 
     motor.init(20000);
     motor.setMotorSpeeds(65, 40, true, false);

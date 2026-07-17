@@ -103,7 +103,7 @@ void IMUOrientation::update()
     lastGyroSpike = spike;
 
     // Bias estimation: update only if not a spike and magnitude moderate
-    if (!spike && fabs(rawGz) < IMU_GYROZ_CLAMP_DEG_S * 0.6f) {
+    if (!spike && fabs(rawGz) < IMU_GYROZ_BIAS_THRESHOLD_DEG_S) {
         gyroZBias = gyroZBias + IMU_GYROZ_BIAS_ALPHA * (rawGz - gyroZBias);
     }
     float gz = rawGz - gyroZBias;

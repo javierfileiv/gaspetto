@@ -72,6 +72,23 @@ public:
      */
     void setTelemetryCallback(void (*callback)(const TelemetryPacket &));
 
+    void setTunings(double kp, double ki, double kd);
+
+    void setTrim(float trim);
+
+    double getKp() const
+    {
+        return Kp;
+    }
+    double getKi() const
+    {
+        return Ki;
+    }
+    double getKd() const
+    {
+        return Kd;
+    }
+
     /**
      * buildTelemetryPacket: fill a telemetry packet with current state
      */
@@ -92,12 +109,13 @@ public:
 private:
     bool imuOk = false;
     double yawSetpoint, currentYaw, motorOffsetOutput;
-    double Kp = 2.0, Ki = 0.01, Kd = 0.01;
+    double Kp = 2.0, Ki = 0.0, Kd = 0.0;
     float telemTargetYaw = 0.0f;
     MovementState currentState = MovementState::IDLE;
     float baseSpeed = 0.0f;
     float telemPwmFreq = 17.0f;
     float pidError = 0.0f; /* Current PID error for telemetry. */
+    float trimOffset = 0.0f;
 
     unsigned long straightStartMs = 0;
 

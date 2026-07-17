@@ -1,6 +1,5 @@
 #pragma once
 
-#include "HardwareTimer.h"
 #include "Log.h"
 #include "MotorControlInterface.h"
 
@@ -10,18 +9,16 @@
 
 struct MotorConfig {
     uint32_t pin[MAX_PIN];
-    uint32_t tim_channel[MAX_PIN];
-    HardwareTimer *timer;
 };
 
 class MotorControl : public MotorControlInterface, public Log {
 public:
-    /** setPins():
+    /** MotorControl():
      * Set the pins for the motor controller.
-     * @lA: Left motor A pin.
-     * @lB: Left motor B pin.
-     * @rA: Right motor A pin.
-     * @rB: Right motor B pin.
+     * @lA: Left motor BWD pin (PWM 0-255).
+     * @lB: Left motor FWD pin (PWM 0-255).
+     * @rA: Right motor FWD pin (PWM 0-255).
+     * @rB: Right motor BWD pin (PWM 0-255).
      */
     MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB);
 
@@ -35,8 +32,8 @@ public:
 
     /** setMotorSpeeds():
      * Set the motor speeds and directions.
-     * @leftSpeed: Speed for the left motor.
-     * @rightSpeed: Speed for the right motor.
+     * @leftSpeed: Speed for the left motor (0-255).
+     * @rightSpeed: Speed for the right motor (0-255).
      * @leftForward: Direction for the left motor (true for forward, false for backward).
      * @rightForward: Direction for the right motor (true for forward, false for backward).
      */
@@ -53,47 +50,43 @@ public:
     struct MotorConfig motor[MAX_SIDES];
 
 private:
-    HardwareTimer leftTimer_;
-    HardwareTimer rightTimer_;
-
     /** setMotorLeft():
-     * Set the left motor's direction and speed (PWM duty cycle 0-100).
-     * @speed_percent: Speed percentage (0-100).
+     * Set the left motor's direction and speed.
+     * @speed: PWM value (0-255).
      * @forward: true for forward, false for backward.
      */
-    void setMotorLeft(uint8_t speed_percent, bool forward);
+    void setMotorLeft(uint8_t speed, bool forward);
 
     /** setMotorRight():
-     * Set the right motor's direction and speed (PWM duty cycle 0-100).
-     * @speed_percent: Speed percentage (0-100).
+     * Set the right motor's direction and speed.
+     * @speed: PWM value (0-255).
      * @forward: true for forward, false for backward.
      */
-    void setMotorRight(uint8_t speed_percent, bool forward);
+    void setMotorRight(uint8_t speed, bool forward);
 
-    /* setPWMfrequency():
+    /** setPWMfrequency():
      * Set the PWM frequency for the motors.
-     * @side: Motor side (LEFT or RIGHT).
      * @frequency: Frequency in Hz.
      */
-    virtual void setPWMfrequency(MotorSide side, uint32_t frequency);
+    virtual void setPWMfrequency(uint32_t frequency);
 
-    /* setPWMdutyCycle():
+    /** setPWMdutyCycle():
      * Set the PWM duty cycle for a specific motor pin.
      * @side: Motor side (LEFT or RIGHT).
-     * @pin: Pin on the motor side (A or B).
-     * @percent_duty: Duty cycle percentage (0-100).
+     * @pin: Pin on the motor side (BWD or FWD).
+     * @duty: PWM duty cycle (0-255).
      */
-    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty);
+    virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t duty);
 
     /** stopRightMotor():
      * Stop the right motor.
      * Set speed of the right motor to zero and stops it.
      */
-    virtual void stopRightMotor();
+    void stopRightMotor();
 
     /** stopLeftMotor():
      * Stop the left motor.
      * Set speed of the left motor to zero and stops it.
      */
-    virtual void stopLeftMotor();
+    void stopLeftMotor();
 };

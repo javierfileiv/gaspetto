@@ -24,10 +24,10 @@ void MockMotorControl::setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, b
     mock->_setMotorSpeeds(leftSpeed, rightSpeed, leftForward, rightForward);
 }
 
-void MockMotorControl::setPWMfrequency(MotorSide side, uint32_t frequency)
+void MockMotorControl::setPWMfrequency(uint32_t frequency)
 {
     auto mock = MockMotorControl::get_instance();
-    mock->_setPWMfrequency(side, frequency);
+    mock->_setPWMfrequency(frequency);
 }
 
 void MockMotorControl::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty)
