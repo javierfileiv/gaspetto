@@ -14,7 +14,10 @@
 #define IMU_GYROZ_SPIKE_REJECT_DEG_S 800.0f
 #endif
 #ifndef IMU_GYROZ_BIAS_ALPHA
-#define IMU_GYROZ_BIAS_ALPHA 0.0015f
+#define IMU_GYROZ_BIAS_ALPHA 0.01f
+#endif
+#ifndef IMU_GYROZ_BIAS_THRESHOLD_DEG_S
+#define IMU_GYROZ_BIAS_THRESHOLD_DEG_S 1.0f
 #endif
 #ifndef IMU_IDLE_YAW_DAMP_RATE
 #define IMU_IDLE_YAW_DAMP_RATE 0.25f /* per second fraction toward zero when idle. */

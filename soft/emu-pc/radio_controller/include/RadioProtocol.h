@@ -20,8 +20,10 @@ struct __attribute__((packed)) TelemetryPacket {
     float ki; /* 4 - Current Ki parameter. */
     float kd; /* 4 - Current Kd parameter. */
     uint8_t imuOk; /* 1 - IMU status (0/1). */
-    /* ======= 29 bytes*/
-    uint8_t padding[3]; /* 3 - Alignment padding to reach 32 bytes. */
+    uint8_t state; /* 1 - 0=IDLE, 1=STRAIGHT, 2=TURNING */
+    uint8_t speed; /* 1 - baseSpeed (0-100). */
+    int8_t trim; /* 1 - trimOffset (-100 to 100). */
+    /* ======= 32 bytes*/
 };
 
 static_assert(sizeof(TelemetryPacket) == 32, "TelemetryPacket must be exactly 32 bytes");
