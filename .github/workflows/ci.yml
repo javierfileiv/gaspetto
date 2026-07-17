@@ -11,8 +11,30 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
 
 jobs:
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: |
+            {
+              "extends": ["@commitlint/config-conventional"],
+              "rules": {
+                "type-enum": [2, "always", ["feat", "fix", "refactor", "docs", "style", "test", "chore", "perf", "ci", "build", "revert"]],
+                "subject-case": [0],
+                "subject-empty": [2, "never"],
+                "type-empty": [2, "never"]
+              }
+            }
+
+
   build_pc:
     runs-on: ubuntu-latest
     steps:

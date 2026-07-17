@@ -130,7 +130,7 @@ TEST_F(PIDMovementTest, StraightDriving_MotorsReceiveSymmetricPWM)
 TEST_F(PIDMovementTest, StraightDriving_CorrectionOnYawDrift)
 {
     setYaw(0.0f);
-    movementController.startStraightDriving(50.0f, 5000);
+    movementController.startStraightDriving(80.0f, 5000);
     runPIDCycles(2);
 
     /* Introduce a 10° drift to the right. */
@@ -217,7 +217,7 @@ TEST_F(PIDMovementTest, TurnTargetNormalizationBelowMinus180IsHandled)
 TEST_F(PIDMovementTest, StraightDrivingWrapsPositiveDiffAcrossBoundary)
 {
     setYaw(170.0f);
-    movementController.startStraightDriving(50.0f, 5000);
+    movementController.startStraightDriving(85.0f, 5000);
 
     /* target=170, current=-170 => diff=340 => wrap branch diff>180 */
     setYaw(-170.0f);
@@ -236,7 +236,7 @@ TEST_F(PIDMovementTest, StraightDrivingWrapsPositiveDiffAcrossBoundary)
 TEST_F(PIDMovementTest, StraightDrivingWrapsNegativeDiffAcrossBoundary)
 {
     setYaw(-170.0f);
-    movementController.startStraightDriving(50.0f, 5000);
+    movementController.startStraightDriving(85.0f, 5000);
 
     /* target=-170, current=170 => diff=-340 => wrap branch diff<-180 */
     setYaw(170.0f);
@@ -325,7 +325,7 @@ TEST_F(PIDMovementTest, TurningWithLargeErrorClampsMotorSpeeds)
 TEST_F(PIDMovementTest, StraightDrivingLargePositiveAndNegativeDriftProducesOppositeCorrections)
 {
     setYaw(0.0f);
-    movementController.startStraightDriving(120.0f, 5000);
+    movementController.startStraightDriving(85.0f, 5000);
 
     uint32_t leftPos = 0, rightPos = 0;
     uint32_t leftNeg = 0, rightNeg = 0;
