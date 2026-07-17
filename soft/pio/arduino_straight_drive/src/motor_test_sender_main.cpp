@@ -247,15 +247,16 @@ void loop()
     {
         TelemetryPacket telemetry;
         radio.read(&telemetry, sizeof(telemetry));
-        bool show = expectTelemetry ||
-                    (telemetryEnabled && (++telemetryCount % TELEMETRY_THROTTLE == 0));
-        if (show)
+        bool byExpect   = expectTelemetry;
+        bool byThrottle = telemetryEnabled && (++telemetryCount % TELEMETRY_THROTTLE == 0);
+        if (byExpect || byThrottle)
         {
             displayTelemetry(telemetry);
         }
-        if (show || expectTelemetry)
+        if (byExpect)
         {
             expectTelemetry = false;
+            telemetryCount  = 0;
         }
     }
 
@@ -319,12 +320,18 @@ void loop()
             {
                 Serial.println(F("Program full!"));
             }
+            else if (cmd.length() >= CMD_LEN)
+            {
+                Serial.println(F("Command too long"));
+            }
             else
             {
                 cmd.toCharArray(programQueue[programCount], CMD_LEN);
                 programCount++;
                 Serial.print(F("Added to program ("));
                 Serial.print(programCount);
+                Serial.print(F("/"));
+                Serial.print(PROGRAM_MAX);
                 Serial.println(F(")"));
             }
         }
