@@ -2,8 +2,6 @@
 
 #include "Arduino.h"
 
-#define TIME_CHANNEL(pin) STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(pin), PinMap_PWM))
-
 MotorControl::MotorControl(uint32_t lA, uint32_t lB, uint32_t rA, uint32_t rB)
 {
     motor[LEFT].pin[BWD] = lA;
@@ -22,49 +20,34 @@ void MotorControl::init(uint32_t pwm_freq)
     pinMode(motor[LEFT].pin[FWD], OUTPUT);
     pinMode(motor[RIGHT].pin[BWD], OUTPUT);
     pinMode(motor[RIGHT].pin[FWD], OUTPUT);
-    leftTimer_ = HardwareTimer((
-            TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(motor[LEFT].pin[BWD]), PinMap_PWM));
-    motor[LEFT].timer = &leftTimer_;
-    motor[LEFT].timer->pause();
-    motor[LEFT].tim_channel[BWD] = TIME_CHANNEL(motor[LEFT].pin[BWD]);
-    motor[LEFT].tim_channel[FWD] = TIME_CHANNEL(motor[LEFT].pin[FWD]);
-    rightTimer_ = HardwareTimer((TIM_TypeDef *)pinmap_peripheral(
-            digitalPinToPinName(motor[RIGHT].pin[BWD]), PinMap_PWM));
-    motor[RIGHT].timer = &rightTimer_;
-    motor[RIGHT].timer->pause();
-    motor[RIGHT].tim_channel[BWD] = TIME_CHANNEL(motor[RIGHT].pin[BWD]);
-    motor[RIGHT].tim_channel[FWD] = TIME_CHANNEL(motor[RIGHT].pin[FWD]);
-    setPWMfrequency(LEFT, pwm_freq);
-    setPWMfrequency(RIGHT, pwm_freq);
-    setPWMdutyCycle(LEFT, BWD, LOW);
-    setPWMdutyCycle(LEFT, FWD, LOW);
-    setPWMdutyCycle(RIGHT, BWD, LOW);
-    setPWMdutyCycle(RIGHT, FWD, LOW);
+
+    setPWMfrequency(pwm_freq);
+
+    analogWrite(motor[LEFT].pin[BWD], 0);
+    analogWrite(motor[LEFT].pin[FWD], 0);
+    analogWrite(motor[RIGHT].pin[BWD], 0);
+    analogWrite(motor[RIGHT].pin[FWD], 0);
 }
 
-void MotorControl::setMotorLeft(uint8_t speed_percent, bool forward)
+void MotorControl::setMotorLeft(uint8_t speed, bool forward)
 {
-    setPWMdutyCycle(LEFT, BWD, LOW);
-    setPWMdutyCycle(LEFT, FWD, LOW);
     if (forward) {
-        setPWMdutyCycle(LEFT, BWD, speed_percent);
-        setPWMdutyCycle(LEFT, FWD, LOW);
+        analogWrite(motor[LEFT].pin[BWD], speed);
+        analogWrite(motor[LEFT].pin[FWD], 0);
     } else {
-        setPWMdutyCycle(LEFT, BWD, LOW);
-        setPWMdutyCycle(LEFT, FWD, speed_percent);
+        analogWrite(motor[LEFT].pin[BWD], 0);
+        analogWrite(motor[LEFT].pin[FWD], speed);
     }
 }
 
-void MotorControl::setMotorRight(uint8_t speed_percent, bool forward)
+void MotorControl::setMotorRight(uint8_t speed, bool forward)
 {
-    setPWMdutyCycle(RIGHT, BWD, LOW);
-    setPWMdutyCycle(RIGHT, FWD, LOW);
     if (forward) {
-        setPWMdutyCycle(RIGHT, BWD, speed_percent);
-        setPWMdutyCycle(RIGHT, FWD, LOW);
+        analogWrite(motor[RIGHT].pin[BWD], speed);
+        analogWrite(motor[RIGHT].pin[FWD], 0);
     } else {
-        setPWMdutyCycle(RIGHT, BWD, LOW);
-        setPWMdutyCycle(RIGHT, FWD, speed_percent);
+        analogWrite(motor[RIGHT].pin[BWD], 0);
+        analogWrite(motor[RIGHT].pin[FWD], speed);
     }
 }
 
@@ -75,28 +58,26 @@ void MotorControl::setMotorSpeeds(uint32_t leftSpeed, uint32_t rightSpeed, bool 
     setMotorRight(rightSpeed, rightForward);
 }
 
-void MotorControl::setPWMfrequency(MotorSide side, uint32_t frequency)
+void MotorControl::setPWMfrequency(uint32_t frequency)
 {
-    motor[side].timer->setPWM(motor[side].tim_channel[BWD], motor[side].pin[BWD], frequency, 0);
-    motor[side].timer->setPWM(motor[side].tim_channel[FWD], motor[side].pin[FWD], frequency, 0);
+    analogWriteFrequency(frequency);
 }
 
-void MotorControl::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty)
+void MotorControl::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t duty)
 {
-    motor[side].timer->setCaptureCompare(motor[side].tim_channel[pin], percent_duty,
-                                         PERCENT_COMPARE_FORMAT);
+    analogWrite(motor[side].pin[pin], duty);
 }
 
 void MotorControl::stopLeftMotor()
 {
-    setPWMdutyCycle(LEFT, BWD, 0);
-    setPWMdutyCycle(LEFT, FWD, 0);
+    analogWrite(motor[LEFT].pin[BWD], 0);
+    analogWrite(motor[LEFT].pin[FWD], 0);
 }
 
 void MotorControl::stopRightMotor()
 {
-    setPWMdutyCycle(RIGHT, BWD, 0);
-    setPWMdutyCycle(RIGHT, FWD, 0);
+    analogWrite(motor[RIGHT].pin[BWD], 0);
+    analogWrite(motor[RIGHT].pin[FWD], 0);
 }
 
 void MotorControl::stopBothMotors()

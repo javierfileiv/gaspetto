@@ -37,21 +37,12 @@ double g_yawSetpoint = 0.0;
 
 /* Tunable gains (start with same as original manual PID). */
 double g_Kp = 2.0;
-double g_Ki = 0.01;
-double g_Kd = 0.01;
-
+double g_Ki = 0.0;
+double g_Kd = 0.0;
 PID g_yawPID(&g_yawInput, &g_yawOutput, &g_yawSetpoint, g_Kp, g_Ki, g_Kd, 0); /* DIRECT mode. */
 
-/* Turn completion / anti-oscillation helpers. */
-int g_stableCount = 0;
-const int STABLE_REQUIRED = 4; /* Need N consecutive cycles inside deadband. */
-const float TURN_DEADBAND_DEG = 3.0f; /* Final acceptance window. */
-const float TURN_DECEL_ANGLE_DEG = 35.0f; /* Start reducing speed under this error. */
-const float TURN_MIN_SPEED_RATIO = 0.28f; /* Minimum fraction of base speed. */
-
-/* Output smoothing to reduce motor jitter. */
-double g_prevFilteredOutput = 0.0;
-const double OUTPUT_FILTER_ALPHA = 0.25; /* 0..1 (higher = more weight to new sample). */
+const float TURN_COMPLETION_DEG = 3.0f; /* Stop turn when error within this threshold. */
+const unsigned long TURN_TIMEOUT_MS = 7000; /* Force stop turn after this many ms. */
 }
 
 MovementController::MovementController(MotorControlInterface &motorControl,
@@ -73,9 +64,9 @@ void MovementController::init(uint32_t pwm_freq)
     _motorControl.init(pwm_freq);
 
     /* Configure PID (20 Hz like test implementation). */
-    g_yawPID.SetSampleTime(50); /* Milliseconds. */
-    g_yawPID.SetOutputLimits(-180.0, 180.0); /* Degrees-equivalent authority. */
     g_yawPID.SetTunings(g_Kp, g_Ki, g_Kd);
+    g_yawPID.SetOutputLimits(-180.0, 180.0); /* Degrees-equivalent authority. */
+    g_yawPID.SetSampleTime(50); /* Milliseconds. */
     g_yawPID.SetMode(1); /* AUTOMATIC. */
     currentState = MovementState::IDLE;
 }
@@ -95,12 +86,10 @@ void MovementController::startStraightDriving(float speed, uint32_t duration_ms)
     /* Capture current yaw as the target heading. */
     yawSetpoint = _imu.yaw();
     telemTargetYaw = yawSetpoint;
-    baseSpeed = speed;
+    baseSpeed = constrain(speed, -255.0f, 255.0f);
 
     /* Sync PID variables. */
     g_yawSetpoint = yawSetpoint;
-    g_yawInput = yawSetpoint; /* Start at zero error. */
-    g_stableCount = 0;
     g_yawPID.SetMode(1);
 
     straightStartMs = millis();
@@ -135,7 +124,6 @@ void MovementController::startTurningInPlace(float final_yaw_angle, float speed,
 
     g_yawSetpoint = yawSetpoint;
     g_yawInput = _imu.yaw();
-    g_stableCount = 0;
     g_yawPID.SetMode(1);
 
     straightStartMs = millis();
@@ -158,12 +146,23 @@ bool MovementController::isMoving() const
 
 void MovementController::updateMovement()
 {
+    /* Always update IMU, even when idle — needed for telemetry. */
+    _imu.update();
+
     if (currentState == MovementState::IDLE || !imuOk) {
+        yawSetpoint = currentYaw;
         return;
     }
 
     /* Check if timed movement has expired. */
     if (timedMovement && (millis() - movementStartMs >= movementDurationMs)) {
+        stopMovement();
+        return;
+    }
+
+    /* Force stop turn after timeout. */
+    if (currentState == MovementState::TURNING_IN_PLACE &&
+        millis() - straightStartMs >= TURN_TIMEOUT_MS) {
         stopMovement();
         return;
     }
@@ -185,10 +184,7 @@ void MovementController::updateMovement()
 
     /* Compute PID when library decides interval elapsed. */
     if (g_yawPID.Compute()) {
-        /* Smooth output to reduce jitter. */
-        g_prevFilteredOutput = OUTPUT_FILTER_ALPHA * g_yawOutput +
-                               (1.0 - OUTPUT_FILTER_ALPHA) * g_prevFilteredOutput;
-        motorOffsetOutput = g_prevFilteredOutput;
+        motorOffsetOutput = g_yawOutput;
 
         /* Human-readable error (shortest angular diff). */
         pidError = yawDiff(yawSetpoint, currentYaw);
@@ -204,35 +200,32 @@ void MovementController::applyPidOutput()
     int rightPWM = 0;
 
     if (currentState == MovementState::TURNING_IN_PLACE) {
-        float absErr = safe_fabs(pidError);
+        static int stableCount = 0;
+        const int STABLE_REQUIRED = 3;
 
-        /* Speed deceleration near target. */
-        float speedRatio = 1.0f;
-        if (absErr < TURN_DECEL_ANGLE_DEG) {
-            speedRatio = safe_max(TURN_MIN_SPEED_RATIO, absErr / TURN_DECEL_ANGLE_DEG);
-        }
-        float commanded = baseSpeed * speedRatio;
-
-        double correctionScale = motorOffsetOutput / 180.0; /* Map to [-1,1]. */
+        double correctionScale = motorOffsetOutput / 180.0;
         correctionScale = constrain(correctionScale, -1.0, 1.0);
 
-        leftPWM = static_cast<int>(-correctionScale * commanded);
-        rightPWM = static_cast<int>(correctionScale * commanded);
+        int turnPWM = static_cast<int>(safe_fabs(correctionScale) * baseSpeed);
+        if (turnPWM < 20)
+            turnPWM = 20;
 
-        /* Stability / deadband check to finalize turn. */
-        if (absErr < TURN_DEADBAND_DEG) {
-            g_stableCount++;
-            if (g_stableCount >= STABLE_REQUIRED) {
+        leftPWM = (correctionScale >= 0) ? -turnPWM : turnPWM;
+        rightPWM = -leftPWM;
+
+        if (safe_fabs(pidError) < TURN_COMPLETION_DEG) {
+            stableCount++;
+            if (stableCount >= STABLE_REQUIRED) {
                 stopMovement();
                 return;
             }
         } else {
-            g_stableCount = 0;
+            stableCount = 0;
         }
     } else {
         /* Straight driving heading correction. */
         float speedScale = baseSpeed / 255.0f;
-        double correctionScale = motorOffsetOutput / 180.0; /* [-1,1]. */
+        double correctionScale = motorOffsetOutput / 180.0; /* Map to [-1,1]. */
         correctionScale = constrain(correctionScale, -0.3, 0.3); /* Limit authority. */
 
         float left = speedScale - static_cast<float>(correctionScale) * 0.5f;
@@ -244,6 +237,16 @@ void MovementController::applyPidOutput()
 
     leftPWM = safe_clamp(leftPWM, -255, 255);
     rightPWM = safe_clamp(rightPWM, -255, 255);
+
+    if (currentState == MovementState::STRAIGHT_DRIVING && trimOffset != 0.0f) {
+        if (trimOffset > 0) {
+            leftPWM += static_cast<int>(trimOffset * 2.55f);
+        } else {
+            rightPWM -= static_cast<int>(-trimOffset * 2.55f);
+        }
+        leftPWM = safe_clamp(leftPWM, -255, 255);
+        rightPWM = safe_clamp(rightPWM, -255, 255);
+    }
 
     bool leftForward = leftPWM >= 0;
     bool rightForward = rightPWM >= 0;
@@ -276,6 +279,22 @@ void MovementController::setTelemetryCallback(void (*callback)(const TelemetryPa
     telemetryCallback = callback;
 }
 
+void MovementController::setTunings(double kp, double ki, double kd)
+{
+    Kp = kp;
+    Ki = ki;
+    Kd = kd;
+    g_Kp = kp;
+    g_Ki = ki;
+    g_Kd = kd;
+    g_yawPID.SetTunings(kp, ki, kd);
+}
+
+void MovementController::setTrim(float trim)
+{
+    trimOffset = constrain(trim, -100.0f, 100.0f);
+}
+
 TelemetryPacket MovementController::buildTelemetryPacket() const
 {
     TelemetryPacket telemetry;
@@ -283,12 +302,26 @@ TelemetryPacket MovementController::buildTelemetryPacket() const
 
     telemetry.targetYaw = telemTargetYaw;
     telemetry.yaw = imuOk ? _imu.yaw() : 0.0f;
-    telemetry.err = pidError;
+    telemetry.err = (currentState == MovementState::IDLE) ? 0.0f : pidError;
     telemetry.pwmFreq = telemPwmFreq;
     telemetry.kp = static_cast<float>(Kp);
     telemetry.ki = static_cast<float>(Ki);
     telemetry.kd = static_cast<float>(Kd);
     telemetry.imuOk = imuOk ? 1 : 0;
+    if (currentState == MovementState::STRAIGHT_DRIVING) {
+        telemetry.state = baseSpeed > 0 ? 1 : 2;
+    } else if (currentState == MovementState::TURNING_IN_PLACE) {
+        float diff = yawSetpoint - (imuOk ? _imu.yaw() : 0.0f);
+        while (diff > 180.0f)
+            diff -= 360.0f;
+        while (diff < -180.0f)
+            diff += 360.0f;
+        telemetry.state = diff > 0 ? 4 : 3;
+    } else {
+        telemetry.state = 0;
+    }
+    telemetry.speed = static_cast<uint8_t>(constrain(safe_fabs(baseSpeed), 0.0f, 255.0f));
+    telemetry.trim = static_cast<int8_t>(constrain(trimOffset, -100.0f, 100.0f));
 
     return telemetry;
 }

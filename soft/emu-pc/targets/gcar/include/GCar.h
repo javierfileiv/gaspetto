@@ -19,9 +19,9 @@ const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
 /** @brief Number of states for GCar. */
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
 
-const float INITIAL_MOTOR_SPEED = 50;
-const uint32_t TURN_MOTOR_SPEED = 30;
-const uint32_t MOTOR_TIMEOUT_MS = 5000; /* Default timeout for motor commands. */
+const float INITIAL_MOTOR_SPEED = 37;
+const uint32_t TURN_MOTOR_SPEED = 35;
+const uint32_t MOTOR_TIMEOUT_MS = 2500; /* Default timeout for motor commands. */
 
 /**
  * @brief Active object base type for GCar.
