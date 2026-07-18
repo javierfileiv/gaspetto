@@ -59,6 +59,82 @@ Run from repository root.
 	./tools/coverage-gaspetto-utest
 	```
 
+## Tuning
+
+The `arduino_straight_drive` project (`soft/pio/arduino_straight_drive/`) provides two programs for PID tuning on real hardware:
+
+| Target | Board | Description |
+|--------|-------|-------------|
+| `arduino_straight_drive` | BlackPill F411CE + MPU6050 + DRV8871 + NRF24L01 | Receiver: runs PID on the robot |
+| `motor_test_sender` | Arduino Uno + NRF24L01 | Sender: sends commands via radio |
+
+### Flash
+
+```bash
+cd soft/pio/arduino_straight_drive
+
+# Receiver (robot)
+pio run -e arduino_straight_drive -t upload
+
+# Sender (Arduino Uno)
+pio run -e motor_test_sender -t upload
+```
+
+### Commands
+
+All commands are sent from the sender as text (e.g. `w50`). Lowercase sends immediately, uppercase adds to the program queue (send with `*`).
+
+```
+--- Direct motor (PWM 500ms) ---
+  L<v>  Left motor
+  R<v>  Right motor
+  B<v>  Both motors
+  B     Debug telemetry
+  M     Full test all dirs
+
+--- PID movement ---
+  W<v>  Forward
+  S<v>  Backward
+  A<v>  Turn left 90 deg
+  D<v>  Turn right 90 deg
+  X     Stop all
+  Z     Zero yaw
+  M<v>  Set movement timeout (ms)
+
+--- PID tuning ---
+  K<v>  Kp (K50 = 0.05)
+  I<v>  Ki (I100 = 0.10)
+  V<v>  Kd (V50 = 0.05)
+  O<v>  Trim offset (±100)
+
+--- Program ---
+  *     Send program queue
+  -     Clear program queue
+  T     Toggle telemetry display
+```
+
+### Telemetry
+
+Auto-sent every 500ms during movement, shown on the sender (throttled to 1/10). Press `B` (or space on the receiver serial) for an immediate debug dump.
+
+Format:
+```
+3245 W50 Y=2.3 e=0.5 Kp=2.000 Ki=0.010 Kd=0.010 O=0
+```
+
+| Field | Meaning |
+|-------|---------|
+| `3234` | Timestamp (millis) |
+| `W50` | State (IDL/FWD/BWD/TL/TR) + speed |
+| `Y` | Current yaw (degrees) |
+| `e` | PID error |
+| `Kp/Ki/Kd` | PID gains |
+| `O` | Trim offset |
+
+### Shared PID (GCar)
+
+The PID controller (`MovementController`), motor driver (`MotorControl`), and IMU (`IMUOrientation`) are shared between `motor_test_main` and the GCar firmware via symlinks. Tuning values found with the test program can be directly applied to GCar — the behavior is identical.
+
 ## Coverage Outputs
 
 After running `./tools/coverage-gaspetto-utest`, reports are generated in:
