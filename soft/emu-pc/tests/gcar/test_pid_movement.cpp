@@ -352,3 +352,88 @@ TEST_F(PIDMovementTest, StraightDrivingLargePositiveAndNegativeDriftProducesOppo
     EXPECT_NE(leftNeg, rightNeg);
     EXPECT_NE((leftPos > rightPos), (leftNeg > rightNeg));
 }
+
+TEST_F(PIDMovementTest, SetTuningsUpdatesPidValues)
+{
+    movementController.setTunings(1.5, 0.02, 0.03);
+    TelemetryPacket t = movementController.buildTelemetryPacket();
+    EXPECT_FLOAT_EQ(t.kp, 1.5f);
+    EXPECT_FLOAT_EQ(t.ki, 0.02f);
+    EXPECT_FLOAT_EQ(t.kd, 0.03f);
+}
+
+TEST_F(PIDMovementTest, SetTrimAffectsTelemetryAndMotorSpeeds)
+{
+    movementController.setTrim(15.0f);
+    {
+        TelemetryPacket t = movementController.buildTelemetryPacket();
+        EXPECT_EQ(t.trim, 15);
+    }
+
+    setYaw(0.0f);
+    movementController.startStraightDriving(100.0f, 5000);
+
+    uint32_t lastLeft = 0, lastRight = 0;
+    ON_CALL(mockMotorControl, _setMotorSpeeds(_, _, _, _))
+            .WillByDefault([&](uint32_t l, uint32_t r, bool, bool) {
+                lastLeft = l;
+                lastRight = r;
+            });
+
+    runPIDCycles(3);
+    EXPECT_GT(lastLeft, lastRight);
+}
+
+TEST_F(PIDMovementTest, TurnTimeoutStopsMovement)
+{
+    setYaw(0.0f);
+    movementController.startTurningInPlace(90.0f, 50.0f);
+    runPIDCycles(2);
+    EXPECT_TRUE(movementController.isMoving());
+
+    advanceTime(10000);
+    movementController.updateMovement();
+    EXPECT_FALSE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, StartTurningSetsStateNotIdle)
+{
+    setYaw(0.0f);
+    EXPECT_FALSE(movementController.isMoving());
+    movementController.startTurningInPlace(90.0f, 50.0f);
+    EXPECT_TRUE(movementController.isMoving());
+}
+
+TEST_F(PIDMovementTest, TelemetryReflectsTurningState)
+{
+    setYaw(0.0f);
+    movementController.startTurningInPlace(-90.0f, 50.0f);
+    runPIDCycles(3);
+
+    TelemetryPacket t = movementController.buildTelemetryPacket();
+    EXPECT_TRUE(t.state == 3 || t.state == 4);
+    EXPECT_GT(t.speed, 0u);
+}
+
+TEST_F(PIDMovementTest, CheckTelemetryCallbackIsInvoked)
+{
+    int callCount = 0;
+    gTelemetryCounter = &callCount;
+    movementController.setTelemetryCallback(telemetryCounterCallback);
+    movementController.startStraightDriving(50.0f, 5000);
+
+    advanceTime(600);
+    movementController.updateMovement();
+    EXPECT_GT(callCount, 0);
+
+    gTelemetryCounter = nullptr;
+    movementController.setTelemetryCallback(nullptr);
+}
+
+TEST_F(PIDMovementTest, CheckTelemetryNoCallbackDoesNotCrash)
+{
+    movementController.setTelemetryCallback(nullptr);
+    movementController.startStraightDriving(50.0f, 5000);
+    advanceTime(600);
+    movementController.updateMovement();
+}
