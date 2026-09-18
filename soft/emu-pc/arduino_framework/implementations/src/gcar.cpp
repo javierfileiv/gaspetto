@@ -2,7 +2,7 @@
 #include "GCar_ino.h"
 #include "Serial.h"
 
-#ifdef USE_RADIO_CONTROLLER
+#ifdef PC_KEYBOARD_RADIO_SIM
 extern EventPacket pkt;
 #else
 extern Event event;
@@ -11,7 +11,7 @@ extern Event event;
 void gcar_input_switch(char ch)
 {
     switch (ch) {
-#ifdef USE_RADIO_CONTROLLER
+#ifdef PC_KEYBOARD_RADIO_SIM
     case 'W':
     case 'w':
         pkt.eventId = static_cast<uint8_t>(EventId::ACTION);
