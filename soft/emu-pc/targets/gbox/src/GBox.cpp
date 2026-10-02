@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdint>
 #ifdef ARDUINO
+#include "BitBangWire.h"
 #include "stm32f4xx_hal.h"
 
 #include <Adafruit_NeoPixel.h>
@@ -131,7 +132,7 @@ struct AdsDeviceConfig {
 };
 
 #ifdef ARDUINO
-TwoWire gI2c3(I2C3_SDA_PIN, I2C3_SCL_PIN);
+BitBangWire gI2c3(I2C3_SDA_PIN, I2C3_SCL_PIN);
 #else
 TwoWire gI2c3;
 #endif
