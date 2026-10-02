@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Arduino.h>
 
 const uint32_t MOTOR_LEFT_BWD = PA_3; /* Example PWM pin for motor left. D1 on salaea. */

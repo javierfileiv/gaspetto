@@ -107,8 +107,8 @@ TEST(GBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
                 EXPECT_EQ(len, sizeof(CommandPacket));
                 const CommandPacket *pkt = static_cast<const CommandPacket *>(data);
                 EXPECT_EQ(pkt->count, 2);
-                EXPECT_EQ(pkt->commands[0], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
-                EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::MOTOR_STOP));
+                EXPECT_EQ(pkt->commands[0], static_cast<uint8_t>(CommandId::MOTOR_STOP));
+                EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
                 return true;
             });
     EXPECT_CALL(rig.mockRf24, _startListening());
@@ -314,8 +314,8 @@ TEST(GBoxButtonInterruptTest, ClearQueueCommandOrderIsCorrect)
     EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket)))
             .WillOnce([](const void *data, uint8_t len) {
                 const CommandPacket *pkt = static_cast<const CommandPacket *>(data);
-                EXPECT_EQ(pkt->commands[0], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
-                EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::MOTOR_STOP));
+                EXPECT_EQ(pkt->commands[0], static_cast<uint8_t>(CommandId::MOTOR_STOP));
+                EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
                 return true;
             });
     EXPECT_CALL(rig.mockRf24, _startListening());
@@ -395,8 +395,8 @@ TEST(GBoxButtonInterruptTest, ClearQueueCommandIncludesBothCommands)
     capturedResult = rig.box.sendClearQueueCommand();
 
     EXPECT_TRUE(capturedResult);
-    EXPECT_EQ(capturedCmd0, static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
-    EXPECT_EQ(capturedCmd1, static_cast<uint8_t>(CommandId::MOTOR_STOP));
+    EXPECT_EQ(capturedCmd0, static_cast<uint8_t>(CommandId::MOTOR_STOP));
+    EXPECT_EQ(capturedCmd1, static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
 }
 
 /* ============================================================================ */

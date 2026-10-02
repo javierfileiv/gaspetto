@@ -1,8 +1,7 @@
-#ifndef CAR_EVENTS_H
-#define CAR_EVENTS_H
+#pragma once
 
 #include "CommandId.h"
-#include "Event.h"
+#include "GenericEvent.h"
 
 #ifndef ARDUINO
 #include <stdint.h>
@@ -49,5 +48,3 @@ inline const char *eventIdToString(EventId id)
         return "UNKNOWN";
     }
 }
-
-#endif /* CAR_EVENTS_H */

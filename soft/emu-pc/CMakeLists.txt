@@ -28,7 +28,9 @@ option(NRF_SENDER "Build NRF Sender target" OFF)
 option(BUILD_TESTS "Build unit tests" OFF)
 
 # Define global compile definitions before adding subdirectories
-add_compile_definitions(USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG)
+add_compile_definitions(
+  USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG PC_KEYBOARD_RADIO_SIM
+)
 
 # Interface library carrying the target-specific compile definition (GCAR / GBOX / NRF_SENDER) so
 # that all sub-libraries (radio_controller, arduino_framework, etc.) see the right -D flag.

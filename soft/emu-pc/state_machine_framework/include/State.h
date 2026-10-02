@@ -1,5 +1,4 @@
-#ifndef STATE_H
-#define STATE_H
+#pragma once
 
 #include "Arduino.h"
 #include "Log.h"
@@ -53,5 +52,3 @@ public:
 protected:
     ActiveObjectBase *active_object_ = nullptr;
 };
-
-#endif /* STATE_H */

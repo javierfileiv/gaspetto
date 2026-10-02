@@ -1,5 +1,5 @@
-#ifndef HARDWARETIMER_H
-#define HARDWARETIMER_H
+#pragma once
+
 #include "Arduino.h"
 
 #include <functional>
@@ -27,5 +27,3 @@ public:
     void setCaptureCompare(uint32_t channel, uint32_t compare, TimerCompareFormat_t format);
     void pause();
 };
-
-#endif /* HARDWARETIMER_H */

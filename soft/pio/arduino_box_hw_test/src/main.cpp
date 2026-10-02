@@ -10,22 +10,17 @@
 #ifdef TEST_ADS1115
 #include <Adafruit_ADS1X15.h>
 #endif
+#include "i2c3_bitbang.h"
 #include "pin_definitions.h"
 
 // Initialize radio object
 RF24 radio(NRF24_CE, NRF24_CSN);
 
-// I2C3 bus instance (I2C1 uses the global i2c1 alias)
-TwoWire i2c3(I2C3_SDA_PIN, I2C3_SCL_PIN);
+// I2C1 uses the global Wire instance
 TwoWire &i2c1 = Wire;
 
-constexpr uint32_t kI2c1ClockHz = 100000;
-#ifndef TEST_I2C3_CLOCK_HZ
-#define TEST_I2C3_CLOCK_HZ 50000
-#endif
-constexpr uint32_t kI2c3ClockHz             = TEST_I2C3_CLOCK_HZ;
+constexpr uint32_t kI2c1ClockHz             = 100000;
 constexpr uint16_t kRailSettleDelayMs       = 250;
-constexpr uint16_t kAdsConversionTimeoutMs  = 40;
 constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 
 #ifndef TEST_ADS1115_MEAN_SAMPLES
@@ -94,15 +89,16 @@ Adafruit_NeoPixel leds(kLedCount, PIN_LED_DATA, NEO_GRB + NEO_KHZ800);
 
 struct I2CProbeEntry
 {
-    TwoWire *wire;
+    bool useBitBang; // true = use bit-banging, false = use TwoWire
+    TwoWire *wire;   // only used if useBitBang is false
     uint8_t address;
     const char *label;
 };
 
 static const I2CProbeEntry kI2CProbes[] = {
-    {&i2c1, 0x48, "I2C1 0x48 (ADDR->GND)"}, {&i2c1, 0x49, "I2C1 0x49 (ADDR->VCC)"},
-    {&i2c1, 0x4A, "I2C1 0x4A (ADDR->SDA)"}, {&i2c1, 0x4B, "I2C1 0x4B (ADDR->SCL)"},
-    {&i2c3, 0x4A, "I2C3 0x4A (ADDR->SDA)"},
+    {false, &i2c1, 0x48, "I2C1 0x48 (ADDR->GND)"},  {false, &i2c1, 0x49, "I2C1 0x49 (ADDR->VCC)"},
+    {false, &i2c1, 0x4A, "I2C1 0x4A (ADDR->SDA)"},  {false, &i2c1, 0x4B, "I2C1 0x4B (ADDR->SCL)"},
+    {true, nullptr, 0x4A, "I2C3 0x4A (ADDR->SDA)"},
 };
 constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
 
@@ -112,17 +108,25 @@ void probeI2CDevices()
     for (uint8_t i = 0; i < kProbeCount; ++i)
     {
         const I2CProbeEntry &e = kI2CProbes[i];
-        e.wire->beginTransmission(e.address);
-        const uint8_t err = e.wire->endTransmission();
-        if (err == 0)
+        bool ack;
+
+        if (e.useBitBang)
+        {
+            ack = i2c3_bb_probe(e.address);
+        }
+        else
+        {
+            e.wire->beginTransmission(e.address);
+            ack = (e.wire->endTransmission() == 0);
+        }
+
+        if (ack)
         {
             Serial.print("   [OK]  ");
         }
         else
         {
-            Serial.print("   [MISS] err=");
-            Serial.print(err);
-            Serial.print(" ");
+            Serial.print("   [MISS] ");
         }
         Serial.println(e.label);
     }
@@ -132,51 +136,59 @@ void probeI2CDevices()
 #ifdef TEST_ADS1115
 struct AdsTestEntry
 {
-    TwoWire *wire;
+    bool useBitBang; // true = use bit-banging, false = use TwoWire
+    TwoWire *wire;   // only used if useBitBang is false
     uint8_t address;
     const char *busName;
     const char *addrNote;
 };
 
 // I2C1: ADDR→GND=0x48, ADDR→VCC=0x49, ADDR→SDA=0x4A, ADDR→SCL=0x4B
-// I2C3: 1 module, ADDR→SDA=0x4A
+// I2C3: 1 module, ADDR→SDA=0x4A (uses bit-banging)
 static AdsTestEntry kAdsTests[] = {
-    {&i2c1, 0x48, "I2C1", "ADDR->GND"}, {&i2c1, 0x49, "I2C1", "ADDR->VCC"},
-    {&i2c1, 0x4A, "I2C1", "ADDR->SDA"}, {&i2c1, 0x4B, "I2C1", "ADDR->SCL"},
-    {&i2c3, 0x4A, "I2C3", "ADDR->SDA"},
+    {false, &i2c1, 0x48, "I2C1", "ADDR->GND"},  {false, &i2c1, 0x49, "I2C1", "ADDR->VCC"},
+    {false, &i2c1, 0x4A, "I2C1", "ADDR->SDA"},  {false, &i2c1, 0x4B, "I2C1", "ADDR->SCL"},
+    {true, nullptr, 0x4A, "I2C3", "ADDR->SDA"},
 };
 constexpr uint8_t kAdsCount             = sizeof(kAdsTests) / sizeof(kAdsTests[0]);
 constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
 
 CalibrationStats gCalibrationStats[kCalibrationSlotCount] = {};
 
-bool isI2c3Wire(const TwoWire *wire)
+bool isI2c3Entry(const AdsTestEntry *entry)
 {
-    return wire == &i2c3;
+    return entry->useBitBang;
 }
 
 void recoverI2c3Bus()
 {
-    Serial.println("   [WARN] I2C3 transaction failed, reinitializing I2C3 bus...");
-    i2c3.end();
-    delay(5);
-    i2c3.begin();
-    i2c3.setClock(kI2c3ClockHz);
+    Serial.println("   [WARN] I2C3 transaction failed, reinitializing I2C3 bit-bang...");
+    i2c3_bb_init();
     delay(20);
 }
 
-bool readAdsConfigRegister(TwoWire *wire, uint8_t address, uint16_t &config)
+bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
 {
     config = 0;
 
+    if (entry->useBitBang)
+    {
+        return i2c3_bb_read_register(entry->address, ADS1X15_REG_POINTER_CONFIG, config);
+    }
+
+    TwoWire *wire   = entry->wire;
+    uint8_t address = entry->address;
+
+    // Transaction 1: Write register pointer
     wire->beginTransmission(address);
     wire->write(ADS1X15_REG_POINTER_CONFIG);
-    const uint8_t txErr = wire->endTransmission(false);
+    const uint8_t txErr = wire->endTransmission(); // Stop condition (no repeated start)
     if (txErr != 0)
     {
         return false;
     }
 
+    // Transaction 2: Read data
     const uint8_t rxCount = wire->requestFrom(address, static_cast<uint8_t>(2));
     if (rxCount != 2 || wire->available() < 2)
     {
@@ -187,7 +199,7 @@ bool readAdsConfigRegister(TwoWire *wire, uint8_t address, uint16_t &config)
     return true;
 }
 
-bool readAdsSingleEndedWithTimeout(Adafruit_ADS1115 &ads, uint8_t channel, int16_t &raw)
+bool readAdsSingleEndedWithTimeout(const AdsTestEntry *entry, uint8_t channel, int16_t &raw)
 {
     static constexpr uint16_t kMuxByChannel[4] = {
         ADS1X15_REG_CONFIG_MUX_SINGLE_0,
@@ -201,29 +213,68 @@ bool readAdsSingleEndedWithTimeout(Adafruit_ADS1115 &ads, uint8_t channel, int16
         return false;
     }
 
-    ads.startADCReading(kMuxByChannel[channel], false);
+    uint16_t config = ADS1X15_REG_CONFIG_CQUE_NONE | ADS1X15_REG_CONFIG_MODE_SINGLE |
+                      ADS1X15_REG_CONFIG_PGA_4_096V | kMuxByChannel[channel] | RATE_ADS1115_128SPS |
+                      ADS1X15_REG_CONFIG_OS_SINGLE;
 
-    const unsigned long startMs = millis();
-    while (!ads.conversionComplete())
+    if (entry->useBitBang)
     {
-        if (millis() - startMs > kAdsConversionTimeoutMs)
+        // Use bit-banging for I2C3
+        if (!i2c3_bb_write_register(entry->address, ADS1X15_REG_POINTER_CONFIG, config))
         {
             return false;
         }
-        delay(1);
+        delay(15);
+
+        uint16_t conversion;
+        if (!i2c3_bb_read_register(entry->address, ADS1X15_REG_POINTER_CONVERT, conversion))
+        {
+            return false;
+        }
+        raw = (int16_t)conversion;
+        return true;
     }
 
-    raw = ads.getLastConversionResults();
+    TwoWire *wire   = entry->wire;
+    uint8_t address = entry->address;
+
+    wire->beginTransmission(address);
+    wire->write(ADS1X15_REG_POINTER_CONFIG);
+    wire->write((uint8_t)(config >> 8));
+    wire->write((uint8_t)(config & 0xFF));
+    uint8_t txErr = wire->endTransmission();
+    if (txErr != 0)
+    {
+        return false;
+    }
+
+    delay(15);
+
+    wire->beginTransmission(address);
+    wire->write(ADS1X15_REG_POINTER_CONVERT);
+    txErr = wire->endTransmission();
+    if (txErr != 0)
+    {
+        return false;
+    }
+
+    const uint8_t rxCount = wire->requestFrom(address, static_cast<uint8_t>(2));
+    if (rxCount != 2 || wire->available() < 2)
+    {
+        return false;
+    }
+
+    raw = (int16_t)((wire->read() << 8) | wire->read());
     return true;
 }
 
-bool readAdsSingleEndedMeanWithTimeout(Adafruit_ADS1115 &ads, uint8_t channel, int16_t &meanRaw)
+bool readAdsSingleEndedMeanWithTimeout(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw)
 {
     int32_t sum = 0;
     for (uint8_t sample = 0; sample < kAdsMeanSamples; ++sample)
     {
         int16_t raw = 0;
-        if (!readAdsSingleEndedWithTimeout(ads, channel, raw))
+        if (!readAdsSingleEndedWithTimeout(entry, channel, raw))
         {
             return false;
         }
@@ -318,9 +369,20 @@ void runPieceCalibrationScan()
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
     {
         const AdsTestEntry &entry = kAdsTests[deviceIndex];
-        Adafruit_ADS1115 ads;
 
-        if (!ads.begin(entry.address, entry.wire))
+        // Check if device is accessible
+        bool deviceFound;
+        if (entry.useBitBang)
+        {
+            deviceFound = i2c3_bb_probe(entry.address);
+        }
+        else
+        {
+            Adafruit_ADS1115 ads;
+            deviceFound = ads.begin(entry.address, entry.wire);
+        }
+
+        if (!deviceFound)
         {
             Serial.print("   [MISS] ");
             Serial.print(entry.busName);
@@ -330,20 +392,15 @@ void runPieceCalibrationScan()
             continue;
         }
 
-        ads.setGain(GAIN_ONE);
-
         for (uint8_t ch = 0; ch < 4; ++ch)
         {
             int16_t rawMean = 0;
-            bool readOk     = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
-            if (!readOk && isI2c3Wire(entry.wire))
+            bool readOk     = readAdsSingleEndedMeanWithTimeout(&entry, ch, rawMean);
+
+            if (!readOk && isI2c3Entry(&entry))
             {
                 recoverI2c3Bus();
-                if (ads.begin(entry.address, entry.wire))
-                {
-                    ads.setGain(GAIN_ONE);
-                    readOk = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
-                }
+                readOk = readAdsSingleEndedMeanWithTimeout(&entry, ch, rawMean);
             }
 
             const uint8_t slotIndex = static_cast<uint8_t>(deviceIndex * 4 + ch);
@@ -392,9 +449,20 @@ void runI2CTests()
     for (uint8_t i = 0; i < kAdsCount; ++i)
     {
         const AdsTestEntry &entry = kAdsTests[i];
-        Adafruit_ADS1115 ads;
 
-        if (!ads.begin(entry.address, entry.wire))
+        // Check if device is accessible
+        bool deviceFound;
+        if (entry.useBitBang)
+        {
+            deviceFound = i2c3_bb_probe(entry.address);
+        }
+        else
+        {
+            Adafruit_ADS1115 ads;
+            deviceFound = ads.begin(entry.address, entry.wire);
+        }
+
+        if (!deviceFound)
         {
             Serial.print("   [MISS] ");
             Serial.print(entry.busName);
@@ -406,14 +474,12 @@ void runI2CTests()
             continue;
         }
 
-        ads.setGain(GAIN_ONE); // ±4.096 V, matches GBox
-
         uint16_t config = 0;
-        bool configOk   = readAdsConfigRegister(entry.wire, entry.address, config);
-        if (!configOk && isI2c3Wire(entry.wire))
+        bool configOk   = readAdsConfigRegister(&entry, config);
+        if (!configOk && isI2c3Entry(&entry))
         {
             recoverI2c3Bus();
-            configOk = readAdsConfigRegister(entry.wire, entry.address, config);
+            configOk = readAdsConfigRegister(&entry, config);
         }
 
         if (!configOk)
@@ -458,11 +524,11 @@ void runI2CTests()
         for (uint8_t ch = 0; ch < 4; ++ch)
         {
             int16_t rawMean = 0;
-            bool readOk     = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
-            if (!readOk && isI2c3Wire(entry.wire))
+            bool readOk     = readAdsSingleEndedMeanWithTimeout(&entry, ch, rawMean);
+            if (!readOk && isI2c3Entry(&entry))
             {
                 recoverI2c3Bus();
-                readOk = readAdsSingleEndedMeanWithTimeout(ads, ch, rawMean);
+                readOk = readAdsSingleEndedMeanWithTimeout(&entry, ch, rawMean);
             }
 
             Serial.print("          ch");
@@ -635,10 +701,10 @@ void setup()
     Serial.println("\n2. Testing nRF24L01+ SPI communication...");
 
     // Initialize SPI bus pins for STM32
-    SPI.setMISO(PA6);
-    SPI.setMOSI(PA7);
-    SPI.setSCLK(PA5);
-    SPI.begin();
+    // SPI.setMISO(PA6);
+    // SPI.setMOSI(PA7);
+    // SPI.setSCLK(PA5);
+    // SPI.begin();
 
     if (radio.begin())
     {
@@ -659,13 +725,16 @@ void setup()
     i2c1.setClock(kI2c1ClockHz);
     Serial.println("   I2C1 (SCL=PB6, SDA=PB7) @ 100kHz initialized.");
 
-    Serial.print("I2C3 object: ");
-    Serial.println((uint32_t)&i2c3, HEX);
-    // I2C3 is already configured in constructor with SDA=PB4, SCL=PA8
-    i2c3.begin();
-    delay(50); // Allow I2C3 to settle
-    i2c3.setClock(kI2c3ClockHz);
-    Serial.println("   I2C3 (SCL=PA8, SDA=PB4) @ 50kHz initialized.");
+    // Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered
+    Serial.println("\n4. Turning ON 3V3_SWITCHED to power ADS1115 modules...");
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); // Turn ON Q2
+    delay(kRailSettleDelayMs);                 // Wait for modules to initialize
+    Serial.println("   [OK] 3V3_SWITCHED activated - ADS1115 modules should be powered");
+
+    // Initialize I2C3 bit-banging
+    Serial.println("\n5. Initializing I2C3 bit-banging (PB4=SDA, PA8=SCL)...");
+    i2c3_bb_init();
+    Serial.println("   [OK] I2C3 bit-banging initialized.");
 
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
