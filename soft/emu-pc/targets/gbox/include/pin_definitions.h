@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Arduino.h>
 
 #define PIN_MOSFET_5V_LEDS PB14

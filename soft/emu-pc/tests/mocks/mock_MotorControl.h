@@ -1,10 +1,7 @@
 #pragma once
 
-#include "mock_base.h"
-#ifndef MOCK_MOTOR_CONTROL_H
-#define MOCK_MOTOR_CONTROL_H
-
 #include "MotorControlInterface.h"
+#include "mock_base.h"
 
 #include <gmock/gmock.h>
 
@@ -27,5 +24,3 @@ public:
     virtual void setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t percent_duty) override;
     virtual void stopBothMotors() override;
 };
-
-#endif // MOCK_MOTOR_CONTROL_H

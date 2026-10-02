@@ -2,9 +2,9 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
-#include "CarEvents.h"
 #include "CommandPacket.h"
 #include "Context.h"
+#include "Events.h"
 #include "RadioController.h"
 #include "pin_definitions.h"
 
@@ -866,10 +866,10 @@ bool GBox::sendClearQueueCommand()
 
     CommandPacket packet{};
     packet.count = 2;
-    packet.commands[0] = static_cast<uint8_t>(CommandId::QUEUE_CLEAR);
-    packet.commands[1] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+    packet.commands[0] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+    packet.commands[1] = static_cast<uint8_t>(CommandId::QUEUE_CLEAR);
 
-    LOG("Sending clear queue command with MOTOR_STOP.");
+    LOG("Sending MOTOR_STOP and clear queue command.");
     LOGLN();
 
     return _ctx.radioController->sendBuffer(&packet, sizeof(packet));

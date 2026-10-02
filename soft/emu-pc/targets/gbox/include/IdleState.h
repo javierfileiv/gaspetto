@@ -1,7 +1,6 @@
-#ifndef IDLE_STATE_H
-#define IDLE_STATE_H
+#pragma once
 
-#include "CarEvents.h"
+#include "Events.h"
 #include "State.h"
 
 class IdleState : public GenericState<Event> {
@@ -9,4 +8,3 @@ public:
     void enter() override;
     void processEvent(Event &evt) override;
 };
-#endif /* IDLE_STATE_H */
