@@ -370,6 +370,33 @@ After success or error animations, the active LED holds for **60 seconds** befor
 | `MOTOR_STOP` | Stop motors |
 | `QUEUE_CLEAR` | Clear queued commands and stop |
 
+## I2C3 Bit-Bang Implementation
+
+The Gaspetto Box uses two I2C buses to communicate with ADS1115 ADC modules:
+- **I2C1** (PB6/PB7) - Hardware I2C, works reliably
+- **I2C3** (PB4/PA8) - Bit-banged implementation
+
+### Why Bit-Bang I2C3?
+
+The STM32F411CE's hardware I2C3 peripheral has reliability issues on PB4/PA8 pins. Testing confirmed that:
+- Hardware I2C3 initialization succeeds
+- Device detection works
+- ADC conversion hangs during actual reads
+
+The bit-bang implementation (`soft/emu-pc/targets/gbox/src/i2c3_bitbang.cpp`) provides reliable I2C communication at ~10kHz speed, bypassing the hardware peripheral issues.
+
+### BitBangWire Wrapper
+
+To use the bit-bang implementation with the `Adafruit_ADS1X15` library (which expects a `TwoWire*`), we created `BitBangWire` in `soft/pio/GBox_pio/include/BitBangWire.h`:
+
+```cpp
+class BitBangWire : public TwoWire {
+    // Implements TwoWire interface using i2c3_bb_* functions
+};
+```
+
+**Trade-off**: Inherits from `TwoWire` for API compatibility, wasting ~100 bytes of RAM (0.08% of 128KB) for an unused parent object. This is acceptable for a single, maintainable code path.
+
 ## Hardware test firmware
 
 These PIO projects live alongside production firmware under `soft/pio/`:
@@ -378,6 +405,7 @@ These PIO projects live alongside production firmware under `soft/pio/`:
 |---------|---------|
 | `arduino_box_hw_test` | ADS1115, NeoPixel, NRF bring-up |
 | `arduino_car_hw_test` | Motors, IMU bring-up |
+| `arduino_i2c3_bb_test` | I2C3 bit-bang validation |
 | `arduino_straight_drive` | PWM threshold + PID straight-drive tuning |
 | `mpu_plot` | IMU plotting utility |
 
