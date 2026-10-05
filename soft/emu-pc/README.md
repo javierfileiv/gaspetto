@@ -370,6 +370,30 @@ After success or error animations, the active LED holds for **60 seconds** befor
 | `MOTOR_STOP` | Stop motors |
 | `QUEUE_CLEAR` | Clear queued commands and stop |
 
+## I2C3 Bit-Bang Implementation
+
+The Gaspetto Box reads its ADS1115 modules on two I2C buses:
+
+- **I2C1** (PB6/PB7) - hardware peripheral, works reliably
+- **I2C3** (PB4/PA8) - bit-banged in software
+
+The hardware I2C3 peripheral on PB4/PA8 is not dependable: initialization and device
+detection succeed, but real conversions misbehave during reads. `i2c3_bitbang.cpp` drives
+the two lines directly instead, at about 33kHz (10us per transition, 30us per bit). Only
+the low side is driven: releasing a line lets the 4k7 pull-ups of the ADS1115 module bring
+it back up, which is what bounds the rate. Speed is not the constraint here, determinism is.
+
+`Adafruit_ADS1X15` only accepts a `TwoWire*`, so `BitBangWire` derives from `TwoWire` to
+feed it. That works only because Arduino Core STM32 3.0.0 declares the bus methods virtual:
+`TwoWire` derives from `arduino::HardwareI2C`, so a call through a `TwoWire*` lands on the
+bit-bang. On core 2.x those methods are non-virtual, the call binds statically to the
+hardware peripheral while `write()` and `read()` keep touching our buffers, and the
+transaction splits across two drivers. This is why `GBox_pio`, `arduino_box_hw_test` and
+`arduino_i2c3_bb_test` are pinned to ststm32 20.0.0 while the other targets stay on 19.6.0.
+
+See `soft/pio/arduino_i2c3_bb_test` for the hardware test that proves the dispatch, and
+`soft/emu-pc/targets/gbox/include/i2c3_bitbang.h` for the driver interface.
+
 ## Hardware test firmware
 
 These PIO projects live alongside production firmware under `soft/pio/`:
@@ -380,6 +404,7 @@ These PIO projects live alongside production firmware under `soft/pio/`:
 | `arduino_car_hw_test` | Motors, IMU bring-up |
 | `arduino_straight_drive` | PWM threshold + PID straight-drive tuning |
 | `mpu_plot` | IMU plotting utility |
+| `arduino_i2c3_bb_test` | I2C3 bit-bang driver and BitBangWire dispatch proof |
 
 See the root [README.md](../../README.md) for build and flash commands.
 
