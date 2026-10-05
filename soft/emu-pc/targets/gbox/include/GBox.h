@@ -2,11 +2,11 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
-#include "CarEvents.h"
-#include "CarStates.h"
 #include "CommandPacket.h"
 #include "Context.h"
+#include "Events.h"
 #include "Log.h"
+#include "States.h"
 
 #include <array>
 #include <atomic>
@@ -39,7 +39,8 @@ struct AdsRouteInfo {
     uint8_t channel;
 };
 
-class GBox : public GenericActiveObject<StateId, Event, BOX_MAX_STATES> {
+using BoxActiveObject = GenericActiveObject<StateId, Event, BOX_MAX_STATES>;
+class GBox : public BoxActiveObject {
 public:
     /** GBox(): Constructor for the GBox class.
      *  @ctx: Reference to the Context instance containing dependencies.

@@ -1,6 +1,6 @@
 #include "mock_RadioController.h"
 
-#include "Event.h"
+#include "GenericEvent.h"
 #include "config_radio.h"
 
 #include <cstring>

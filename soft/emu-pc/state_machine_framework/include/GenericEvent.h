@@ -1,5 +1,4 @@
-#ifndef EVENT_H
-#define EVENT_H
+#pragma once
 
 #ifndef ARDUINO
 #include <stdint.h>
@@ -83,5 +82,3 @@ private:
     EventIdT eventId_;
     PayloadT payload_;
 };
-
-#endif /* EVENT_H */

@@ -1,12 +1,11 @@
-#ifndef RADIO_EVENT_H
-#define RADIO_EVENT_H
+#pragma once
 
 #ifndef ARDUINO
 #else
 #include "Arduino.h"
 #endif
 
-#include "Event.h"
+#include "GenericEvent.h"
 
 class RadioEvent : public Event {
 public:
@@ -19,5 +18,3 @@ public:
     {
     }
 };
-
-#endif /* RADIO_EVENT_H */

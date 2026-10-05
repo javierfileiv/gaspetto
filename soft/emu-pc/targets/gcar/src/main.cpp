@@ -1,8 +1,7 @@
 #include "Arduino.h"
-#include "CarEvents.h"
-#include "CarStates.h"
 #include "Context.h"
 #include "EventQueue.h"
+#include "Events.h"
 #include "GCar.h"
 #include "IMUOrientation.h"
 #include "IdleState.h"
@@ -13,6 +12,7 @@
 #include "RF24.h"
 #include "RadioController.h"
 #include "RadioProtocol.h"
+#include "States.h"
 #include "TimeredEventQueue.h"
 #include "config_radio.h"
 

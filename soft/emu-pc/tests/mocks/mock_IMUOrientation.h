@@ -1,10 +1,7 @@
 #pragma once
 
-#include "mock_base.h"
-#ifndef MOCK_IMU_ORIENTATION_H
-#define MOCK_IMU_ORIENTATION_H
-
 #include "IMUOrientationInterface.h"
+#include "mock_base.h"
 
 #include <gmock/gmock.h>
 
@@ -34,5 +31,3 @@ public:
 private:
     static MockIMUOrientation *instance_;
 };
-
-#endif // MOCK_IMU_ORIENTATION_H

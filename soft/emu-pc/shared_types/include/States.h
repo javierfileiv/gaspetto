@@ -1,5 +1,4 @@
-#ifndef CAR_STATES_H
-#define CAR_STATES_H
+#pragma once
 
 #ifndef ARDUINO
 #include <stdint.h>
@@ -16,5 +15,3 @@ enum class StateId : uint8_t {
     PROCESSING, /**< Processing state - handling motor commands. */
     MAX_STATE_ID /**< Sentinel - must be last. */
 };
-
-#endif /* CAR_STATES_H */

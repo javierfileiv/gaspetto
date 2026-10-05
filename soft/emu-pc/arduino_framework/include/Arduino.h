@@ -1,6 +1,6 @@
 #pragma once
 #include "Arduino_pins_pc.h"
-#include "CarEvents.h"
+#include "Events.h"
 #include "HardwareTimer.h"
 #include "Serial.h"
 
@@ -8,7 +8,6 @@
 #include <thread>
 
 #ifndef ARDUINO
-#include "CarEvents.h"
 extern "C" Event getEmulatedEvent(void);
 #endif
 

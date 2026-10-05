@@ -1,5 +1,4 @@
-#ifndef EVENT_QUEUE_H
-#define EVENT_QUEUE_H
+#pragma once
 
 #include "config_event.h"
 
@@ -71,5 +70,3 @@ private:
     uint8_t tail_ = 0;
     uint8_t count_ = 0;
 };
-
-#endif /* EVENT_QUEUE_H */
