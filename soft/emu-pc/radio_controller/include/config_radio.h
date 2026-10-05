@@ -22,7 +22,7 @@ const uint32_t NRF24_CSN = 10; /* Chip select RF24 pin*/
 #ifdef GCAR
 const uint32_t NRF24_CE = PB0; /* Chip enable RF24 pin*/
 const uint32_t NRF24_CSN = PB1; /* Chip select RF24 pin*/
-#elif GBOX
+#elif defined(GBOX)
 const uint32_t NRF24_CE = PA3; /* Chip enable RF24 pin*/
 const uint32_t NRF24_CSN = PA4; /* Chip select RF24 pin*/
 #else
