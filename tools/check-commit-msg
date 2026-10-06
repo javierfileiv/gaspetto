@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Validates commit message format (conventional commits).
+# Equivalent to CI commitlint with @commitlint/config-conventional + custom rules.
+
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+
+if [[ ! -f "$COMMIT_MSG_FILE" ]]; then
+    echo "Error: commit message file not found: $COMMIT_MSG_FILE"
+    exit 1
+fi
+
+# Read the commit message, stripping comments and trailing blank lines.
+MSG=$(grep -v '^#' "$COMMIT_MSG_FILE" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
+
+if [[ -z "$MSG" ]]; then
+    echo "Error: commit message is empty"
+    exit 1
+fi
+
+SUBJECT=$(echo "$MSG" | head -n1)
+
+# Valid types (matches CI config).
+VALID_TYPES="feat|fix|chore|refactor|docs|test|style|perf|ci|build|revert"
+
+# Check conventional commit format: type(scope): description OR type: description
+if ! echo "$SUBJECT" | grep -qE "^($VALID_TYPES)(\([^)]+\))?: .+"; then
+    echo "Error: subject does not match conventional commit format"
+    echo "  Valid types: $VALID_TYPES"
+    echo "  Got: $SUBJECT"
+    exit 1
+fi
+
+# Check subject length (72 chars recommended for git log readability)
+SUBJECT_LEN=${#SUBJECT}
+if (( SUBJECT_LEN > 72 )); then
+    echo "Warning: subject is $SUBJECT_LEN chars (recommended max: 72)"
+fi
+
+# Extract body (everything after the first blank line)
+BODY=$(echo "$MSG" | tail -n +3)
+
+# Check body line lengths (100 chars max per @commitlint/config-conventional default)
+LINE_NUM=2
+while IFS= read -r line; do
+    LINE_NUM=$((LINE_NUM + 1))
+    LINE_LEN=${#line}
+    if (( LINE_LEN > 100 )); then
+        echo "Error: line $LINE_NUM of commit body is $LINE_LEN chars (max: 100)"
+        echo "  $line"
+        exit 1
+    fi
+done <<< "$BODY"
+
+exit 0
