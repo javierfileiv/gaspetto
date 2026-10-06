@@ -73,6 +73,7 @@ public:
     void debounceAndEnqueue(Event &evt, unsigned long currentTime);
 
     void initHardware();
+    bool runHealthCheck();
 #ifndef ARDUINO
     void injectBoardPieces(const BoxBoardPieces &boardPieces);
     void injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawValues);
@@ -106,6 +107,7 @@ private:
     void SystemClock_Config();
     void configurePins();
     void setLedRailEnabled(bool enabled);
+    void showHealthStatus(bool ok);
     void blackoutLeds();
     uint16_t rawValueForPiece(BoxPieceId piece) const;
     BoxPieceId decodePiece(uint16_t rawValue) const;

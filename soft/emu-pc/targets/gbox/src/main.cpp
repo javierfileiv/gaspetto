@@ -259,6 +259,7 @@ void setup()
 #endif /* ARDUINO */
 
     gbox.initHardware();
+    gbox.runHealthCheck();
     /* Initialize the GBox state machine. */
 #ifndef ARDUINO
     gbox.setLowPowerModeCallback(enter_low_power_mode);

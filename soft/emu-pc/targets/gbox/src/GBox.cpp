@@ -13,6 +13,7 @@
 #include <cstdint>
 #ifdef ARDUINO
 #include "BitBangWire.h"
+#include "i2c3_bitbang.h"
 #include "stm32f4xx_hal.h"
 
 #include <Adafruit_NeoPixel.h>
@@ -415,6 +416,72 @@ void GBox::initHardware()
     }
     initialized_ = true;
     LOGLN("GBox: hardware initialized.");
+}
+
+bool GBox::runHealthCheck()
+{
+#ifdef ARDUINO
+    bool allOk = true;
+
+    /* Power up the ADS1115 modules on the 3V3 rail before probing. */
+    setSensorRailEnabled(true);
+    delay(100); /* Let the rail settle. */
+
+    LOGLN("--- Hardware health check ---");
+
+    /* Probe I2C1: 4 ADS1115 addresses (0x48-0x4B). */
+    constexpr uint8_t kI2c1Addresses[] = { 0x48, 0x49, 0x4A, 0x4B };
+    for (uint8_t addr : kI2c1Addresses) {
+        Wire.beginTransmission(addr);
+        bool ack = (Wire.endTransmission() == 0);
+        LOG("I2C1 0x");
+        LOG(addr, HEX);
+        LOG(": ");
+        LOGLN(ack ? "[OK]" : "[FAIL]");
+        if (!ack)
+            allOk = false;
+    }
+
+    /* Probe I2C3: 1 ADS1115 via bit-bang. */
+    bool i2c3Ok = i2c3_bb_probe(0x4A);
+    LOG("I2C3 0x4A: ");
+    LOGLN(i2c3Ok ? "[OK]" : "[FAIL]");
+    if (!i2c3Ok)
+        allOk = false;
+
+    /* Check radio. */
+    bool radioOk = false;
+    if (_ctx.radioController != nullptr) {
+        radioOk = _ctx.radioController->isChipConnected();
+    }
+    LOG("nRF24: ");
+    LOGLN(radioOk ? "[OK]" : "[FAIL]");
+    if (!radioOk)
+        allOk = false;
+
+    LOGLN("--- Check complete ---");
+
+    showHealthStatus(allOk);
+    setSensorRailEnabled(false);
+    return allOk;
+#else
+    return true;
+#endif
+}
+
+void GBox::showHealthStatus(bool ok)
+{
+#ifdef ARDUINO
+    if (ok) {
+        leds_.setPixelColor(0, leds_.Color(0, 50, 0)); /* Green. */
+    } else {
+        leds_.setPixelColor(0, leds_.Color(50, 0, 0)); /* Red. */
+    }
+    leds_.show();
+    delay(1500);
+    leds_.setPixelColor(0, 0);
+    leds_.show();
+#endif
 }
 
 #ifndef ARDUINO

@@ -26,6 +26,7 @@ public:
     void sendEvent(Event evt);
     EventQueue *getRadioQueue();
     bool sendBuffer(const void *data, uint8_t len);
+    bool isChipConnected();
 
     /**
      * sendTelemetry(): Send telemetry packet via radio

@@ -157,6 +157,11 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
     return result;
 }
 
+bool RadioController::isChipConnected()
+{
+    return _radio.isChipConnected();
+}
+
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 {
     bool result = false;
