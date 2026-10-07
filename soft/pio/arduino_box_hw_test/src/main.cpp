@@ -75,11 +75,10 @@ struct CalibrationStats
 };
 
 #ifdef TEST_LED_ANIMATIONS
-constexpr uint8_t kLedCount = 3;
 constexpr uint8_t kLedState = 0;
 constexpr uint8_t kLedRadio = 1;
 constexpr uint8_t kLedBuild = 2;
-Adafruit_NeoPixel leds(kLedCount, PIN_LED_DATA, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel leds(BOX_LED_COUNT, PIN_LED_DATA, NEO_GRB + NEO_KHZ800);
 #endif
 
 // ==========================================

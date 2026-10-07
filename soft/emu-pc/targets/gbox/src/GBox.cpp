@@ -145,7 +145,18 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
 };
 
 #ifdef ARDUINO
-constexpr uint8_t kLedCount = 3;
+/* Expected LED behaviour, three NeoPixels on the strip, left to right:
+ * - boot health check: led 0 (left) lights solid green when every probe passes,
+ *   solid red otherwise, holds ~1.5s then goes off
+ * - board scan: a cyan dot bounces led 0 -> 1 -> 2 -> back twice, then blackout
+ * - program accepted: green cascades led 0 -> 1 -> 2, all three hold green
+ * - build failed: led 2 (right) blinks red three times, then holds red
+ * - empty board: led 2 blinks amber twice, then holds amber
+ * - RF send failed: led 1 (center) blinks red three times, then holds with led
+ *   1 red plus led 0 green
+ * Terminal states hold their pattern ~60s, then the box arms STOP mode and all
+ * LEDs go off (PC emulation runs the same patterns as log-only animations)
+ */
 constexpr uint8_t kLedState = 0; /* left   : system / scan state   */
 constexpr uint8_t kLedRadio = 1; /* center : radio status           */
 constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
@@ -246,7 +257,7 @@ GBox::GBox(Context &ctx)
         , _ctx(ctx)
         , lastScan{}
 #ifdef ARDUINO
-        , leds_(kLedCount, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
+        , leds_(BOX_LED_COUNT, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
 #endif
         , initialized_(false)
         , lastDebounceTime_(0)
@@ -585,9 +596,9 @@ void GBox::runScanAnimation()
     }
     blackoutLeds();
 #else
-    for (std::size_t slot = 0; slot < BOX_LED_SLOTS; ++slot) {
-        LOG("LED scanner CYAN slot (Scan animation) ");
-        LOG(static_cast<int>(slot) + 1);
+    for (std::size_t led = 0; led < BOX_LED_COUNT; ++led) {
+        LOG("LED scanner CYAN led (Scan animation) ");
+        LOG(static_cast<int>(led) + 1);
         LOGLN();
         delayMs(15);
     }
