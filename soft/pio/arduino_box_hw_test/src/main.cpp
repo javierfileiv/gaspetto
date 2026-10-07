@@ -11,6 +11,7 @@
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "i2c3_bitbang.h"
+#include "piece_thresholds.h"
 #include "pin_definitions.h"
 
 // Initialize radio object
@@ -27,43 +28,10 @@ constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 #define TEST_ADS1115_MEAN_SAMPLES 10
 #endif
 
-#ifndef TEST_THRESHOLD_FORWARD_START
-#define TEST_THRESHOLD_FORWARD_START 100
-#endif
-
-#ifndef TEST_THRESHOLD_BACKWARD_START
-#define TEST_THRESHOLD_BACKWARD_START 700
-#endif
-
-#ifndef TEST_THRESHOLD_TURN_RIGHT_START
-#define TEST_THRESHOLD_TURN_RIGHT_START 1300
-#endif
-
-#ifndef TEST_THRESHOLD_TURN_LEFT_START
-#define TEST_THRESHOLD_TURN_LEFT_START 1900
-#endif
-
-#ifndef TEST_THRESHOLD_LOOP_START
-#define TEST_THRESHOLD_LOOP_START 2500
-#endif
-
-#ifndef TEST_THRESHOLD_LOOP_END
-#define TEST_THRESHOLD_LOOP_END 3099
-#endif
+/* Piece thresholds come from the shared piece_thresholds.h with their
+ * static asserts: same numbers as the production firmware */
 
 static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be >= 1");
-static_assert(TEST_THRESHOLD_FORWARD_START > 0, "Forward threshold must be > 0");
-static_assert(TEST_THRESHOLD_FORWARD_START < TEST_THRESHOLD_BACKWARD_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_BACKWARD_START < TEST_THRESHOLD_TURN_RIGHT_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_TURN_RIGHT_START < TEST_THRESHOLD_TURN_LEFT_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_TURN_LEFT_START < TEST_THRESHOLD_LOOP_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_LOOP_START <= TEST_THRESHOLD_LOOP_END,
-              "Loop threshold start must be <= loop threshold end");
-static_assert(TEST_THRESHOLD_LOOP_END <= 4095, "Loop threshold end must be <= 4095");
 
 constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
 
@@ -153,6 +121,170 @@ constexpr uint8_t kAdsCount             = sizeof(kAdsTests) / sizeof(kAdsTests[0
 constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
 
 CalibrationStats gCalibrationStats[kCalibrationSlotCount] = {};
+uint32_t gCalibrationScanCounter                          = 0;
+
+/* Runtime test modes, switched over the USB CDC port. Health runs the
+ * connectivity cycle each pass; Calibration keeps the 3V3 sensor rail
+ * powered and watches piece ADC values continuously */
+enum class TestMode : uint8_t
+{
+    Health,
+    Calibration,
+};
+
+TestMode gMode           = TestMode::Health;
+bool gCalibrationRailsOn = false;
+/* One test run is pending. True at boot so the first health pass runs
+ * without a keystroke, then set again by 's' from any mode */
+bool gRunTestRequested = true;
+
+/* Change report history for the health cycle: the five ADS slots plus
+ * the nRF24 chip state. Filled at the end of each health run and
+ * compared against the previous run */
+bool gLastProbeState[kAdsCount + 1] = {};
+bool gProbeStateValid               = false;
+
+/* Sliced delay so USB CDC commands are polled while the test cycles wait.
+ * Rail settle delays keep the plain delay(): the electrical settling must
+ * not be interrupted */
+void handleUsbCommands();
+
+void delayWithUsb(uint32_t totalMs)
+{
+    constexpr uint32_t kSliceMs = 50;
+    uint32_t remaining          = totalMs;
+    while (remaining > 0)
+    {
+        const uint32_t slice = remaining > kSliceMs ? kSliceMs : remaining;
+        delay(slice);
+        remaining -= slice;
+        handleUsbCommands();
+    }
+}
+
+void resetCalibrationStats()
+{
+    for (uint8_t i = 0; i < kCalibrationSlotCount; ++i)
+    {
+        gCalibrationStats[i] = CalibrationStats{};
+    }
+    gCalibrationScanCounter = 0;
+}
+
+void enterMode(TestMode mode)
+{
+    if (gMode == mode)
+    {
+        gRunTestRequested = true; /* already active: re-run this mode test */
+        Serial.println("\n-> test already active, running it ('?' status)");
+        return;
+    }
+
+    gMode = mode;
+    if (gMode == TestMode::Calibration)
+    {
+        resetCalibrationStats();
+        /* Force the rail state right away so the first scan sees powered
+         * sensors regardless of where the health cycle was interrupted */
+        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+        gCalibrationRailsOn = true;
+        Serial.println("\n-> mode: calibration ('s' scan, '?' status)");
+    }
+    else
+    {
+        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+        digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+        gCalibrationRailsOn = false;
+        Serial.println("\n-> mode: health ('?' for status)");
+    }
+}
+
+void handleUsbCommands()
+{
+    while (Serial.available() > 0)
+    {
+        const int incoming = Serial.read();
+        switch (incoming)
+        {
+        case 'h':
+            enterMode(TestMode::Health);
+            break;
+        case 'c':
+            enterMode(TestMode::Calibration);
+            break;
+        case 's':
+            gRunTestRequested = true;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/* Quiet variant of the probe used by the verbose one: same device list,
+ * no printing, plus the nRF24 chip state as the last entry */
+void reportProbeChanges()
+{
+    bool current[kAdsCount + 1];
+
+    for (uint8_t i = 0; i < kAdsCount; ++i)
+    {
+        const AdsTestEntry &entry = kAdsTests[i];
+        if (entry.useBitBang)
+        {
+            current[i] = i2c3_bb_probe(entry.address);
+        }
+        else
+        {
+            Adafruit_ADS1115 ads;
+            current[i] = ads.begin(entry.address, entry.wire);
+        }
+    }
+    current[kAdsCount] = radio.isChipConnected();
+
+    if (gProbeStateValid)
+    {
+        bool unchanged = true;
+        for (uint8_t i = 0; i <= kAdsCount; ++i)
+        {
+            if (current[i] == gLastProbeState[i])
+            {
+                continue;
+            }
+            unchanged = false;
+            Serial.print("   [CHANGE] ");
+            if (i < kAdsCount)
+            {
+                Serial.print(kAdsTests[i].busName);
+                Serial.print(" 0x");
+                Serial.print(kAdsTests[i].address, HEX);
+            }
+            else
+            {
+                Serial.print("nRF24L01+");
+            }
+            Serial.print(": ");
+            Serial.print(gLastProbeState[i] ? "ok" : "miss");
+            Serial.print(" -> ");
+            Serial.println(current[i] ? "ok" : "miss");
+        }
+        if (unchanged)
+        {
+            Serial.println("   state unchanged since previous run");
+        }
+    }
+    else
+    {
+        Serial.println("   baseline recorded (no previous run to compare)");
+    }
+
+    for (uint8_t i = 0; i <= kAdsCount; ++i)
+    {
+        gLastProbeState[i] = current[i];
+    }
+    gProbeStateValid = true;
+}
 
 bool isI2c3Entry(const AdsTestEntry *entry)
 {
@@ -296,27 +428,27 @@ const char *pieceLabelForRaw(int16_t raw)
     {
         return "INVALID";
     }
-    if (raw < TEST_THRESHOLD_FORWARD_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_FORWARD_START)
     {
         return "EMPTY";
     }
-    if (raw < TEST_THRESHOLD_BACKWARD_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_BACKWARD_START)
     {
         return "FORWARD";
     }
-    if (raw < TEST_THRESHOLD_TURN_RIGHT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START)
     {
         return "BACKWARD";
     }
-    if (raw < TEST_THRESHOLD_TURN_LEFT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START)
     {
         return "TURN_RIGHT";
     }
-    if (raw < TEST_THRESHOLD_LOOP_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_LOOP_START)
     {
         return "TURN_LEFT";
     }
-    if (raw <= TEST_THRESHOLD_LOOP_END)
+    if (raw <= GASPETTO_ADC_THRESHOLD_LOOP_END)
     {
         return "LOOP_CALL";
     }
@@ -346,25 +478,23 @@ void updateCalibrationStats(uint8_t slotIndex, int16_t raw)
 
 void runPieceCalibrationScan()
 {
-    static uint32_t scanCounter = 0;
-
     Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
     Serial.print("scan=");
-    Serial.println(++scanCounter);
+    Serial.println(++gCalibrationScanCounter);
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
     Serial.print(" thresholds=[FWD:");
-    Serial.print(TEST_THRESHOLD_FORWARD_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_FORWARD_START);
     Serial.print(" BACK:");
-    Serial.print(TEST_THRESHOLD_BACKWARD_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_BACKWARD_START);
     Serial.print(" RIGHT:");
-    Serial.print(TEST_THRESHOLD_TURN_RIGHT_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START);
     Serial.print(" LEFT:");
-    Serial.print(TEST_THRESHOLD_TURN_LEFT_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START);
     Serial.print(" LOOP:");
-    Serial.print(TEST_THRESHOLD_LOOP_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_START);
     Serial.print(" LOOPEND:");
-    Serial.println(TEST_THRESHOLD_LOOP_END);
+    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_END);
     Serial.println("]");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
@@ -733,31 +863,20 @@ void setup()
 
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
-#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
-    Serial.println("   MODE: piece threshold calibration");
-#else
-    Serial.println("   MODE: hardware connectivity test");
-#endif
+    Serial.println("   hw-test: runtime modes build");
+    Serial.println(
+        "   USB commands: 'h' health mode, 'c' calibration mode, 's' run test, '?' status");
+    Serial.print("   mode: ");
+    Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
 
     Serial.println("\n--- POWER RAILS TEST CYCLE ---");
 }
 
 // ==========================================
-// MAIN LOOP (Test Cycle)
+// HEALTH CYCLE (runs on demand)
 // ==========================================
-void loop()
+void runHealthCycle()
 {
-#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
-    static bool calibrationRailsOn = false;
-
-    if (!calibrationRailsOn)
-    {
-        Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
-        delay(kRailSettleDelayMs);
-        calibrationRailsOn = true;
-    }
-
     // Quick double blink visual check on builtin LED.
     for (int i = 0; i < 2; i++)
     {
@@ -767,27 +886,7 @@ void loop()
         delay(100);
     }
 
-    probeI2CDevices();
-
-#ifdef TEST_ADS1115
-    runPieceCalibrationScan();
-#endif
-
-#ifdef TEST_LED_ANIMATIONS
-    runScanAnimationTest();
-#endif
-
-    delay(kCalibrationScanPeriodMs);
-    return;
-#else
-    // Quick double blink visual check on builtin LED.
-    for (int i = 0; i < 2; i++)
-    {
-        digitalWrite(PIN_LED, LOW);
-        delay(100);
-        digitalWrite(PIN_LED, HIGH);
-        delay(100);
-    }
+    Serial.println("[health] cycle start ('c' = calibration, '?' = status)");
 
     Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);     // Turn ON Q1
@@ -809,6 +908,8 @@ void loop()
     runPowerOffCycleAnimation();
 #endif
 
+    reportProbeChanges();
+
     // Quick double blink visual check on builtin LED.
     for (int i = 0; i < 2; i++)
     {
@@ -817,14 +918,82 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
-    delay(DELAY);
+    delayWithUsb(DELAY);
+
+    if (gMode != TestMode::Health)
+    {
+        /* Mode changed while waiting: leave rails exactly as the new mode
+         * set them instead of tearing the 3V3 rail down under it */
+        return;
+    }
 
     Serial.println("-> TURNING OFF 5V_SWITCHED...");
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     // Turn OFF Q1
     Serial.println("-> TURNING OFF 3V3_SWITCHED...");
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); // Turn OFF Q2
 
-    Serial.println("Cycle complete. Restarting in 2 seconds.");
-    delay(DELAY);
+    Serial.println("Cycle complete. 's' reruns the test.");
+    delayWithUsb(DELAY);
+}
+
+// ==========================================
+// MAIN LOOP
+// ==========================================
+void loop()
+{
+    handleUsbCommands();
+
+    if (gMode == TestMode::Calibration)
+    {
+        if (!gCalibrationRailsOn)
+        {
+            Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
+            digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+            delay(kRailSettleDelayMs);
+            gCalibrationRailsOn = true;
+        }
+
+        // Quick double blink visual check on builtin LED.
+        for (int i = 0; i < 2; i++)
+        {
+            digitalWrite(PIN_LED, LOW);
+            delay(100);
+            digitalWrite(PIN_LED, HIGH);
+            delay(100);
+        }
+
+#ifdef TEST_ADS1115
+        if (gRunTestRequested)
+        {
+            gRunTestRequested = false;
+            runPieceCalibrationScan();
+        }
 #endif
+
+        if (gMode != TestMode::Calibration)
+        {
+            return; /* mode changed while waiting: skip the rest delay */
+        }
+
+        delayWithUsb(kCalibrationScanPeriodMs);
+        return;
+    }
+
+#ifdef TEST_ADS1115
+    if (gRunTestRequested)
+    {
+        gRunTestRequested = false;
+        runHealthCycle();
+    }
+#endif
+
+    // Quiet idle: heartbeat only, no probes, no tests between demands.
+    for (int i = 0; i < 2; i++)
+    {
+        digitalWrite(PIN_LED, LOW);
+        delay(100);
+        digitalWrite(PIN_LED, HIGH);
+        delay(100);
+    }
+    delayWithUsb(kCalibrationScanPeriodMs);
 }
