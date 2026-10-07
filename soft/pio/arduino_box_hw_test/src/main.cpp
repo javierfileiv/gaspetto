@@ -153,6 +153,96 @@ constexpr uint8_t kAdsCount             = sizeof(kAdsTests) / sizeof(kAdsTests[0
 constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
 
 CalibrationStats gCalibrationStats[kCalibrationSlotCount] = {};
+uint32_t gCalibrationScanCounter                          = 0;
+
+/* Runtime test modes, switched over the USB CDC port. Health runs the
+ * connectivity cycle each pass; Calibration keeps the 3V3 sensor rail
+ * powered and watches piece ADC values continuously */
+enum class TestMode : uint8_t
+{
+    Health,
+    Calibration,
+};
+
+TestMode gMode           = TestMode::Health;
+bool gCalibrationRailsOn = false;
+
+/* Sliced delay so USB CDC commands are polled while the test cycles wait.
+ * Rail settle delays keep the plain delay(): the electrical settling must
+ * not be interrupted */
+void handleUsbCommands();
+
+void delayWithUsb(uint32_t totalMs)
+{
+    constexpr uint32_t kSliceMs = 50;
+    uint32_t remaining          = totalMs;
+    while (remaining > 0)
+    {
+        const uint32_t slice = remaining > kSliceMs ? kSliceMs : remaining;
+        delay(slice);
+        remaining -= slice;
+        handleUsbCommands();
+    }
+}
+
+void resetCalibrationStats()
+{
+    for (uint8_t i = 0; i < kCalibrationSlotCount; ++i)
+    {
+        gCalibrationStats[i] = CalibrationStats{};
+    }
+    gCalibrationScanCounter = 0;
+}
+
+void enterMode(TestMode mode)
+{
+    if (gMode == mode)
+    {
+        return;
+    }
+
+    gMode = mode;
+    if (gMode == TestMode::Calibration)
+    {
+        resetCalibrationStats();
+        /* Force the rail state right away so the first scan sees powered
+         * sensors regardless of where the health cycle was interrupted */
+        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+        gCalibrationRailsOn = true;
+        Serial.println("\n-> mode: calibration ('?' for status)");
+    }
+    else
+    {
+        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+        digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+        gCalibrationRailsOn = false;
+        Serial.println("\n-> mode: health ('?' for status)");
+    }
+}
+
+void handleUsbCommands()
+{
+    while (Serial.available() > 0)
+    {
+        const int incoming = Serial.read();
+        switch (incoming)
+        {
+        case 'h':
+            enterMode(TestMode::Health);
+            break;
+        case 'c':
+            enterMode(TestMode::Calibration);
+            break;
+        case '?':
+            Serial.print("mode: ");
+            Serial.println(gMode == TestMode::Health ? "health" : "calibration");
+            break;
+        default:
+            break;
+        }
+    }
+}
 
 bool isI2c3Entry(const AdsTestEntry *entry)
 {
@@ -346,11 +436,9 @@ void updateCalibrationStats(uint8_t slotIndex, int16_t raw)
 
 void runPieceCalibrationScan()
 {
-    static uint32_t scanCounter = 0;
-
     Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
     Serial.print("scan=");
-    Serial.println(++scanCounter);
+    Serial.println(++gCalibrationScanCounter);
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
     Serial.print(" thresholds=[FWD:");
@@ -364,7 +452,7 @@ void runPieceCalibrationScan()
     Serial.print(" LOOP:");
     Serial.print(TEST_THRESHOLD_LOOP_START);
     Serial.print(" LOOPEND:");
-    Serial.println(TEST_THRESHOLD_LOOP_END);
+    Serial.print(TEST_THRESHOLD_LOOP_END);
     Serial.println("]");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
@@ -733,11 +821,10 @@ void setup()
 
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
-#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
-    Serial.println("   MODE: piece threshold calibration");
-#else
-    Serial.println("   MODE: hardware connectivity test");
-#endif
+    Serial.println("   hw-test: runtime modes build");
+    Serial.println("   USB commands: 'h' health mode, 'c' calibration mode, '?' status");
+    Serial.print("   mode: ");
+    Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
 
     Serial.println("\n--- POWER RAILS TEST CYCLE ---");
 }
@@ -747,39 +834,46 @@ void setup()
 // ==========================================
 void loop()
 {
-#ifdef TEST_PIECE_THRESHOLD_CALIBRATION
-    static bool calibrationRailsOn = false;
+    handleUsbCommands();
 
-    if (!calibrationRailsOn)
+    if (gMode == TestMode::Calibration)
     {
-        Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
-        delay(kRailSettleDelayMs);
-        calibrationRailsOn = true;
-    }
+        if (!gCalibrationRailsOn)
+        {
+            Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
+            digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+            delay(kRailSettleDelayMs);
+            gCalibrationRailsOn = true;
+        }
 
-    // Quick double blink visual check on builtin LED.
-    for (int i = 0; i < 2; i++)
-    {
-        digitalWrite(PIN_LED, LOW);
-        delay(100);
-        digitalWrite(PIN_LED, HIGH);
-        delay(100);
-    }
+        // Quick double blink visual check on builtin LED.
+        for (int i = 0; i < 2; i++)
+        {
+            digitalWrite(PIN_LED, LOW);
+            delay(100);
+            digitalWrite(PIN_LED, HIGH);
+            delay(100);
+        }
 
-    probeI2CDevices();
+        probeI2CDevices();
 
 #ifdef TEST_ADS1115
-    runPieceCalibrationScan();
+        runPieceCalibrationScan();
 #endif
 
 #ifdef TEST_LED_ANIMATIONS
-    runScanAnimationTest();
+        runScanAnimationTest();
 #endif
 
-    delay(kCalibrationScanPeriodMs);
-    return;
-#else
+        if (gMode != TestMode::Calibration)
+        {
+            return; /* mode changed while scanning: skip the rest delay */
+        }
+
+        delayWithUsb(kCalibrationScanPeriodMs);
+        return;
+    }
+
     // Quick double blink visual check on builtin LED.
     for (int i = 0; i < 2; i++)
     {
@@ -788,6 +882,8 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
+
+    Serial.println("[health] cycle start ('c' = calibration, '?' = status)");
 
     Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);     // Turn ON Q1
@@ -817,7 +913,14 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
-    delay(DELAY);
+    delayWithUsb(DELAY);
+
+    if (gMode != TestMode::Health)
+    {
+        /* Mode changed while waiting: leave rails exactly as the new mode
+         * set them instead of tearing the 3V3 rail down under it */
+        return;
+    }
 
     Serial.println("-> TURNING OFF 5V_SWITCHED...");
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     // Turn OFF Q1
@@ -825,6 +928,5 @@ void loop()
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); // Turn OFF Q2
 
     Serial.println("Cycle complete. Restarting in 2 seconds.");
-    delay(DELAY);
-#endif
+    delayWithUsb(DELAY);
 }
