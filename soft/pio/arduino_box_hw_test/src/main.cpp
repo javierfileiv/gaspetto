@@ -11,6 +11,7 @@
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "i2c3_bitbang.h"
+#include "piece_thresholds.h"
 #include "pin_definitions.h"
 
 // Initialize radio object
@@ -27,43 +28,10 @@ constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 #define TEST_ADS1115_MEAN_SAMPLES 10
 #endif
 
-#ifndef TEST_THRESHOLD_FORWARD_START
-#define TEST_THRESHOLD_FORWARD_START 100
-#endif
-
-#ifndef TEST_THRESHOLD_BACKWARD_START
-#define TEST_THRESHOLD_BACKWARD_START 700
-#endif
-
-#ifndef TEST_THRESHOLD_TURN_RIGHT_START
-#define TEST_THRESHOLD_TURN_RIGHT_START 1300
-#endif
-
-#ifndef TEST_THRESHOLD_TURN_LEFT_START
-#define TEST_THRESHOLD_TURN_LEFT_START 1900
-#endif
-
-#ifndef TEST_THRESHOLD_LOOP_START
-#define TEST_THRESHOLD_LOOP_START 2500
-#endif
-
-#ifndef TEST_THRESHOLD_LOOP_END
-#define TEST_THRESHOLD_LOOP_END 3099
-#endif
+/* Piece thresholds come from the shared piece_thresholds.h with their
+ * static asserts: same numbers as the production firmware */
 
 static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be >= 1");
-static_assert(TEST_THRESHOLD_FORWARD_START > 0, "Forward threshold must be > 0");
-static_assert(TEST_THRESHOLD_FORWARD_START < TEST_THRESHOLD_BACKWARD_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_BACKWARD_START < TEST_THRESHOLD_TURN_RIGHT_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_TURN_RIGHT_START < TEST_THRESHOLD_TURN_LEFT_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_TURN_LEFT_START < TEST_THRESHOLD_LOOP_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_LOOP_START <= TEST_THRESHOLD_LOOP_END,
-              "Loop threshold start must be <= loop threshold end");
-static_assert(TEST_THRESHOLD_LOOP_END <= 4095, "Loop threshold end must be <= 4095");
 
 constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
 
@@ -460,27 +428,27 @@ const char *pieceLabelForRaw(int16_t raw)
     {
         return "INVALID";
     }
-    if (raw < TEST_THRESHOLD_FORWARD_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_FORWARD_START)
     {
         return "EMPTY";
     }
-    if (raw < TEST_THRESHOLD_BACKWARD_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_BACKWARD_START)
     {
         return "FORWARD";
     }
-    if (raw < TEST_THRESHOLD_TURN_RIGHT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START)
     {
         return "BACKWARD";
     }
-    if (raw < TEST_THRESHOLD_TURN_LEFT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START)
     {
         return "TURN_RIGHT";
     }
-    if (raw < TEST_THRESHOLD_LOOP_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_LOOP_START)
     {
         return "TURN_LEFT";
     }
-    if (raw <= TEST_THRESHOLD_LOOP_END)
+    if (raw <= GASPETTO_ADC_THRESHOLD_LOOP_END)
     {
         return "LOOP_CALL";
     }
@@ -516,17 +484,17 @@ void runPieceCalibrationScan()
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
     Serial.print(" thresholds=[FWD:");
-    Serial.print(TEST_THRESHOLD_FORWARD_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_FORWARD_START);
     Serial.print(" BACK:");
-    Serial.print(TEST_THRESHOLD_BACKWARD_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_BACKWARD_START);
     Serial.print(" RIGHT:");
-    Serial.print(TEST_THRESHOLD_TURN_RIGHT_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START);
     Serial.print(" LEFT:");
-    Serial.print(TEST_THRESHOLD_TURN_LEFT_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START);
     Serial.print(" LOOP:");
-    Serial.print(TEST_THRESHOLD_LOOP_START);
+    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_START);
     Serial.print(" LOOPEND:");
-    Serial.print(TEST_THRESHOLD_LOOP_END);
+    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_END);
     Serial.println("]");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)

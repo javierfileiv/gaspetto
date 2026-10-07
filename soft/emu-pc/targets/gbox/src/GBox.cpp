@@ -6,6 +6,7 @@
 #include "Context.h"
 #include "Events.h"
 #include "RadioController.h"
+#include "piece_thresholds.h"
 #include "pin_definitions.h"
 
 #include <Adafruit_ADS1X15.h>
@@ -42,49 +43,14 @@ namespace
 #define GASPETTO_ADC_CONVERSION_TIMEOUT_MS 40
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_FORWARD_START
-#define GASPETTO_ADC_THRESHOLD_FORWARD_START 100
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_BACKWARD_START
-#define GASPETTO_ADC_THRESHOLD_BACKWARD_START 700
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START 1300
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 1900
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
-#define GASPETTO_ADC_THRESHOLD_LOOP_START 2500
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_END
-#define GASPETTO_ADC_THRESHOLD_LOOP_END 3099
-#endif
+/* Piece thresholds come from the shared piece_thresholds.h, with their
+ * static asserts. Only sampling and timing knobs stay defined here */
 
 static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
               "GASPETTO_ADC_SAMPLES_PER_CHANNEL must be >= 1");
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLES must be >= 1");
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
               "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
-static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START > 0,
-              "GASPETTO_ADC_THRESHOLD_FORWARD_START must be > 0");
-static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START < GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= GASPETTO_ADC_THRESHOLD_LOOP_END,
-              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= LOOP_END");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= 4095,
-              "GASPETTO_ADC_THRESHOLD_LOOP_END must be <= 4095");
 
 constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
     AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
