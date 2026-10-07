@@ -64,7 +64,7 @@ TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
     EXPECT_EQ(packet.count, BOX_MAX_PAYLOAD_COMMANDS);
 }
 
-TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
+TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopAreaWhenNoOtherPieces)
 {
     BoxPieceId board[BOX_TOTAL_SLOTS];
     gbox_test::fillEmptyBoard(board);
@@ -77,7 +77,27 @@ TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
     const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
-    EXPECT_FALSE(isEmpty);
+    EXPECT_TRUE(isEmpty);
+    EXPECT_EQ(packet.count, 0);
+}
+
+TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopArea)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = false;
+
+    board[0] = BoxPieceId::LOOP_CALL;
+    board[14] = BoxPieceId::LOOP_CALL;
+    board[15] = BoxPieceId::FORWARD;
+
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+
+    ASSERT_TRUE(ok);
+    ASSERT_FALSE(isEmpty);
+    ASSERT_EQ(packet.count, 1);
+    EXPECT_EQ(packet.commands[0], static_cast<uint8_t>(CommandId::MOTOR_FORWARD));
 }
 
 TEST(GBoxProgramBuilderTest, SupportsThreeLoopCallsWithFullLoopZone)

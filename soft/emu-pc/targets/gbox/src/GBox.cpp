@@ -343,9 +343,12 @@ bool GBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPack
 
     for (std::size_t slot = 0; slot < BOX_LOOP_SLOTS; ++slot) {
         loopPieces[slot] = boardPieces[BOX_MAIN_SLOTS + slot];
-        if (loopPieces[slot] == BoxPieceId::LOOP_CALL || loopPieces[slot] == BoxPieceId::INVALID) {
+        if (loopPieces[slot] == BoxPieceId::INVALID) {
             isEmpty = false;
             return false;
+        }
+        if (loopPieces[slot] == BoxPieceId::LOOP_CALL) {
+            loopPieces[slot] = BoxPieceId::EMPTY;
         }
     }
 
