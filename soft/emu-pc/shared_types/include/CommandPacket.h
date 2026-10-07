@@ -17,7 +17,6 @@ enum class BoxPieceId : uint8_t {
     BACKWARD,
     TURN_RIGHT,
     TURN_LEFT,
-    STOP,
     LOOP_CALL,
     INVALID,
 };

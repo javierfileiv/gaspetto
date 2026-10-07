@@ -14,18 +14,18 @@ inline constexpr BoxPieceId kEmptyBoardPieces[] = {
 
 inline constexpr BoxPieceId kDemoBoardPieces[] = {
     BoxPieceId::FORWARD,    BoxPieceId::TURN_RIGHT, BoxPieceId::LOOP_CALL, BoxPieceId::FORWARD,
-    BoxPieceId::STOP,       BoxPieceId::EMPTY,      BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
+    BoxPieceId::BACKWARD,   BoxPieceId::EMPTY,      BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
     BoxPieceId::EMPTY,      BoxPieceId::EMPTY,      BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
     BoxPieceId::EMPTY,      BoxPieceId::EMPTY,      BoxPieceId::TURN_LEFT, BoxPieceId::FORWARD,
-    BoxPieceId::TURN_RIGHT, BoxPieceId::STOP,       BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
+    BoxPieceId::TURN_RIGHT, BoxPieceId::BACKWARD,   BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
 };
 
 inline constexpr BoxPieceId kOverflowBoardPieces[] = {
-    BoxPieceId::LOOP_CALL, BoxPieceId::LOOP_CALL, BoxPieceId::LOOP_CALL, BoxPieceId::LOOP_CALL,
-    BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
-    BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,
-    BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,  BoxPieceId::TURN_LEFT, BoxPieceId::TURN_RIGHT,
-    BoxPieceId::STOP,      BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,  BoxPieceId::STOP,
+    BoxPieceId::LOOP_CALL, BoxPieceId::LOOP_CALL, BoxPieceId::LOOP_CALL,  BoxPieceId::LOOP_CALL,
+    BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,      BoxPieceId::EMPTY,
+    BoxPieceId::EMPTY,     BoxPieceId::EMPTY,     BoxPieceId::EMPTY,      BoxPieceId::EMPTY,
+    BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,  BoxPieceId::TURN_LEFT,  BoxPieceId::TURN_RIGHT,
+    BoxPieceId::BACKWARD,  BoxPieceId::FORWARD,   BoxPieceId::TURN_RIGHT, BoxPieceId::BACKWARD,
 };
 
 static_assert(sizeof(kEmptyBoardPieces) == sizeof(BoxBoardPieces),

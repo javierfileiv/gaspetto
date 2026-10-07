@@ -43,12 +43,12 @@ constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 #define TEST_THRESHOLD_TURN_LEFT_START 1900
 #endif
 
-#ifndef TEST_THRESHOLD_STOP_START
-#define TEST_THRESHOLD_STOP_START 2500
+#ifndef TEST_THRESHOLD_LOOP_START
+#define TEST_THRESHOLD_LOOP_START 2500
 #endif
 
-#ifndef TEST_THRESHOLD_LOOP_START
-#define TEST_THRESHOLD_LOOP_START 3100
+#ifndef TEST_THRESHOLD_LOOP_END
+#define TEST_THRESHOLD_LOOP_END 3099
 #endif
 
 static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be >= 1");
@@ -59,11 +59,11 @@ static_assert(TEST_THRESHOLD_BACKWARD_START < TEST_THRESHOLD_TURN_RIGHT_START,
               "Thresholds must be strictly increasing");
 static_assert(TEST_THRESHOLD_TURN_RIGHT_START < TEST_THRESHOLD_TURN_LEFT_START,
               "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_TURN_LEFT_START < TEST_THRESHOLD_STOP_START,
+static_assert(TEST_THRESHOLD_TURN_LEFT_START < TEST_THRESHOLD_LOOP_START,
               "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_STOP_START < TEST_THRESHOLD_LOOP_START,
-              "Thresholds must be strictly increasing");
-static_assert(TEST_THRESHOLD_LOOP_START <= 4095, "Loop threshold must be <= 4095");
+static_assert(TEST_THRESHOLD_LOOP_START <= TEST_THRESHOLD_LOOP_END,
+              "Loop threshold start must be <= loop threshold end");
+static_assert(TEST_THRESHOLD_LOOP_END <= 4095, "Loop threshold end must be <= 4095");
 
 constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
 
@@ -312,15 +312,11 @@ const char *pieceLabelForRaw(int16_t raw)
     {
         return "TURN_RIGHT";
     }
-    if (raw < TEST_THRESHOLD_STOP_START)
+    if (raw < TEST_THRESHOLD_LOOP_START)
     {
         return "TURN_LEFT";
     }
-    if (raw < TEST_THRESHOLD_LOOP_START)
-    {
-        return "STOP";
-    }
-    if (raw <= 4095)
+    if (raw <= TEST_THRESHOLD_LOOP_END)
     {
         return "LOOP_CALL";
     }
@@ -365,10 +361,10 @@ void runPieceCalibrationScan()
     Serial.print(TEST_THRESHOLD_TURN_RIGHT_START);
     Serial.print(" LEFT:");
     Serial.print(TEST_THRESHOLD_TURN_LEFT_START);
-    Serial.print(" STOP:");
-    Serial.print(TEST_THRESHOLD_STOP_START);
     Serial.print(" LOOP:");
     Serial.print(TEST_THRESHOLD_LOOP_START);
+    Serial.print(" LOOPEND:");
+    Serial.println(TEST_THRESHOLD_LOOP_END);
     Serial.println("]");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)

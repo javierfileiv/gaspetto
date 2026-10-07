@@ -58,12 +58,12 @@ namespace
 #define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 1900
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_STOP_START
-#define GASPETTO_ADC_THRESHOLD_STOP_START 2500
+#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
+#define GASPETTO_ADC_THRESHOLD_LOOP_START 2500
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
-#define GASPETTO_ADC_THRESHOLD_LOOP_START 3100
+#ifndef GASPETTO_ADC_THRESHOLD_LOOP_END
+#define GASPETTO_ADC_THRESHOLD_LOOP_END 3099
 #endif
 
 static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
@@ -79,14 +79,14 @@ static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_TUR
               "ADC thresholds must be strictly increasing");
 static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_STOP_START,
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_STOP_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= 4095,
-              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= 4095");
+static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= GASPETTO_ADC_THRESHOLD_LOOP_END,
+              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= LOOP_END");
+static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= 4095,
+              "GASPETTO_ADC_THRESHOLD_LOOP_END must be <= 4095");
 
-constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
+constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
     AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
                     BoxPieceId::EMPTY, "EMPTY" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
@@ -99,12 +99,10 @@ constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
                     static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START - 1),
                     BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_STOP_START - 1),
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
                     BoxPieceId::TURN_LEFT, "TURN_LEFT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_STOP_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1), BoxPieceId::STOP,
-                    "STOP" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, 4095, BoxPieceId::LOOP_CALL, "LOOP_CALL" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
+                    BoxPieceId::LOOP_CALL, "LOOP_CALL" },
 };
 
 constexpr uint8_t kChannelsPerAds = 4;
@@ -222,8 +220,6 @@ CommandId pieceToCommand(BoxPieceId piece)
         return CommandId::MOTOR_TURN_RIGHT;
     case BoxPieceId::TURN_LEFT:
         return CommandId::MOTOR_TURN_LEFT;
-    case BoxPieceId::STOP:
-        return CommandId::MOTOR_STOP;
     default:
         return CommandId::NONE;
     }
@@ -930,8 +926,6 @@ const char *GBox::pieceToString(BoxPieceId piece) const
         return "TURN_RIGHT";
     case BoxPieceId::TURN_LEFT:
         return "TURN_LEFT";
-    case BoxPieceId::STOP:
-        return "STOP";
     case BoxPieceId::LOOP_CALL:
         return "LOOP_CALL";
     default:
