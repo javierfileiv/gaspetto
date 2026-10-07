@@ -19,9 +19,9 @@ TEST(GBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
     board[2] = BoxPieceId::LOOP_CALL;
     board[3] = BoxPieceId::STOP;
 
-    board[14] = BoxPieceId::TURN_LEFT;
-    board[15] = BoxPieceId::FORWARD;
-    board[16] = BoxPieceId::STOP;
+    board[12] = BoxPieceId::TURN_LEFT;
+    board[13] = BoxPieceId::FORWARD;
+    board[14] = BoxPieceId::STOP;
 
     const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
 
@@ -78,6 +78,65 @@ TEST(GBoxProgramBuilderTest, RejectsLoopTokenInsideLoopArea)
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
+}
+
+TEST(GBoxProgramBuilderTest, SupportsThreeLoopCallsWithFullLoopZone)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = false;
+
+    /* 3 x 8 loop commands + 1 stop = 25, still within the 31 command payload. */
+    board[0] = BoxPieceId::LOOP_CALL;
+    board[1] = BoxPieceId::LOOP_CALL;
+    board[2] = BoxPieceId::LOOP_CALL;
+    board[3] = BoxPieceId::STOP;
+
+    board[12] = BoxPieceId::FORWARD;
+    board[13] = BoxPieceId::BACKWARD;
+    board[14] = BoxPieceId::TURN_RIGHT;
+    board[15] = BoxPieceId::TURN_LEFT;
+    board[16] = BoxPieceId::STOP;
+    board[17] = BoxPieceId::FORWARD;
+    board[18] = BoxPieceId::BACKWARD;
+    board[19] = BoxPieceId::STOP;
+
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+
+    ASSERT_TRUE(ok);
+    ASSERT_FALSE(isEmpty);
+    ASSERT_EQ(packet.count, 25);
+}
+
+TEST(GBoxProgramBuilderTest, RejectsFourthLoopCallWithFullLoopZone)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = false;
+
+    /* 4 x 8 = 32 commands, one beyond the 31 command payload. */
+    board[0] = BoxPieceId::LOOP_CALL;
+    board[1] = BoxPieceId::LOOP_CALL;
+    board[2] = BoxPieceId::LOOP_CALL;
+    board[3] = BoxPieceId::LOOP_CALL;
+    board[4] = BoxPieceId::STOP;
+
+    board[12] = BoxPieceId::FORWARD;
+    board[13] = BoxPieceId::BACKWARD;
+    board[14] = BoxPieceId::TURN_RIGHT;
+    board[15] = BoxPieceId::TURN_LEFT;
+    board[16] = BoxPieceId::STOP;
+    board[17] = BoxPieceId::FORWARD;
+    board[18] = BoxPieceId::BACKWARD;
+    board[19] = BoxPieceId::STOP;
+
+    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+
+    EXPECT_FALSE(ok);
+    EXPECT_FALSE(isEmpty);
+    EXPECT_EQ(packet.count, BOX_MAX_PAYLOAD_COMMANDS);
 }
 
 TEST(GBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
