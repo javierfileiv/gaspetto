@@ -58,12 +58,12 @@ namespace
 #define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 1900
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_STOP_START
-#define GASPETTO_ADC_THRESHOLD_STOP_START 2500
+#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
+#define GASPETTO_ADC_THRESHOLD_LOOP_START 2500
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
-#define GASPETTO_ADC_THRESHOLD_LOOP_START 3100
+#ifndef GASPETTO_ADC_THRESHOLD_LOOP_END
+#define GASPETTO_ADC_THRESHOLD_LOOP_END 3099
 #endif
 
 static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
@@ -79,14 +79,14 @@ static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_TUR
               "ADC thresholds must be strictly increasing");
 static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_STOP_START,
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_STOP_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= 4095,
-              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= 4095");
+static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= GASPETTO_ADC_THRESHOLD_LOOP_END,
+              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= LOOP_END");
+static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= 4095,
+              "GASPETTO_ADC_THRESHOLD_LOOP_END must be <= 4095");
 
-constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
+constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
     AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
                     BoxPieceId::EMPTY, "EMPTY" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
@@ -99,12 +99,10 @@ constexpr std::array<AdcDecodeEntry, 7> kAdcDecodeTable = {
                     static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START - 1),
                     BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_STOP_START - 1),
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
                     BoxPieceId::TURN_LEFT, "TURN_LEFT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_STOP_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1), BoxPieceId::STOP,
-                    "STOP" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, 4095, BoxPieceId::LOOP_CALL, "LOOP_CALL" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
+                    BoxPieceId::LOOP_CALL, "LOOP_CALL" },
 };
 
 constexpr uint8_t kChannelsPerAds = 4;
@@ -145,7 +143,18 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
 };
 
 #ifdef ARDUINO
-constexpr uint8_t kLedCount = 3;
+/* Expected LED behaviour, three NeoPixels on the strip, left to right:
+ * - boot health check: led 0 (left) lights solid green when every probe passes,
+ *   solid red otherwise, holds ~1.5s then goes off
+ * - board scan: a cyan dot bounces led 0 -> 1 -> 2 -> back twice, then blackout
+ * - program accepted: green cascades led 0 -> 1 -> 2, all three hold green
+ * - build failed: led 2 (right) blinks red three times, then holds red
+ * - empty board: led 2 blinks amber twice, then holds amber
+ * - RF send failed: led 1 (center) blinks red three times, then holds with led
+ *   1 red plus led 0 green
+ * Terminal states hold their pattern ~60s, then the box arms STOP mode and all
+ * LEDs go off (PC emulation runs the same patterns as log-only animations)
+ */
 constexpr uint8_t kLedState = 0; /* left   : system / scan state   */
 constexpr uint8_t kLedRadio = 1; /* center : radio status           */
 constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
@@ -211,8 +220,6 @@ CommandId pieceToCommand(BoxPieceId piece)
         return CommandId::MOTOR_TURN_RIGHT;
     case BoxPieceId::TURN_LEFT:
         return CommandId::MOTOR_TURN_LEFT;
-    case BoxPieceId::STOP:
-        return CommandId::MOTOR_STOP;
     default:
         return CommandId::NONE;
     }
@@ -246,7 +253,7 @@ GBox::GBox(Context &ctx)
         , _ctx(ctx)
         , lastScan{}
 #ifdef ARDUINO
-        , leds_(kLedCount, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
+        , leds_(BOX_LED_COUNT, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
 #endif
         , initialized_(false)
         , lastDebounceTime_(0)
@@ -332,9 +339,12 @@ bool GBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPack
 
     for (std::size_t slot = 0; slot < BOX_LOOP_SLOTS; ++slot) {
         loopPieces[slot] = boardPieces[BOX_MAIN_SLOTS + slot];
-        if (loopPieces[slot] == BoxPieceId::LOOP_CALL || loopPieces[slot] == BoxPieceId::INVALID) {
+        if (loopPieces[slot] == BoxPieceId::INVALID) {
             isEmpty = false;
             return false;
+        }
+        if (loopPieces[slot] == BoxPieceId::LOOP_CALL) {
+            loopPieces[slot] = BoxPieceId::EMPTY;
         }
     }
 
@@ -585,9 +595,9 @@ void GBox::runScanAnimation()
     }
     blackoutLeds();
 #else
-    for (std::size_t slot = 0; slot < BOX_LED_SLOTS; ++slot) {
-        LOG("LED scanner CYAN slot (Scan animation) ");
-        LOG(static_cast<int>(slot) + 1);
+    for (std::size_t led = 0; led < BOX_LED_COUNT; ++led) {
+        LOG("LED scanner CYAN led (Scan animation) ");
+        LOG(static_cast<int>(led) + 1);
         LOGLN();
         delayMs(15);
     }
@@ -916,8 +926,6 @@ const char *GBox::pieceToString(BoxPieceId piece) const
         return "TURN_RIGHT";
     case BoxPieceId::TURN_LEFT:
         return "TURN_LEFT";
-    case BoxPieceId::STOP:
-        return "STOP";
     case BoxPieceId::LOOP_CALL:
         return "LOOP_CALL";
     default:

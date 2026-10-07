@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Validates commit message format (conventional commits).
-# Equivalent to CI commitlint with @commitlint/config-conventional + custom rules.
+# Local version is more permissive than CI: fixup/squash commits pass here
+# because they get squashed before push; CI rejects them via defaultIgnores: false.
 
 set -euo pipefail
 
@@ -20,6 +21,11 @@ if [[ -z "$MSG" ]]; then
 fi
 
 SUBJECT=$(echo "$MSG" | head -n1)
+
+# Local-only allowance: fixup/squash commits skip validation entirely.
+if echo "$SUBJECT" | grep -qE '^(fixup|squash)! '; then
+    exit 0
+fi
 
 # Valid types (matches CI config).
 VALID_TYPES="feat|fix|chore|refactor|docs|test|style|perf|ci|build|revert"
