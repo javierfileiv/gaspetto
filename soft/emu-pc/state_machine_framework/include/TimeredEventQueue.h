@@ -1,5 +1,4 @@
-#ifndef TIMERED_EVENT_QUEUE_H
-#define TIMERED_EVENT_QUEUE_H
+#pragma once
 
 #include "Arduino.h"
 #include "Log.h"
@@ -128,5 +127,3 @@ private:
     int8_t headIndex_;
     int8_t freeListHead_;
 };
-
-#endif /* TIMERED_EVENT_QUEUE_H */

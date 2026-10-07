@@ -1,5 +1,4 @@
-#ifndef LOG_H
-#define LOG_H
+#pragma once
 
 #include "Arduino.h"
 
@@ -221,5 +220,3 @@ public:
 
 #define LOG(...) Log::log(__VA_ARGS__)
 #define LOGLN(...) Log::logln(__VA_ARGS__)
-
-#endif /* LOG_H */

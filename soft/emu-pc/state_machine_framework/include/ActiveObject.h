@@ -1,5 +1,4 @@
-#ifndef ACTIVE_OBJECT_H
-#define ACTIVE_OBJECT_H
+#pragma once
 
 #include "Arduino.h"
 #include "Log.h"
@@ -146,5 +145,3 @@ protected:
     StateType *states[MaxStates];
     StateIdT currentStateIndex;
 };
-
-#endif /* ACTIVE_OBJECT_H */

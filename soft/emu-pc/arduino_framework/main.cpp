@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "CarEvents.h"
+#include "Events.h"
 #include "GCar_ino.h"
 #include "Serial.h"
 #include "implementations.h"
@@ -45,7 +45,7 @@ static void keyboardInput(void)
             char ch = Serial.read();
 #ifdef GCAR
             gcar_input_switch(ch);
-#ifndef USE_RADIO_CONTROLLER
+#ifndef PC_KEYBOARD_RADIO_SIM
             ISR();
 #endif
 #endif

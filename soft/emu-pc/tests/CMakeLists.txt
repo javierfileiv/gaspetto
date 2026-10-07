@@ -21,7 +21,6 @@ add_executable(
   gcar/test_queue_clear.cpp
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
-  mocks/stub_RF24.cpp
   mocks/mock_MovementController.cpp
   mocks/mock_IMUOrientation.cpp
   mocks/mock_MotorControl.cpp

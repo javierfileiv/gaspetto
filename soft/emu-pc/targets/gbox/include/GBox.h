@@ -2,11 +2,11 @@
 
 #include "ActiveObject.h"
 #include "Arduino.h"
-#include "CarEvents.h"
-#include "CarStates.h"
 #include "CommandPacket.h"
 #include "Context.h"
+#include "Events.h"
 #include "Log.h"
+#include "States.h"
 
 #include <array>
 #include <atomic>
@@ -39,7 +39,8 @@ struct AdsRouteInfo {
     uint8_t channel;
 };
 
-class GBox : public GenericActiveObject<StateId, Event, BOX_MAX_STATES> {
+using BoxActiveObject = GenericActiveObject<StateId, Event, BOX_MAX_STATES>;
+class GBox : public BoxActiveObject {
 public:
     /** GBox(): Constructor for the GBox class.
      *  @ctx: Reference to the Context instance containing dependencies.
@@ -72,6 +73,7 @@ public:
     void debounceAndEnqueue(Event &evt, unsigned long currentTime);
 
     void initHardware();
+    bool runHealthCheck();
 #ifndef ARDUINO
     void injectBoardPieces(const BoxBoardPieces &boardPieces);
     void injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawValues);
@@ -105,6 +107,7 @@ private:
     void SystemClock_Config();
     void configurePins();
     void setLedRailEnabled(bool enabled);
+    void showHealthStatus(bool ok);
     void blackoutLeds();
     uint16_t rawValueForPiece(BoxPieceId piece) const;
     BoxPieceId decodePiece(uint16_t rawValue) const;

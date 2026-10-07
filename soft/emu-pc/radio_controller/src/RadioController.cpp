@@ -1,7 +1,7 @@
 #include "RadioController.h"
 
 #include "Arduino.h"
-#include "CarEvents.h"
+#include "Events.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
 
@@ -155,6 +155,11 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
     }
 
     return result;
+}
+
+bool RadioController::isChipConnected()
+{
+    return _radio.isChipConnected();
 }
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)

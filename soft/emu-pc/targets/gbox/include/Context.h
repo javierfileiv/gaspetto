@@ -1,8 +1,7 @@
-#ifndef CONTEXT_H
-#define CONTEXT_H
+#pragma once
 
-#include "CarEvents.h"
 #include "EventQueue.h"
+#include "Events.h"
 #include "IdleState.h"
 #include "ProcessingState.h"
 #include "TimeredEventQueue.h"
@@ -24,5 +23,3 @@ struct Context {
     IdleState *idleState;
     ProcessingState *processingState;
 };
-
-#endif /* CONTEXT_H */

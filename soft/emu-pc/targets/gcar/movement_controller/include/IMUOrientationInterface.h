@@ -1,5 +1,4 @@
-#ifndef IMU_ORIENTATION_INTERFACE_H
-#define IMU_ORIENTATION_INTERFACE_H
+#pragma once
 
 #include <stdint.h>
 
@@ -35,5 +34,3 @@ public:
     virtual float gyroZDeg() const = 0;
     virtual void zeroYaw() = 0;
 };
-
-#endif // IMU_ORIENTATION_INTERFACE_H

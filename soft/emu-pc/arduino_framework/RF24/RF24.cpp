@@ -107,3 +107,8 @@ void RF24::simulateSuccessfulTransmission()
 {
     g_fail_next_transmission = false;
 }
+bool RF24::isChipConnected(void)
+{
+    /* PC emulation: always connected. */
+    return true;
+}

@@ -22,9 +22,9 @@ const uint32_t NRF24_CSN = 10; /* Chip select RF24 pin*/
 #ifdef GCAR
 const uint32_t NRF24_CE = PB0; /* Chip enable RF24 pin*/
 const uint32_t NRF24_CSN = PB1; /* Chip select RF24 pin*/
-#elif GBOX
-const uint32_t NRF24_CE = PA8; /* Chip enable RF24 pin*/
-const uint32_t NRF24_CSN = PA9; /* Chip select RF24 pin*/
+#elif defined(GBOX)
+const uint32_t NRF24_CE = PA3; /* Chip enable RF24 pin*/
+const uint32_t NRF24_CSN = PA4; /* Chip select RF24 pin*/
 #else
 #warning "No radio pins defined. Using default for utests"
 const uint32_t NRF24_CE = 0; /* Chip enable RF24 pin*/

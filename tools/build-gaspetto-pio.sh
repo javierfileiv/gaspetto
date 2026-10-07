@@ -58,6 +58,7 @@ declare -a BUILD_PATHS=(
     "$PROJECT_ROOT/soft/pio/NrfSender_pio"
     "$PROJECT_ROOT/soft/pio/arduino_straight_drive"
     "$PROJECT_ROOT/soft/pio/arduino_box_hw_test"
+    "$PROJECT_ROOT/soft/pio/arduino_i2c3_bb_test"
     "$PROJECT_ROOT/soft/pio/arduino_car_hw_test"
     "$PROJECT_ROOT/soft/pio/mpu_plot"
 )
@@ -68,6 +69,7 @@ declare -a BUILD_LABELS=(
     "NrfSender"
     "Arduino Straight Drive"
     "Arduino Box HW Test"
+    "Arduino I2C3 BB Test"
     "Arduino Car HW Test"
     "MPU Plot"
 )

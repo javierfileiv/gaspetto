@@ -1,6 +1,6 @@
 #include "Arduino.h"
-#include "CarEvents.h"
 #include "EventQueue.h"
+#include "Events.h"
 #include "GBox.h"
 #include "IdleState.h"
 #include "Log.h"
@@ -259,6 +259,7 @@ void setup()
 #endif /* ARDUINO */
 
     gbox.initHardware();
+    gbox.runHealthCheck();
     /* Initialize the GBox state machine. */
 #ifndef ARDUINO
     gbox.setLowPowerModeCallback(enter_low_power_mode);

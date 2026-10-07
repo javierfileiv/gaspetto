@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Arduino.h"
-#include "CarEvents.h"
 #include "CommandPacket.h"
 #include "EventQueue.h"
+#include "Events.h"
 #include "Log.h"
 #include "RadioProtocol.h"
 
@@ -26,6 +26,7 @@ public:
     void sendEvent(Event evt);
     EventQueue *getRadioQueue();
     bool sendBuffer(const void *data, uint8_t len);
+    bool isChipConnected();
 
     /**
      * sendTelemetry(): Send telemetry packet via radio
