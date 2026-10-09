@@ -10,6 +10,7 @@
 #ifdef TEST_ADS1115
 #include <Adafruit_ADS1X15.h>
 #endif
+#include "CommandPacket.h"
 #include "i2c3_bitbang.h"
 #include "piece_thresholds.h"
 #include "pin_definitions.h"
@@ -148,6 +149,12 @@ bool gProbeStateValid               = false;
  * Rail settle delays keep the plain delay(): the electrical settling must
  * not be interrupted */
 void handleUsbCommands();
+void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece);
+void resetLabeledSlot(uint8_t slotIndex);
+void runGapAnalysis();
+void emitThresholdHeader();
+void printUsbHelp();
+bool labelCharToPiece(char ch, BoxPieceId &piece);
 
 void delayWithUsb(uint32_t totalMs)
 {
@@ -189,7 +196,7 @@ void enterMode(TestMode mode)
         digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
         digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
         gCalibrationRailsOn = true;
-        Serial.println("\n-> mode: calibration ('s' scan, '?' status)");
+        Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
     }
     else
     {
@@ -200,11 +207,38 @@ void enterMode(TestMode mode)
     }
 }
 
+/* The key list, shown at boot and on demand by '?' */
+void printUsbHelp()
+{
+    Serial.println("   usb: h health, c calibration, s run test, t gaps, x thresholds, ? help");
+    Serial.println("   calibration: '<slot><label>' e.g. '5f' (e f b r l L), R = reset slot");
+}
+
 void handleUsbCommands()
 {
+    /* pendingSlot collects a typed slot number that prefixes a label key
+     * ('17L'): digits accumulate in a row and the next label letter ends
+     * the slot selection; any other key clears the pending digits. With
+     * no explicit slot the label reuses the previously addressed slot */
+    static uint16_t pendingSlot    = 0;
+    static bool digitsStarted      = false;
+    static uint8_t lastLabeledSlot = kCalibrationSlotCount; /* none selected */
+
     while (Serial.available() > 0)
     {
         const int incoming = Serial.read();
+
+        if (incoming >= '0' && incoming <= '9')
+        {
+            pendingSlot   = static_cast<uint16_t>(pendingSlot * 10 + (incoming - '0'));
+            digitsStarted = true;
+            continue;
+        }
+
+        const char ch    = static_cast<char>(incoming);
+        BoxPieceId piece = BoxPieceId::INVALID;
+        (void)labelCharToPiece(ch, piece);
+
         switch (incoming)
         {
         case 'h':
@@ -216,9 +250,76 @@ void handleUsbCommands()
         case 's':
             gRunTestRequested = true;
             break;
+        case '?':
+            Serial.print("mode: ");
+            Serial.println(gMode == TestMode::Health ? "health" : "calibration");
+            printUsbHelp();
+            break;
+        case 't':
+            runGapAnalysis();
+            break;
+        case 'x':
+            emitThresholdHeader();
+            break;
+        case 'R':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("sample reset works in calibration mode ('c' to switch)");
+                break;
+            }
+            if (digitsStarted)
+            {
+                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
+                {
+                    resetLabeledSlot(static_cast<uint8_t>(pendingSlot - 1));
+                }
+                else
+                {
+                    Serial.println("slot out of range (1..20)");
+                }
+            }
+            else if (lastLabeledSlot < kCalibrationSlotCount)
+            {
+                resetLabeledSlot(lastLabeledSlot);
+            }
+            else
+            {
+                Serial.println("type '<slot>R' e.g. '5R' (reset slot 5 samples)");
+            }
+            break;
         default:
+            if (piece == BoxPieceId::INVALID)
+            {
+                break;
+            }
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("labels register in calibration mode ('c' to switch)");
+                break;
+            }
+            if (digitsStarted)
+            {
+                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
+                {
+                    lastLabeledSlot = static_cast<uint8_t>(pendingSlot - 1);
+                }
+                else
+                {
+                    Serial.println("slot out of range (1..20)");
+                    break;
+                }
+            }
+            else if (lastLabeledSlot >= kCalibrationSlotCount)
+            {
+                Serial.println("type '<slot><label>' e.g. '5f' (slot 5 forward)");
+                break;
+            }
+            recordLabelPoint(lastLabeledSlot, piece);
             break;
         }
+
+        digitsStarted = false;
+        pendingSlot   = 0;
     }
 }
 
@@ -422,6 +523,357 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
     return true;
 }
 
+// ==========================================
+// PIECE LABELING (calibration mode)
+// ==========================================
+
+/* Accumulated samples per (slot, piece): the operator moves a piece into a
+ * slot, types '<slot><label>' and the current mean reading lands in that
+ * cluster. Across visits, min/max/count map each piece type per sensor.
+ * Label indexes match the BoxPieceId enum order EMPTY..LOOP_CALL; INVALID
+ * is never labeled */
+struct LabelCluster
+{
+    uint32_t sum;
+    uint16_t min;
+    uint16_t max;
+    uint16_t count;
+};
+
+LabelCluster gPieceClusters[kCalibrationSlotCount][6] = {};
+
+const char *labelName(int index)
+{
+    switch (index)
+    {
+    case 0:
+        return "EMPTY";
+    case 1:
+        return "FORWARD";
+    case 2:
+        return "BACKWARD";
+    case 3:
+        return "TURN_RIGHT";
+    case 4:
+        return "TURN_LEFT";
+    case 5:
+        return "LOOP_CALL";
+    default:
+        return "?";
+    }
+}
+
+bool labelCharToPiece(char ch, BoxPieceId &piece)
+{
+    switch (ch)
+    {
+    case 'e':
+        piece = BoxPieceId::EMPTY;
+        return true;
+    case 'f':
+        piece = BoxPieceId::FORWARD;
+        return true;
+    case 'b':
+        piece = BoxPieceId::BACKWARD;
+        return true;
+    case 'r':
+        piece = BoxPieceId::TURN_RIGHT;
+        return true;
+    case 'l':
+        piece = BoxPieceId::TURN_LEFT;
+        return true;
+    case 'L':
+        piece = BoxPieceId::LOOP_CALL;
+        return true;
+    default:
+        return false;
+    }
+}
+
+void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw)
+{
+    LabelCluster &cluster = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
+    if (cluster.count == 0)
+    {
+        cluster.min   = raw;
+        cluster.max   = raw;
+        cluster.sum   = raw;
+        cluster.count = 1;
+        return;
+    }
+    if (raw < cluster.min)
+    {
+        cluster.min = raw;
+    }
+    if (raw > cluster.max)
+    {
+        cluster.max = raw;
+    }
+    cluster.sum += raw;
+    ++cluster.count;
+}
+
+void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece)
+{
+    const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
+    const uint8_t channel     = slotIndex % 4;
+
+    int16_t rawMean = 0;
+    bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
+    if (!readOk && isI2c3Entry(&entry))
+    {
+        recoverI2c3Bus();
+        readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    }
+    if (!readOk)
+    {
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slotIndex) + 1);
+        Serial.println(" read TIMEOUT/FAIL, point not recorded");
+        return;
+    }
+
+    const uint16_t raw           = static_cast<uint16_t>(rawMean);
+    const LabelCluster &existing = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
+
+    /* Outlier guard: reject samples far outside the already labeled range,
+     * so a bad contact or a misplaced piece cannot silently stretch the
+     * cluster. Reset the slot cluster ('R') to re-record from scratch */
+    if (existing.count > 0)
+    {
+        const uint32_t spanBottom =
+            existing.min > existing.min / 5 ? existing.min - existing.min / 5 : 0;
+        const uint32_t spanTop = existing.max + existing.max / 5;
+        if (raw < spanBottom || raw > spanTop)
+        {
+            Serial.print("   [OUTLIER IGNORED] slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.print(" ");
+            Serial.print(labelName(static_cast<int>(piece)));
+            Serial.print(" raw=");
+            Serial.print(raw);
+            Serial.print(" expected.raw ");
+            Serial.print(static_cast<int>(spanBottom));
+            Serial.print("-");
+            Serial.println(static_cast<int>(spanTop));
+            return;
+        }
+    }
+
+    addLabelPoint(slotIndex, piece, raw);
+    const LabelCluster &cluster = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
+
+    Serial.print("   slot ");
+    Serial.print(static_cast<int>(slotIndex) + 1);
+    Serial.print(" ");
+    Serial.print(labelName(static_cast<int>(piece)));
+    Serial.print(": raw=");
+    Serial.print(raw);
+    Serial.print(" n=");
+    Serial.println(cluster.count);
+}
+
+void resetLabeledSlot(uint8_t slotIndex)
+{
+    for (int label = 0; label < 6; ++label)
+    {
+        gPieceClusters[slotIndex][label] = LabelCluster{};
+    }
+    Serial.print("   slot ");
+    Serial.print(static_cast<int>(slotIndex) + 1);
+    Serial.println(" samples reset");
+}
+
+/* One labeled piece type seen across all slots, min/max in raw counts */
+struct LabelRange
+{
+    int label;
+    uint32_t min;
+    uint32_t max;
+    uint32_t count;
+};
+
+/* Threshold macro name for a piece type, nullptr when it has none */
+const char *thresholdStartName(int label)
+{
+    switch (label)
+    {
+    case 1:
+        return "GASPETTO_ADC_THRESHOLD_FORWARD_START";
+    case 2:
+        return "GASPETTO_ADC_THRESHOLD_BACKWARD_START";
+    case 3:
+        return "GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START";
+    case 4:
+        return "GASPETTO_ADC_THRESHOLD_TURN_LEFT_START";
+    case 5:
+        return "GASPETTO_ADC_THRESHOLD_LOOP_START";
+    default:
+        return nullptr;
+    }
+}
+
+/* Aggregate every labeled cluster by piece type, lowest first */
+void collectSortedPieceRanges(LabelRange *ranges, uint8_t &written)
+{
+    written = 0;
+    for (int label = 0; label < 6; ++label)
+    {
+        uint32_t min   = 0xFFFFFFFFUL;
+        uint32_t max   = 0;
+        uint32_t count = 0;
+        for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+        {
+            const LabelCluster &cluster = gPieceClusters[slotIndex][label];
+            if (cluster.count == 0)
+            {
+                continue;
+            }
+            count += cluster.count;
+            if (cluster.min < min)
+            {
+                min = cluster.min;
+            }
+            if (cluster.max > max)
+            {
+                max = cluster.max;
+            }
+        }
+        if (count > 0)
+        {
+            ranges[written].label = label;
+            ranges[written].min   = min;
+            ranges[written].max   = max;
+            ranges[written].count = count;
+            ++written;
+        }
+    }
+
+    /* lowest first */
+    for (uint8_t i = 0; i < written; ++i)
+    {
+        for (uint8_t j = i + 1; j < written; ++j)
+        {
+            if (ranges[j].min < ranges[i].min)
+            {
+                const LabelRange swap = ranges[i];
+                ranges[i]             = ranges[j];
+                ranges[j]             = swap;
+            }
+        }
+    }
+}
+
+void runGapAnalysis()
+{
+    LabelRange ranges[6];
+    uint8_t written = 0;
+    collectSortedPieceRanges(ranges, written);
+    Serial.println("--- PIECE THRESHOLD ANALYSIS ---");
+    if (written == 0)
+    {
+        Serial.println("   no labeled samples; enter calibration ('c') then '<slot><label>'");
+        return;
+    }
+    for (uint8_t i = 0; i < written; ++i)
+    {
+        Serial.print("   ");
+        Serial.print(labelName(ranges[i].label));
+        Serial.print(": raw ");
+        Serial.print(static_cast<int>(ranges[i].min));
+        Serial.print("-");
+        Serial.print(static_cast<int>(ranges[i].max));
+        Serial.print(", n=");
+        Serial.print(static_cast<int>(ranges[i].count));
+        Serial.println();
+    }
+
+    for (uint8_t i = 0; i + 1 < written; ++i)
+    {
+        const LabelRange &lower = ranges[i];
+        const LabelRange &upper = ranges[i + 1];
+        if (lower.max >= upper.min)
+        {
+            Serial.print("   [AMBIGUOUS] ");
+            Serial.print(labelName(lower.label));
+            Serial.print(" and ");
+            Serial.print(labelName(upper.label));
+            Serial.println(" ranges overlap; separate them before trusting thresholds");
+            continue;
+        }
+
+        const uint32_t suggested = (lower.max + upper.min) / 2;
+        Serial.print("   #define ");
+        Serial.print(thresholdStartName(upper.label));
+        Serial.print(" ");
+        Serial.println(static_cast<int>(suggested));
+    }
+    Serial.println("   note: top of highest labeled piece informs LOOP_END");
+}
+
+void emitThresholdHeader()
+{
+    LabelRange ranges[6];
+    uint8_t written = 0;
+    collectSortedPieceRanges(ranges, written);
+
+    Serial.println("--- GENERATED piece_thresholds.h BLOCK (raw ADS1115 counts) ---");
+    if (written == 0)
+    {
+        Serial.println("   no labeled samples; enter calibration ('c') then '<slot><label>'");
+        return;
+    }
+
+    Serial.println("#pragma once");
+    Serial.println();
+    Serial.println("/* Generated by arduino_box_hw_test from labeled piece samples */");
+
+    /* Neighborhoods drive the defines: the gap between two adjacent
+     * labeled piece types becomes the upper piece's *_START */
+    for (uint8_t i = 0; i + 1 < written; ++i)
+    {
+        const LabelRange &lower = ranges[i];
+        const LabelRange &upper = ranges[i + 1];
+        const char *name        = thresholdStartName(upper.label);
+        if (lower.max >= upper.min)
+        {
+            Serial.print("/* AMBIGUOUS: cannot derive ");
+            Serial.print(name);
+            Serial.print(" (");
+            Serial.print(labelName(lower.label));
+            Serial.print(" overlaps ");
+            Serial.print(labelName(upper.label));
+            Serial.println(") */");
+            continue;
+        }
+
+        const uint32_t suggested = (lower.max + upper.min) / 2;
+        Serial.print("#define ");
+        Serial.print(name);
+        Serial.print(" ");
+        Serial.print(static_cast<int>(suggested));
+        Serial.print("  /* gap raw ");
+        Serial.print(static_cast<int>(lower.max));
+        Serial.print("-");
+        Serial.print(static_cast<int>(upper.min));
+        Serial.print(", n=");
+        Serial.print(static_cast<int>(lower.count + upper.count));
+        Serial.println(" */");
+    }
+
+    /* LOOP_END just above the top of the highest labeled piece */
+    const LabelRange &top = ranges[written - 1];
+    Serial.print("#define GASPETTO_ADC_THRESHOLD_LOOP_END ");
+    Serial.print(static_cast<int>(top.max + 1));
+    Serial.print("  /* above ");
+    Serial.print(labelName(top.label));
+    Serial.print(" top raw ");
+    Serial.print(static_cast<int>(top.max));
+    Serial.println(" */");
+    Serial.println("#define GASPETTO_ADC_THRESHOLD_MAX 32767");
+    Serial.println("--- END BLOCK: paste over the defines of piece_thresholds.h ---");
+}
+
 const char *pieceLabelForRaw(int16_t raw)
 {
     if (raw < 0)
@@ -564,6 +1016,31 @@ void runPieceCalibrationScan()
             Serial.print(stats.maxRaw - stats.minRaw);
             Serial.print(" => ");
             Serial.println(pieceLabelForRaw(rawMean));
+        }
+    }
+
+    Serial.println("--- LABELED PIECE SAMPLES ---");
+    for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+    {
+        for (int label = 0; label < 6; ++label)
+        {
+            const LabelCluster &cluster = gPieceClusters[slotIndex][label];
+            if (cluster.count == 0)
+            {
+                continue;
+            }
+            Serial.print("   slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.print(" ");
+            Serial.print(labelName(label));
+            Serial.print(": n=");
+            Serial.print(cluster.count);
+            Serial.print(" raw ");
+            Serial.print(cluster.min);
+            Serial.print("-");
+            Serial.print(cluster.max);
+            Serial.print(" mean=");
+            Serial.println(static_cast<int>(cluster.sum / cluster.count));
         }
     }
 }
@@ -864,8 +1341,7 @@ void setup()
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
     Serial.println("   hw-test: runtime modes build");
-    Serial.println(
-        "   USB commands: 'h' health mode, 'c' calibration mode, 's' run test, '?' status");
+    printUsbHelp();
     Serial.print("   mode: ");
     Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
 
