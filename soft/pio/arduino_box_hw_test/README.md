@@ -26,6 +26,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `?` | Print the active mode and rail states |
 | `t` | Piece threshold gap analysis (any mode) |
 | `x` | Emit the paste-ready `piece_thresholds.h` block |
+| `m` | Continuous readout of a slot (`<slot>m` or `m` for the last addressed) |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
 
@@ -90,6 +91,30 @@ Practical hints:
 - A `[AMBIGUOUS]` line usually means too few samples: add more `'slot<label>'` points for the reported pieces and run `t` again
 - All printed values are raw ADS1115 counts (GAIN_ONE, single-ended, 3V3 rail) — the same scale the production decode compares against, so threshold pastes need no conversion
 - Samples survive mode switches — entering calibration only resets the per-slot scan statistics, never the labeled clusters; a power cycle or an explicit `R` are the only ways to clear them
+
+## Slot Monitor (`m`)
+
+Continuous readout of one slot while you work it, ~5 readings per second:
+
+```text
+5m          # monitor slot 5 (or m alone: last addressed slot)
+   [ADS module 2/5: I2C1 0x49, slot 5 = channel 1/4]
+   slot 5: raw=14025 min=14019 max=14027
+   slot 5: raw=14026 min=14019 max=14027
+   slot 5: raw=14024 min=14019 max=14027
+   slot 5: raw=14025 min=14019 max=14027
+   [ADS module 2/5: I2C1 0x49, slot 5 = channel 1/4]
+   slot 5: raw=14025 min=14019 max=14027
+   ...
+<any key>   # stop, prints a summary (n, mean, min, max, span)
+```
+
+The readouts are grouped by four — one header per group reminds which ADS module and channel the slot sits on. The running `min`/`max` are the point of the tool:
+
+- **Clamp check**: a max pinned near the top of the scale (~26400 on the 3V3 rail) means the 49E hall output is saturated — the piece is too strong or too close, not "reading high". Fix the physics (more air gap, glue spacer under the magnet), not the code
+- **Variance check**: span across a settled reading set shows the class spread; keep it well below the distance to the next class's range when pasting thresholds
+- Readouts sit inside the calibration mode so the labels/parser stay consistent — a stray label key cannot run mid-monitor
+- **Self-recovery**: a failed read re-inits the module (I2C1 bus restart + begin, I2C3 bit-bang re-init) and retries the read once — the `[RECOVERED]`/`[WARN]` line tells which bus healed
 
 ## Gap Analysis (`t`)
 

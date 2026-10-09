@@ -139,6 +139,10 @@ bool gCalibrationRailsOn = false;
  * without a keystroke, then set again by 's' from any mode */
 bool gRunTestRequested = true;
 
+/* Continuous slot monitor ('m'): while active, usb keys only stop it */
+bool gMonitorActive = false;
+bool gMonitorExit   = false;
+
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
@@ -151,7 +155,9 @@ bool gProbeStateValid               = false;
 void handleUsbCommands();
 void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece);
 void resetLabeledSlot(uint8_t slotIndex);
+void runSlotMonitor(uint8_t slotIndex);
 void runGapAnalysis();
+void recoverAdsModule(const AdsTestEntry *entry);
 void emitThresholdHeader();
 void printUsbHelp();
 bool labelCharToPiece(char ch, BoxPieceId &piece);
@@ -196,6 +202,7 @@ void enterMode(TestMode mode)
         digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
         digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
         gCalibrationRailsOn = true;
+        delay(kRailSettleDelayMs);
         Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
     }
     else
@@ -211,7 +218,8 @@ void enterMode(TestMode mode)
 void printUsbHelp()
 {
     Serial.println("   usb: h health, c calibration, s run test, t gaps, x thresholds, ? help");
-    Serial.println("   calibration: '<slot><label>' e.g. '5f' (e f b r l L), R = reset slot");
+    Serial.println(
+        "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
 }
 
 void handleUsbCommands()
@@ -227,6 +235,15 @@ void handleUsbCommands()
     while (Serial.available() > 0)
     {
         const int incoming = Serial.read();
+
+        /* While the slot monitor runs, any key is a stop request */
+        if (gMonitorActive)
+        {
+            gMonitorExit  = true;
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
 
         if (incoming >= '0' && incoming <= '9')
         {
@@ -286,6 +303,31 @@ void handleUsbCommands()
             {
                 Serial.println("type '<slot>R' e.g. '5R' (reset slot 5 samples)");
             }
+            break;
+        case 'm':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("slot monitor works in calibration mode ('c' to switch)");
+                break;
+            }
+            if (digitsStarted)
+            {
+                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
+                {
+                    lastLabeledSlot = static_cast<uint8_t>(pendingSlot - 1);
+                }
+                else
+                {
+                    Serial.println("slot out of range (1..20)");
+                    break;
+                }
+            }
+            else if (lastLabeledSlot >= kCalibrationSlotCount)
+            {
+                Serial.println("type '<slot>m' e.g. '5m' (monitor slot 5)");
+                break;
+            }
+            runSlotMonitor(lastLabeledSlot);
             break;
         default:
             if (piece == BoxPieceId::INVALID)
@@ -397,6 +439,26 @@ void recoverI2c3Bus()
     Serial.println("   [WARN] I2C3 transaction failed, reinitializing I2C3 bit-bang...");
     i2c3_bb_init();
     delay(20);
+}
+
+/* Bring one ADS module back after a failed transaction: bit-banged
+ * I2C3 re-inits the bus itself; hardware I2C1 needs a bus restart and
+ * a fresh module begin before the next try can succeed */
+void recoverAdsModule(const AdsTestEntry *entry)
+{
+    if (entry->useBitBang)
+    {
+        recoverI2c3Bus();
+        return;
+    }
+
+    entry->wire->end();
+    entry->wire->begin();
+    entry->wire->setClock(kI2c1ClockHz);
+    Adafruit_ADS1115 ads;
+    ads.begin(entry->address, entry->wire);
+    ads.setGain(GAIN_ONE);
+    Serial.println("   [RECOVERED] I2C1 module re-inited");
 }
 
 bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
@@ -620,9 +682,9 @@ void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece)
 
     int16_t rawMean = 0;
     bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
-    if (!readOk && isI2c3Entry(&entry))
+    if (!readOk)
     {
-        recoverI2c3Bus();
+        recoverAdsModule(&entry);
         readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
     }
     if (!readOk)
@@ -682,6 +744,119 @@ void resetLabeledSlot(uint8_t slotIndex)
     Serial.print("   slot ");
     Serial.print(static_cast<int>(slotIndex) + 1);
     Serial.println(" samples reset");
+}
+
+/* Continuous readout of one slot: ~5 mean reads per second with running
+ * min/max. Any usb key stops it. Clamp detection: a max pinned at the
+ * top of the scale (near 26400 on the 3V3 rail) means the hall sensor
+ * output is saturated, not that the piece reads high */
+void runSlotMonitor(uint8_t slotIndex)
+{
+    const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
+    const uint8_t channel     = slotIndex % 4;
+
+    Serial.print("--- MONITOR slot ");
+    Serial.print(static_cast<int>(slotIndex) + 1);
+    Serial.print(" (");
+    Serial.print(entry.busName);
+    Serial.println("), any key to stop ---");
+    if (!gCalibrationRailsOn)
+    {
+        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
+    }
+
+    uint16_t minRaw = 0xFFFF;
+    uint16_t maxRaw = 0;
+    uint32_t count  = 0;
+    uint64_t sum    = 0;
+
+    gMonitorActive = true;
+    gMonitorExit   = false;
+    while (!gMonitorExit)
+    {
+        int16_t rawMean = 0;
+        bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
+        if (!readOk)
+        {
+            Serial.println("   read TIMEOUT/FAIL, recovering module");
+            recoverAdsModule(&entry);
+            readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        }
+        if (readOk)
+        {
+            const uint16_t raw = static_cast<uint16_t>(rawMean);
+            if (raw < minRaw)
+            {
+                minRaw = raw;
+            }
+            if (raw > maxRaw)
+            {
+                maxRaw = raw;
+            }
+            sum += raw;
+            ++count;
+        }
+
+        /* Group the readouts by four so the addressed ADS module is
+         * always visible: one group header per four readings */
+        if (readOk && count % 4 == 1)
+        {
+            Serial.print("   [ADS module ");
+            Serial.print(static_cast<int>(slotIndex / 4) + 1);
+            Serial.print("/5: ");
+            Serial.print(entry.busName);
+            Serial.print(" 0x");
+            Serial.print(entry.address, HEX);
+            Serial.print(", slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.print(" = channel ");
+            Serial.print(static_cast<int>(channel) + 1);
+            Serial.println("/4]");
+        }
+
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slotIndex) + 1);
+        Serial.print(": raw=");
+        if (readOk)
+        {
+            Serial.print(rawMean);
+        }
+        else
+        {
+            Serial.print("----");
+        }
+        Serial.print(" min=");
+        if (count > 0)
+        {
+            Serial.print(static_cast<int>(minRaw));
+            Serial.print(" max=");
+            Serial.println(maxRaw);
+        }
+        else
+        {
+            Serial.println("---- max=----");
+        }
+
+        /* The parser only sets gMonitorExit here, so the sampling
+         * period doubles as the usb response time */
+        delayWithUsb(200);
+    }
+    gMonitorActive = false;
+
+    Serial.println("--- MONITOR stopped ---");
+    if (count > 0)
+    {
+        Serial.print("   samples n=");
+        Serial.print(static_cast<int>(count));
+        Serial.print(" mean=");
+        Serial.print(static_cast<int>(sum / count));
+        Serial.print(" min=");
+        Serial.print(static_cast<int>(minRaw));
+        Serial.print(" max=");
+        Serial.print(static_cast<int>(maxRaw));
+        Serial.print(" span=");
+        Serial.println(static_cast<int>(maxRaw - minRaw));
+    }
 }
 
 /* One labeled piece type seen across all slots, min/max in raw counts */
