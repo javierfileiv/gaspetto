@@ -63,9 +63,13 @@ struct I2CProbeEntry
     const char *label;
 };
 
+/* Board wiring (slot ranges fixed by the physical layout):
+ * slots 1-4 ADS at 0x4B (ADDR->SCL), 5-8 at 0x48 (ADDR->GND),
+ * 9-12 at 0x4A (ADDR->SDA), 13-16 at 0x49 (ADDR->VCC),
+ * 17-20 on I2C3 at 0x4A (ADDR->SDA). Entries follow slot order */
 static const I2CProbeEntry kI2CProbes[] = {
-    {false, &i2c1, 0x48, "I2C1 0x48 (ADDR->GND)"},  {false, &i2c1, 0x49, "I2C1 0x49 (ADDR->VCC)"},
-    {false, &i2c1, 0x4A, "I2C1 0x4A (ADDR->SDA)"},  {false, &i2c1, 0x4B, "I2C1 0x4B (ADDR->SCL)"},
+    {false, &i2c1, 0x4B, "I2C1 0x4B (ADDR->SCL)"},  {false, &i2c1, 0x48, "I2C1 0x48 (ADDR->GND)"},
+    {false, &i2c1, 0x4A, "I2C1 0x4A (ADDR->SDA)"},  {false, &i2c1, 0x49, "I2C1 0x49 (ADDR->VCC)"},
     {true, nullptr, 0x4A, "I2C3 0x4A (ADDR->SDA)"},
 };
 constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
@@ -111,11 +115,11 @@ struct AdsTestEntry
     const char *addrNote;
 };
 
-// I2C1: ADDR→GND=0x48, ADDR→VCC=0x49, ADDR→SDA=0x4A, ADDR→SCL=0x4B
-// I2C3: 1 module, ADDR→SDA=0x4A (uses bit-banging)
+// Slot ranges (wired on the board): 1-4=0x4B(SCL), 5-8=0x48(GND),
+// 9-12=0x4A(SDA), 13-16=0x49(VCC), 17-20=I2C3 0x4A (bit-bang)
 static AdsTestEntry kAdsTests[] = {
-    {false, &i2c1, 0x48, "I2C1", "ADDR->GND"},  {false, &i2c1, 0x49, "I2C1", "ADDR->VCC"},
-    {false, &i2c1, 0x4A, "I2C1", "ADDR->SDA"},  {false, &i2c1, 0x4B, "I2C1", "ADDR->SCL"},
+    {false, &i2c1, 0x4B, "I2C1", "ADDR->SCL"},  {false, &i2c1, 0x48, "I2C1", "ADDR->GND"},
+    {false, &i2c1, 0x4A, "I2C1", "ADDR->SDA"},  {false, &i2c1, 0x49, "I2C1", "ADDR->VCC"},
     {true, nullptr, 0x4A, "I2C3", "ADDR->SDA"},
 };
 constexpr uint8_t kAdsCount             = sizeof(kAdsTests) / sizeof(kAdsTests[0]);
@@ -143,6 +147,36 @@ bool gRunTestRequested = true;
 bool gMonitorActive = false;
 bool gMonitorExit   = false;
 
+/* Game mode: guided calibration sequence. The operator is prompted for
+ * each (piece, slot) combination and presses SPACE to record once the
+ * reading stabilizes. The kGamePieces array lists which pieces are
+ * iterated; bumping kGamePieceCount adds a new piece (e.g. LOOP_CALL
+ * when the orange magnet is fabricated) without touching the rest.
+ * kGameSlotCount is the number of slots covered (currently 4 because
+ * only slots 1-4 have sensors soldered, extensible to 20) */
+constexpr uint8_t kGameSlotCount          = 4;
+constexpr uint8_t kGameSamplesPerCombo    = 8;
+constexpr uint16_t kGameStabilitySpanMax  = 100;
+constexpr uint8_t kGameStabilityReadCount = 5;
+
+const BoxPieceId kGamePieces[] = {
+    BoxPieceId::EMPTY,      BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,
+    BoxPieceId::TURN_RIGHT, BoxPieceId::TURN_LEFT, BoxPieceId::LOOP_CALL,
+};
+
+/* Active piece count. Bump to 6 when the orange LOOP_CALL piece exists */
+constexpr uint8_t kGamePieceCount = 5;
+
+const char *kGamePieceHints[] = {
+    "EMPTY (remove piece)",       "FORWARD (green, 3mm)",  "BACKWARD (red, 1mm S)",
+    "TURN_RIGHT (yellow, 1mm N)", "TURN_LEFT (blue, 4mm)", "LOOP_CALL (orange, 2mm)",
+};
+
+bool gGameActive         = false;
+uint8_t gGamePieceIndex  = 0;
+uint8_t gGameSlotIndex   = 0;
+uint8_t gGameSampleIndex = 0;
+
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
@@ -155,12 +189,22 @@ bool gProbeStateValid               = false;
 void handleUsbCommands();
 void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece);
 void resetLabeledSlot(uint8_t slotIndex);
+void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
 void runSlotMonitor(uint8_t slotIndex);
 void runGapAnalysis();
 void recoverAdsModule(const AdsTestEntry *entry);
 void emitThresholdHeader();
 void printUsbHelp();
 bool labelCharToPiece(char ch, BoxPieceId &piece);
+const char *labelName(int index);
+void startGameMode();
+void stopGameMode();
+void displayGameInstruction();
+bool readSlotWithStability(uint8_t slotIndex, uint16_t &outMean);
+bool recordAllSlotsEmpty();
+bool attemptGameRecord();
+void advanceGameState();
+void emitGameThresholds();
 
 void delayWithUsb(uint32_t totalMs)
 {
@@ -220,6 +264,7 @@ void printUsbHelp()
     Serial.println("   usb: h health, c calibration, s run test, t gaps, x thresholds, ? help");
     Serial.println(
         "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
+    Serial.println("   game (calibration): 'g' start, SPACE record, 'r' retry step, 'q' quit");
 }
 
 void handleUsbCommands()
@@ -240,6 +285,70 @@ void handleUsbCommands()
         if (gMonitorActive)
         {
             gMonitorExit  = true;
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
+        /* Game mode intercepts its own keys; any other key is dropped so
+         * it cannot leak into the normal label/digit handler */
+        if (gGameActive)
+        {
+            switch (incoming)
+            {
+            case ' ': {
+                const BoxPieceId currentPiece = kGamePieces[gGamePieceIndex];
+                bool ok;
+                if (currentPiece == BoxPieceId::EMPTY)
+                {
+                    ok = recordAllSlotsEmpty();
+                }
+                else
+                {
+                    ok = attemptGameRecord();
+                }
+                if (ok)
+                {
+                    advanceGameState();
+                }
+            }
+            break;
+            case 'r': {
+                const uint8_t slot     = gGameSlotIndex;
+                const BoxPieceId piece = kGamePieces[gGamePieceIndex];
+                if (piece == BoxPieceId::EMPTY)
+                {
+                    /* Reset all slots for EMPTY */
+                    for (uint8_t s = 0; s < kGameSlotCount; ++s)
+                    {
+                        resetLabelPiece(s, BoxPieceId::EMPTY);
+                    }
+                    Serial.println("   reset all slots EMPTY cluster, retry");
+                }
+                else
+                {
+                    resetLabelPiece(slot, piece);
+                    gGameSampleIndex = 0;
+                    Serial.print("   reset slot ");
+                    Serial.print(static_cast<int>(slot) + 1);
+                    Serial.print(" ");
+                    Serial.print(labelName(static_cast<int>(piece)));
+                    Serial.println(" cluster, retry");
+                }
+                displayGameInstruction();
+            }
+            break;
+            case 'q':
+                stopGameMode();
+                break;
+            case '?':
+                Serial.println("\n   Game mode commands:");
+                Serial.println("   SPACE = record, 'r' = retry, 'q' = quit");
+                displayGameInstruction();
+                break;
+            default:
+                break;
+            }
             pendingSlot   = 0;
             digitsStarted = false;
             continue;
@@ -277,6 +386,19 @@ void handleUsbCommands()
             break;
         case 'x':
             emitThresholdHeader();
+            break;
+        case 'g':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("game mode works in calibration mode ('c' to switch)");
+                break;
+            }
+            if (gGameActive)
+            {
+                Serial.println("game mode already active ('q' to stop)");
+                break;
+            }
+            startGameMode();
             break;
         case 'R':
             if (gMode != TestMode::Calibration)
@@ -746,6 +868,502 @@ void resetLabeledSlot(uint8_t slotIndex)
     Serial.println(" samples reset");
 }
 
+void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece)
+{
+    gPieceClusters[slotIndex][static_cast<uint8_t>(piece)] = LabelCluster{};
+}
+
+// ==========================================
+// GAME MODE — guided piece calibration
+// ==========================================
+
+/* Total steps the game will walk through. Each (piece, slot) combo gets
+ * kGameSamplesPerCombo recordings */
+static uint16_t gameTotalSteps()
+{
+    return static_cast<uint16_t>(kGamePieceCount) * kGameSlotCount * kGameSamplesPerCombo;
+}
+
+/* Current linear step number (1-based) across the whole sequence */
+static uint16_t gameCurrentStep()
+{
+    return static_cast<uint16_t>(gGamePieceIndex) * kGameSlotCount * kGameSamplesPerCombo +
+           static_cast<uint16_t>(gGameSlotIndex) * kGameSamplesPerCombo +
+           static_cast<uint16_t>(gGameSampleIndex) + 1;
+}
+
+void startGameMode()
+{
+    gGameActive      = true;
+    gGamePieceIndex  = 0;
+    gGameSlotIndex   = 0;
+    gGameSampleIndex = 0;
+
+    Serial.println("\n--- GAME MODE STARTED ---");
+    Serial.print("   ");
+    Serial.print(gameTotalSteps());
+    Serial.print(" steps (");
+    Serial.print(static_cast<int>(kGamePieceCount));
+    Serial.print(" pieces x ");
+    Serial.print(static_cast<int>(kGameSlotCount));
+    Serial.print(" slots x ");
+    Serial.print(static_cast<int>(kGameSamplesPerCombo));
+    Serial.println(" samples)");
+    Serial.println("   SPACE = record, 'r' = retry, 'q' = quit");
+    displayGameInstruction();
+}
+
+void stopGameMode()
+{
+    gGameActive = false;
+    Serial.println("\n--- GAME MODE ENDED ---");
+    emitGameThresholds();
+}
+
+void displayGameInstruction()
+{
+    const BoxPieceId piece = kGamePieces[gGamePieceIndex];
+
+    /* EMPTY piece is special: record all slots at once since the board
+     * typically starts empty. No need to confirm each slot individually */
+    if (piece == BoxPieceId::EMPTY)
+    {
+        Serial.print("   [");
+        Serial.print(gameCurrentStep());
+        Serial.print("/");
+        Serial.print(gameTotalSteps());
+        Serial.print("] ");
+        Serial.print(kGamePieceHints[gGamePieceIndex]);
+        Serial.println(" for all slots");
+        Serial.println("   -> confirm all slots empty, then SPACE");
+        return;
+    }
+
+    Serial.print("   [");
+    Serial.print(gameCurrentStep());
+    Serial.print("/");
+    Serial.print(gameTotalSteps());
+    Serial.print("] slot ");
+    Serial.print(static_cast<int>(gGameSlotIndex) + 1);
+    Serial.print(", ");
+    Serial.print(kGamePieceHints[gGamePieceIndex]);
+    Serial.print(" [");
+    Serial.print(static_cast<int>(gGameSampleIndex) + 1);
+    Serial.print("/");
+    Serial.print(static_cast<int>(kGameSamplesPerCombo));
+    Serial.println("]");
+    Serial.println("   -> place/adjust, wait for stability, then SPACE");
+}
+
+/* Read one slot several times and check stability. If stable, write the
+ * mean to outMean and return true. Otherwise print the span and return
+ * false. Used by both normal recording and bulk EMPTY recording */
+bool readSlotWithStability(uint8_t slotIndex, uint16_t &outMean)
+{
+    const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
+    const uint8_t channel     = slotIndex % 4;
+
+    uint16_t minVal = 0xFFFF;
+    uint16_t maxVal = 0;
+    int32_t sum     = 0;
+
+    for (uint8_t i = 0; i < kGameStabilityReadCount; ++i)
+    {
+        int16_t raw = 0;
+        bool ok     = readAdsSingleEndedMean(&entry, channel, raw);
+        if (!ok)
+        {
+            recoverAdsModule(&entry);
+            ok = readAdsSingleEndedMean(&entry, channel, raw);
+        }
+        if (!ok)
+        {
+            Serial.print("   slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.println(" read FAIL");
+            return false;
+        }
+        const uint16_t uval = static_cast<uint16_t>(raw);
+        if (uval < minVal)
+        {
+            minVal = uval;
+        }
+        if (uval > maxVal)
+        {
+            maxVal = uval;
+        }
+        sum += raw;
+    }
+
+    const uint16_t span = maxVal - minVal;
+    if (span > kGameStabilitySpanMax)
+    {
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slotIndex) + 1);
+        Serial.print(" unstable (span=");
+        Serial.print(span);
+        Serial.print(", min=");
+        Serial.print(minVal);
+        Serial.print(", max=");
+        Serial.print(maxVal);
+        Serial.println(")");
+        return false;
+    }
+
+    outMean = static_cast<uint16_t>(sum / kGameStabilityReadCount);
+    Serial.print("   slot ");
+    Serial.print(static_cast<int>(slotIndex) + 1);
+    Serial.print(" raw=");
+    Serial.print(outMean);
+    Serial.print(" (span=");
+    Serial.print(span);
+    Serial.println(")");
+    return true;
+}
+
+/* Record EMPTY for all slots at once. Used when the board starts empty
+ * to avoid tedious per-slot confirmation */
+bool recordAllSlotsEmpty()
+{
+    Serial.println("   recording EMPTY for all slots...");
+
+    for (uint8_t slot = 0; slot < kGameSlotCount; ++slot)
+    {
+        uint16_t mean = 0;
+        if (!readSlotWithStability(slot, mean))
+        {
+            Serial.println("   retry SPACE");
+            return false;
+        }
+        addLabelPoint(slot, BoxPieceId::EMPTY, mean);
+    }
+
+    return true;
+}
+
+/* Read the slot several times and check the span is within the stability
+ * threshold. If stable, record one point via addLabelPoint and return
+ * true. Otherwise print the span and return false. EMPTY is handled
+ * specially by recordAllSlotsEmpty() so this function assumes non-EMPTY */
+bool attemptGameRecord()
+{
+    const uint8_t slotIndex   = gGameSlotIndex;
+    const BoxPieceId piece    = kGamePieces[gGamePieceIndex];
+    const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
+    const uint8_t channel     = slotIndex % 4;
+
+    uint16_t minVal = 0xFFFF;
+    uint16_t maxVal = 0;
+    int32_t sum     = 0;
+
+    for (uint8_t i = 0; i < kGameStabilityReadCount; ++i)
+    {
+        int16_t raw = 0;
+        bool ok     = readAdsSingleEndedMean(&entry, channel, raw);
+        if (!ok)
+        {
+            recoverAdsModule(&entry);
+            ok = readAdsSingleEndedMean(&entry, channel, raw);
+        }
+        if (!ok)
+        {
+            Serial.println("   read FAIL, press SPACE again");
+            return false;
+        }
+        const uint16_t uval = static_cast<uint16_t>(raw);
+        if (uval < minVal)
+        {
+            minVal = uval;
+        }
+        if (uval > maxVal)
+        {
+            maxVal = uval;
+        }
+        sum += raw;
+    }
+
+    const uint16_t span = maxVal - minVal;
+    if (span > kGameStabilitySpanMax)
+    {
+        Serial.print("   unstable (span=");
+        Serial.print(span);
+        Serial.print(", min=");
+        Serial.print(minVal);
+        Serial.print(", max=");
+        Serial.print(maxVal);
+        Serial.println("), press SPACE again");
+        return false;
+    }
+
+    const uint16_t mean = static_cast<uint16_t>(sum / kGameStabilityReadCount);
+
+    /* Outlier guard: same ±20% logic as recordLabelPoint, so a misplaced
+     * piece cannot silently stretch the cluster */
+    const LabelCluster &existing = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
+    if (existing.count > 0)
+    {
+        const uint32_t spanBottom =
+            existing.min > existing.min / 5 ? existing.min - existing.min / 5 : 0;
+        const uint32_t spanTop = existing.max + existing.max / 5;
+        if (mean < spanBottom || mean > spanTop)
+        {
+            Serial.print("   [OUTLIER IGNORED] raw=");
+            Serial.print(mean);
+            Serial.print(" expected ");
+            Serial.print(static_cast<int>(spanBottom));
+            Serial.print("-");
+            Serial.println(static_cast<int>(spanTop));
+            return false;
+        }
+    }
+
+    addLabelPoint(slotIndex, piece, mean);
+
+    Serial.print("   recorded raw=");
+    Serial.print(mean);
+    Serial.print(" (span=");
+    Serial.print(span);
+    Serial.print(", n=");
+    Serial.print(existing.count + 1);
+    Serial.println(")");
+    return true;
+}
+
+void advanceGameState()
+{
+    const BoxPieceId currentPiece = kGamePieces[gGamePieceIndex];
+
+    /* EMPTY is recorded in bulk for all slots at once, so skip all
+     * EMPTY steps and jump directly to the next piece */
+    if (currentPiece == BoxPieceId::EMPTY)
+    {
+        gGameSampleIndex = 0;
+        gGameSlotIndex   = 0;
+        ++gGamePieceIndex;
+        if (gGamePieceIndex >= kGamePieceCount)
+        {
+            stopGameMode();
+            return;
+        }
+        displayGameInstruction();
+        return;
+    }
+
+    ++gGameSampleIndex;
+    if (gGameSampleIndex >= kGameSamplesPerCombo)
+    {
+        gGameSampleIndex = 0;
+        ++gGameSlotIndex;
+        if (gGameSlotIndex >= kGameSlotCount)
+        {
+            gGameSlotIndex = 0;
+            ++gGamePieceIndex;
+            if (gGamePieceIndex >= kGamePieceCount)
+            {
+                stopGameMode();
+                return;
+            }
+            Serial.println();
+            Serial.print("=== NEW PIECE: ");
+            Serial.print(kGamePieceHints[gGamePieceIndex]);
+            Serial.println(" ===");
+        }
+        else
+        {
+            Serial.println();
+            Serial.print("=== MOVE PIECE TO SLOT ");
+            Serial.print(static_cast<int>(gGameSlotIndex) + 1);
+            Serial.println(" ===");
+        }
+    }
+    displayGameInstruction();
+}
+
+/* Compute per-piece aggregated stats across game slots, sort by mean,
+ * place thresholds at midpoints between adjacent classes and emit
+ * #define blocks in the same format as piece_thresholds.h */
+void emitGameThresholds()
+{
+    /* Aggregate min/max/sum/count per piece across the kGameSlotCount slots */
+    struct PieceRange
+    {
+        BoxPieceId piece;
+        uint16_t gmin;
+        uint16_t gmax;
+        uint32_t gsum;
+        uint32_t gcount;
+    };
+    PieceRange ranges[kGamePieceCount];
+
+    for (uint8_t p = 0; p < kGamePieceCount; ++p)
+    {
+        PieceRange &r = ranges[p];
+        r.piece       = kGamePieces[p];
+        r.gmin        = 0xFFFF;
+        r.gmax        = 0;
+        r.gsum        = 0;
+        r.gcount      = 0;
+
+        for (uint8_t s = 0; s < kGameSlotCount; ++s)
+        {
+            const LabelCluster &cl = gPieceClusters[s][static_cast<uint8_t>(r.piece)];
+            if (cl.count == 0)
+            {
+                continue;
+            }
+            if (cl.min < r.gmin)
+            {
+                r.gmin = cl.min;
+            }
+            if (cl.max > r.gmax)
+            {
+                r.gmax = cl.max;
+            }
+            r.gsum += cl.sum;
+            r.gcount += cl.count;
+        }
+    }
+
+    /* Print per-piece ranges */
+    Serial.println("\n--- PER-PIECE RANGES (game data) ---");
+    for (uint8_t p = 0; p < kGamePieceCount; ++p)
+    {
+        const PieceRange &r = ranges[p];
+        Serial.print("   ");
+        Serial.print(labelName(static_cast<int>(r.piece)));
+        if (r.gcount == 0)
+        {
+            Serial.println("  : NO DATA");
+            continue;
+        }
+        Serial.print("  : min=");
+        Serial.print(r.gmin);
+        Serial.print(" max=");
+        Serial.print(r.gmax);
+        Serial.print(" mean=");
+        Serial.println(static_cast<int32_t>(r.gsum / r.gcount));
+    }
+
+    /* Sort ranges by mean (insertion sort, 5-6 elements) */
+    for (uint8_t i = 1; i < kGamePieceCount; ++i)
+    {
+        PieceRange tmp  = ranges[i];
+        int32_t tmpMean = tmp.gcount > 0 ? static_cast<int32_t>(tmp.gsum / tmp.gcount) :
+                                           static_cast<int32_t>(tmp.gmin);
+        uint8_t j       = i;
+        while (j > 0)
+        {
+            const PieceRange &prev = ranges[j - 1];
+            int32_t prevMean = prev.gcount > 0 ? static_cast<int32_t>(prev.gsum / prev.gcount) :
+                                                 static_cast<int32_t>(prev.gmin);
+            if (prevMean > tmpMean)
+            {
+                ranges[j] = ranges[j - 1];
+                --j;
+            }
+            else
+            {
+                break;
+            }
+        }
+        ranges[j] = tmp;
+    }
+
+    /* Print sorted order + midpoints */
+    Serial.println("\n--- SORTED ORDER (ascending mean) ---");
+    uint16_t thresholds[kGamePieceCount];
+    for (uint8_t i = 0; i < kGamePieceCount; ++i)
+    {
+        const PieceRange &r = ranges[i];
+        const int32_t mean  = r.gcount > 0 ? static_cast<int32_t>(r.gsum / r.gcount) : 0;
+        Serial.print("   ");
+        Serial.print(static_cast<int>(i));
+        Serial.print(". ");
+        Serial.print(labelName(static_cast<int>(r.piece)));
+        Serial.print("  mean=");
+        Serial.print(mean);
+        Serial.print(" [");
+        Serial.print(r.gmin);
+        Serial.print("..");
+        Serial.print(r.gmax);
+        Serial.println("]");
+
+        if (i == 0)
+        {
+            thresholds[i] = r.gmin;
+        }
+        else
+        {
+            const PieceRange &below = ranges[i - 1];
+            thresholds[i]           = static_cast<uint16_t>(
+                (static_cast<uint32_t>(below.gmax) + static_cast<uint32_t>(r.gmin)) / 2);
+        }
+    }
+
+    /* Print gap analysis */
+    Serial.println("\n--- GAPS (between adjacent sorted classes) ---");
+    for (uint8_t i = 1; i < kGamePieceCount; ++i)
+    {
+        const PieceRange &below = ranges[i - 1];
+        const PieceRange &above = ranges[i];
+        Serial.print("   ");
+        Serial.print(labelName(static_cast<int>(below.piece)));
+        Serial.print(" -> ");
+        Serial.print(labelName(static_cast<int>(above.piece)));
+        Serial.print(" : gap=");
+        Serial.print(static_cast<int>(above.gmin) - static_cast<int>(below.gmax));
+        Serial.print(" threshold=");
+        Serial.println(thresholds[i]);
+    }
+
+    /* Emit #define block in the piece_thresholds.h format. Map each
+     * threshold to the macro name that corresponds to the piece ABOVE
+     * the boundary. The lowest piece's threshold is its own start */
+    Serial.println("\n--- GENERATED piece_thresholds.h ---");
+    Serial.println("#pragma once");
+    Serial.println();
+    Serial.println("#include <stdint.h>");
+    Serial.println();
+
+    /* Map BoxPieceId -> macro suffix. Uses the same names as the
+     * existing header so the output can be pasted directly */
+    const char *macroSuffix[kGamePieceCount];
+    for (uint8_t i = 0; i < kGamePieceCount; ++i)
+    {
+        macroSuffix[i] = labelName(static_cast<int>(ranges[i].piece));
+    }
+
+    for (uint8_t i = 0; i < kGamePieceCount; ++i)
+    {
+        const uint16_t value = thresholds[i];
+        /* Build the macro name: GASPETTO_ADC_THRESHOLD_<PIECE>_START.
+         * The label names use the same wording as the existing macros
+         * (FORWARD, BACKWARD, TURN_RIGHT, TURN_LEFT, LOOP_CALL). EMPTY
+         * gets a new EMPTY_START for the restructured decode table */
+        Serial.print("#ifndef GASPETTO_ADC_THRESHOLD_");
+        Serial.print(macroSuffix[i]);
+        Serial.println("_START");
+        Serial.print("#define GASPETTO_ADC_THRESHOLD_");
+        Serial.print(macroSuffix[i]);
+        Serial.print("_START ");
+        Serial.println(value);
+        Serial.println("#endif");
+        Serial.println();
+    }
+
+    Serial.print("#define GASPETTO_ADC_THRESHOLD_MAX ");
+    /* MAX = one full-scale margin above the highest piece max. Use the
+     * highest observed max + 10% headroom, capped at 26400 (ADS1115
+     * 16-bit unsigned full scale) */
+    const PieceRange &top = ranges[kGamePieceCount - 1];
+    uint32_t maxCeil = top.gcount > 0 ? static_cast<uint32_t>(top.gmax) + top.gmax / 10 : 26400;
+    if (maxCeil > 26400)
+    {
+        maxCeil = 26400;
+    }
+    Serial.println(maxCeil);
+}
+
 /* Continuous readout of one slot: ~5 mean reads per second with running
  * min/max. Any usb key stops it. Clamp detection: a max pinned at the
  * top of the scale (near 26400 on the 3V3 rail) means the hall sensor
@@ -873,6 +1491,8 @@ const char *thresholdStartName(int label)
 {
     switch (label)
     {
+    case 0:
+        return "GASPETTO_ADC_THRESHOLD_EMPTY_START";
     case 1:
         return "GASPETTO_ADC_THRESHOLD_FORWARD_START";
     case 2:
@@ -1055,25 +1675,29 @@ const char *pieceLabelForRaw(int16_t raw)
     {
         return "INVALID";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_FORWARD_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START)
     {
-        return "EMPTY";
+        return "INVALID";
     }
     if (raw < GASPETTO_ADC_THRESHOLD_BACKWARD_START)
     {
-        return "FORWARD";
+        return "TURN_LEFT";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_EMPTY_START)
     {
         return "BACKWARD";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START)
+    if (raw < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START)
+    {
+        return "EMPTY";
+    }
+    if (raw < GASPETTO_ADC_THRESHOLD_FORWARD_START)
     {
         return "TURN_RIGHT";
     }
     if (raw < GASPETTO_ADC_THRESHOLD_LOOP_START)
     {
-        return "TURN_LEFT";
+        return "FORWARD";
     }
     if (raw <= GASPETTO_ADC_THRESHOLD_LOOP_END)
     {
@@ -1602,6 +2226,13 @@ void loop()
             digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
             delay(kRailSettleDelayMs);
             gCalibrationRailsOn = true;
+        }
+
+        /* Game mode: no periodic scan, just USB polling between steps */
+        if (gGameActive)
+        {
+            delayWithUsb(50);
+            return;
         }
 
         // Quick double blink visual check on builtin LED.

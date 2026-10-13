@@ -52,21 +52,25 @@ static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLE
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
               "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
 
+/* Decode table ordered by measured ascending raw value:
+ *   TURN_LEFT (8640) < BACKWARD (11470) < EMPTY (13048) <
+ *   TURN_RIGHT (13679) < FORWARD (14418) < LOOP_CALL (15957) */
 constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
-    AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
-                    BoxPieceId::EMPTY, "EMPTY" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
-                    BoxPieceId::FORWARD, "FORWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
-                    BoxPieceId::BACKWARD, "BACKWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START - 1),
-                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
                     BoxPieceId::TURN_LEFT, "TURN_LEFT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_EMPTY_START - 1),
+                    BoxPieceId::BACKWARD, "BACKWARD" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_EMPTY_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
+                    BoxPieceId::EMPTY, "EMPTY" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
+                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
+                    BoxPieceId::FORWARD, "FORWARD" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
                     BoxPieceId::LOOP_CALL, "LOOP_CALL" },
 };

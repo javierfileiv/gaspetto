@@ -3,53 +3,60 @@
 #include <stdint.h>
 
 /* Piece ADC thresholds, ranges in raw ADS1115 counts at GAIN_ONE.
- * Values are placeholders until the pieces are fabricated: re-measure
- * on the physical board with the piece calibration mode of
- * soft/pio/arduino_box_hw_test, then pin the measured values here.
- * Both the production firmware and the hardware test tools include
- * this header so thresholds diverge nowhere */
+ * Values derived from game-mode calibration campaign (n=8, 4 slots):
+ *   TURN_LEFT:  mean=9863,  range=[8640..11038]
+ *   BACKWARD:   mean=12371, range=[11903..12960]
+ *   EMPTY:      mean=13311, range=[13137..13552]
+ *   TURN_RIGHT: mean=14073, range=[13807..14325]
+ *   FORWARD:    mean=15280, range=[14512..15956]
+ *
+ * Measured ascending order (by mean raw value):
+ *   TURN_LEFT < BACKWARD < EMPTY < TURN_RIGHT < FORWARD < LOOP_CALL
+ *
+ * Thresholds placed at midpoints between adjacent classes. */
 
-#ifndef GASPETTO_ADC_THRESHOLD_FORWARD_START
-#define GASPETTO_ADC_THRESHOLD_FORWARD_START 100
+#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
+#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 8640
 #endif
 
 #ifndef GASPETTO_ADC_THRESHOLD_BACKWARD_START
-#define GASPETTO_ADC_THRESHOLD_BACKWARD_START 700
+#define GASPETTO_ADC_THRESHOLD_BACKWARD_START 11470
 #endif
 
 #ifndef GASPETTO_ADC_THRESHOLD_EMPTY_START
-#define GASPETTO_ADC_THRESHOLD_EMPTY_START 1000
+#define GASPETTO_ADC_THRESHOLD_EMPTY_START 13048
 #endif
 
 #ifndef GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START 1300
+#define GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START 13679
 #endif
 
-#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 1900
+#ifndef GASPETTO_ADC_THRESHOLD_FORWARD_START
+#define GASPETTO_ADC_THRESHOLD_FORWARD_START 14418
 #endif
 
 #ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
-#define GASPETTO_ADC_THRESHOLD_LOOP_START 2500
+#define GASPETTO_ADC_THRESHOLD_LOOP_START 15957
 #endif
 
 #ifndef GASPETTO_ADC_THRESHOLD_LOOP_END
-#define GASPETTO_ADC_THRESHOLD_LOOP_END 3099
+#define GASPETTO_ADC_THRESHOLD_LOOP_END 17551
 #endif
 
-#define GASPETTO_ADC_THRESHOLD_MAX 4095
+#define GASPETTO_ADC_THRESHOLD_MAX 17551
 
-static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START > 0,
-              "GASPETTO_ADC_THRESHOLD_FORWARD_START must be > 0");
-static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START < GASPETTO_ADC_THRESHOLD_BACKWARD_START,
+/* Thresholds must be strictly increasing in measured ascending order */
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START > 0,
+              "GASPETTO_ADC_THRESHOLD_TURN_LEFT_START must be > 0");
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_BACKWARD_START,
               "ADC thresholds must be strictly increasing");
 static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_EMPTY_START,
               "ADC thresholds must be strictly increasing");
 static_assert(GASPETTO_ADC_THRESHOLD_EMPTY_START < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
+static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_FORWARD_START,
               "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
+static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
               "ADC thresholds must be strictly increasing");
 static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= GASPETTO_ADC_THRESHOLD_LOOP_END,
               "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= LOOP_END");

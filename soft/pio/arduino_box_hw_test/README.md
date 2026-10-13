@@ -27,6 +27,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `t` | Piece threshold gap analysis (any mode) |
 | `x` | Emit the paste-ready `piece_thresholds.h` block |
 | `m` | Continuous readout of a slot (`<slot>m` or `m` for the last addressed) |
+| `g` | Start game mode (calibration mode only) |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
 
@@ -43,7 +44,7 @@ Label keys:
 - `l` TURN_LEFT piece
 - `L` LOOP_CALL piece
 
-Pieces are detected by a magnet glued inside a hole of the piece — it cannot be placed upside down. Two or three magnet sizes exist; the slot hall sensor reads a distinct voltage window per piece, which is what the threshold table maps to raw ranges.
+Pieces are detected by a magnet glued inside a hole of the piece so it can be placed upside down. Two or three magnet sizes exist; the slot hall sensor reads a distinct voltage window per piece, which is what the threshold table maps to raw ranges.
 
 The firmware takes one reading of the labeled slot with a 15-sample mean, then prints the raw value and count. Clusters accumulate per slot and per piece type; the same piece may be labeled in several slots to cover different sensors.
 
@@ -135,11 +136,115 @@ Prints a complete `#pragma once` block for `soft/emu-pc/targets/gbox/include/pie
 
 Paste the block over the defines of `piece_thresholds.h` — the `static_assert`s at the bottom of that header re-validate strict ordering at build time.
 
+## Game Mode (Guided Calibration)
+
+Game mode replaces manual `<slot><label>` typing with a guided sequence that prevents mislabeling and enforces reading stability. Activate it in calibration mode with `g`.
+
+### How It Works
+
+The firmware walks through all (piece, slot) combinations in a fixed order:
+
+1. **By piece**: EMPTY → FORWARD → BACKWARD → TURN_RIGHT → TURN_LEFT (and LOOP_CALL when the orange piece exists)
+2. **By slot**: for each piece, all slots 1–4 (currently; extend `kGameSlotCount` when more sensors are soldered)
+3. **By sample**: 8 readings per combination (configurable via `kGameSamplesPerCombo`)
+
+Total: 5 pieces × 4 slots × 8 samples = **160 steps** (320 steps once LOOP_CALL is added).
+
+### Sequence
+
+At each step, the firmware:
+
+1. Displays the instruction: `[step/total] slot N, PIECE_HINT [sample/8]`
+2. Waits for SPACE
+3. Takes 5 rapid readings, checks stability (span < 100 counts)
+4. If stable: records the mean value with outlier guard (±20%), advances to next step
+5. If unstable: prints the span and stays on the same step — adjust the piece and press SPACE again
+
+### Keys During Game Mode
+
+| Key | Action |
+|-----|--------|
+| `SPACE` | Record one sample (after stability check) |
+| `r` | Reset the current (slot, piece) cluster and retry the step from scratch |
+| `q` | Quit game mode and generate thresholds from collected data |
+| `?` | Show game mode commands and current instruction |
+
+### Threshold Generation
+
+When the game completes all steps (or you press `q`), the firmware:
+
+1. Aggregates min/max/mean per piece across all slots
+2. Sorts pieces by mean value
+3. Computes gaps between adjacent classes
+4. Suggests thresholds at midpoints
+5. Prints a ready-to-paste `#define` block in `piece_thresholds.h` format
+
+### Configuration
+
+Game mode parameters are defined near the top of `main.cpp`:
+
+- `kGameSlotCount` — number of slots covered (4 currently, change to 20 when all sensors are soldered)
+- `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
+- `kGameStabilitySpanMax` — max span for stability check (default 100 counts)
+- `kGamePieceCount` — number of active pieces (5 currently, bump to 6 when LOOP_CALL piece exists)
+
+To add the LOOP_CALL piece when the orange magnet is ready:
+
+1. Fabricate the orange piece (2mm magnet, likely south pole)
+2. Change `kGamePieceCount = 6` in `main.cpp`
+3. Rebuild and flash — game mode now walks 192 steps (6 × 4 × 8)
+
+### Example Session
+
+```text
+c                    # calibration mode
+g                    # start game mode
+--- GAME MODE STARTED ---
+   160 steps (5 pieces x 4 slots x 8 samples)
+   SPACE = record, 'r' = retry, 'q' = quit
+   [1/160] slot 1, EMPTY (remove piece) [1/8]
+   -> place/adjust, wait for stability, then SPACE
+SPACE                # piece removed, reading stable
+   recorded raw=13245 (span=42)
+   [2/160] slot 1, EMPTY (remove piece) [2/8]
+   -> place/adjust, wait for stability, then SPACE
+SPACE                # unstable first try
+   unstable (span=234, min=13100, max=13334), press SPACE again
+SPACE                # adjusted, now stable
+   recorded raw=13258 (span=67)
+...
+SPACE                # step 160/160
+   recorded raw=10275 (span=89)
+
+--- GAME MODE ENDED ---
+
+--- PER-PIECE RANGES (game data) ---
+   EMPTY  : min=13152 max=13568 mean=13355
+   FORWARD  : min=15120 max=16176 mean=15701
+...
+
+--- SORTED ORDER (ascending mean) ---
+   0. TURN_LEFT  mean=9942 [8672..11248]
+   1. BACKWARD  mean=12418 [11936..12662]
+   2. EMPTY  mean=13355 [13152..13568]
+   3. TURN_RIGHT  mean=14133 [13804..14352]
+   4. FORWARD  mean=15701 [15120..16176]
+
+--- GENERATED piece_thresholds.h ---
+#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
+#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 8672
+#endif
+...
+```
+
+Copy the generated `#define` block into `soft/emu-pc/targets/gbox/include/piece_thresholds.h` and rebuild the production firmware.
+
 ## Hardware Setup
 
 - **Board**: STM32F411CE BlackPill
 - **Slots**: 20 piece slots, each with a positive hall sensor wired to one of 20 ADC channels (five ADS1115 modules × 4 channels)
-- **I2C buses**: four ADS1115 on hardware I2C1 (PB6/PB7) at 0x48/0x49/0x4A/0x4B (ADDR pin to GND/VCC/SDA/SCL), one on bit-banged I2C3 (PB4/PA8) at 0x4A (ADDR pin to SDA) — the I2C3 bus needs bit-bang recovery when it hangs
+- **I2C buses**: four ADS1115 on hardware I2C1 (PB6/PB7), one on bit-banged I2C3 (PB4/PA8) — the I2C3 bus needs bit-bang recovery when it hangs
+- **Slot wiring**: slots 1-4 on the 0x4B module (ADDR→SCL), 5-8 on 0x48 (ADDR→GND), 9-12 on 0x4A (ADDR→SDA), 13-16 on 0x49 (ADDR→VCC), 17-20 on I2C3 0x4A (ADDR→SDA)
 - **LED**: NeoPixel strip (PC14), powered from the 5V rail
 - **Rails**: 5V LED rail (PB14) and 3V3 sensor rail (PB15), each driven through an open-drain MOSFET gate (LOW = ON)
 - **Radio**: NRF24L01 as in production
