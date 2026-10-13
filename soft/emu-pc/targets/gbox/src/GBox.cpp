@@ -102,9 +102,13 @@ BitBangWire gI2c3(I2C3_SDA_PIN, I2C3_SCL_PIN);
 TwoWire gI2c3;
 #endif
 
+/* Board slot wiring: slots 1-4 on the 0x4B module (ADDR->SCL), 5-8 on
+ * 0x48 (ADDR->GND), 9-12 on 0x4A (ADDR->SDA), 13-16 on 0x49 (ADDR->VCC),
+ * 17-20 on the bit-banged I2C3 bus. Mirrors kAdsTests of
+ * arduino_box_hw_test and the PC mock slotBaseFor */
 constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
-    AdsDeviceConfig{ AdsBus::BUS_1, 0x48, 0 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x49, 4 },
-    AdsDeviceConfig{ AdsBus::BUS_1, 0x4A, 8 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x4B, 12 },
+    AdsDeviceConfig{ AdsBus::BUS_1, 0x4B, 0 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x48, 4 },
+    AdsDeviceConfig{ AdsBus::BUS_1, 0x4A, 8 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x49, 12 },
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
@@ -405,8 +409,8 @@ bool GBox::runHealthCheck()
 
     LOGLN("--- Hardware health check ---");
 
-    /* Probe I2C1: 4 ADS1115 addresses (0x48-0x4B). */
-    constexpr uint8_t kI2c1Addresses[] = { 0x48, 0x49, 0x4A, 0x4B };
+    /* Probe I2C1: 4 ADS1115 addresses, slot order 0x4B..0x49. */
+    constexpr uint8_t kI2c1Addresses[] = { 0x4B, 0x48, 0x4A, 0x49 };
     for (uint8_t addr : kI2c1Addresses) {
         Wire.beginTransmission(addr);
         bool ack = (Wire.endTransmission() == 0);
