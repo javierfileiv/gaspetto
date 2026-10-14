@@ -225,10 +225,14 @@ TEST(GBoxProgramBuilderTest, MapsSlotsToExpectedAdsBusesAndAddresses)
 {
     AdsRouteInfo route{};
 
+    /* Board wiring: slots 0-3 on 0x4B, 4-7 on 0x48, 8-11 on 0x4A, 12-15 on 0x49 */
+    const uint8_t expectedAddress[16] = { 0x4B, 0x4B, 0x4B, 0x4B, 0x48, 0x48, 0x48, 0x48,
+                                          0x4A, 0x4A, 0x4A, 0x4A, 0x49, 0x49, 0x49, 0x49 };
+
     for (std::size_t slot = 0; slot < 16; ++slot) {
         ASSERT_TRUE(GBox::routeForSlot(slot, route));
         EXPECT_FALSE(route.usesI2c3);
-        EXPECT_EQ(route.address, static_cast<uint8_t>(0x48 + (slot / 4)));
+        EXPECT_EQ(route.address, expectedAddress[slot]);
         EXPECT_EQ(route.channel, static_cast<uint8_t>(slot % 4));
     }
 

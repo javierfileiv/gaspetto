@@ -52,21 +52,25 @@ static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLE
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
               "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
 
+/* Decode table ordered by measured ascending raw value:
+ *   TURN_LEFT (8640) < BACKWARD (11470) < EMPTY (13048) <
+ *   TURN_RIGHT (13679) < FORWARD (14418) < LOOP_CALL (15957) */
 constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
-    AdcDecodeEntry{ 0, static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
-                    BoxPieceId::EMPTY, "EMPTY" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
-                    BoxPieceId::FORWARD, "FORWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
-                    BoxPieceId::BACKWARD, "BACKWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START - 1),
-                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
                     BoxPieceId::TURN_LEFT, "TURN_LEFT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_EMPTY_START - 1),
+                    BoxPieceId::BACKWARD, "BACKWARD" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_EMPTY_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
+                    BoxPieceId::EMPTY, "EMPTY" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
+                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
+    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
+                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
+                    BoxPieceId::FORWARD, "FORWARD" },
     AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
                     BoxPieceId::LOOP_CALL, "LOOP_CALL" },
 };
@@ -102,9 +106,13 @@ BitBangWire gI2c3(I2C3_SDA_PIN, I2C3_SCL_PIN);
 TwoWire gI2c3;
 #endif
 
+/* Board slot wiring: slots 1-4 on the 0x4B module (ADDR->SCL), 5-8 on
+ * 0x48 (ADDR->GND), 9-12 on 0x4A (ADDR->SDA), 13-16 on 0x49 (ADDR->VCC),
+ * 17-20 on the bit-banged I2C3 bus. Mirrors kAdsTests of
+ * arduino_box_hw_test and the PC mock slotBaseFor */
 constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
-    AdsDeviceConfig{ AdsBus::BUS_1, 0x48, 0 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x49, 4 },
-    AdsDeviceConfig{ AdsBus::BUS_1, 0x4A, 8 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x4B, 12 },
+    AdsDeviceConfig{ AdsBus::BUS_1, 0x4B, 0 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x48, 4 },
+    AdsDeviceConfig{ AdsBus::BUS_1, 0x4A, 8 },  AdsDeviceConfig{ AdsBus::BUS_1, 0x49, 12 },
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
@@ -405,8 +413,8 @@ bool GBox::runHealthCheck()
 
     LOGLN("--- Hardware health check ---");
 
-    /* Probe I2C1: 4 ADS1115 addresses (0x48-0x4B). */
-    constexpr uint8_t kI2c1Addresses[] = { 0x48, 0x49, 0x4A, 0x4B };
+    /* Probe I2C1: 4 ADS1115 addresses, slot order 0x4B..0x49. */
+    constexpr uint8_t kI2c1Addresses[] = { 0x4B, 0x48, 0x4A, 0x49 };
     for (uint8_t addr : kI2c1Addresses) {
         Wire.beginTransmission(addr);
         bool ack = (Wire.endTransmission() == 0);

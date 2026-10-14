@@ -99,6 +99,10 @@ private:
         return (value != nullptr) && (std::strcmp(value, "1") == 0);
     }
 
+    /* Board slot wiring: slots 1-4 sit on the 0x4B module (ADDR->SCL),
+     * 5-8 on 0x48 (ADDR->GND), 9-12 on 0x4A (ADDR->SDA), 13-16 on 0x49
+     * (ADDR->VCC), 17-20 on the bit-banged I2C3 bus. Mirrors kAdsTests
+     * of arduino_box_hw_test and the production GBox device order */
     static std::size_t slotBaseFor(const TwoWire *wire, uint8_t address)
     {
         if (wire != &Wire) {
@@ -106,13 +110,13 @@ private:
         }
 
         switch (address) {
-        case 0x48:
+        case 0x4B:
             return 0u;
-        case 0x49:
+        case 0x48:
             return 4u;
         case 0x4A:
             return 8u;
-        case 0x4B:
+        case 0x49:
             return 12u;
         default:
             return rawValues().size();
