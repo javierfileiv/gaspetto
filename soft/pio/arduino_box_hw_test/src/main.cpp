@@ -177,6 +177,16 @@ uint8_t gGamePieceIndex  = 0;
 uint8_t gGameSlotIndex   = 0;
 uint8_t gGameSampleIndex = 0;
 
+/* Auto-capture: while true the game polls the current slot and records a
+ * sample as soon as the reading settles, so the operator only places
+ * pieces instead of pressing SPACE per sample. EMPTY is excluded (one
+ * SPACE confirms the whole board is clear). Toggle with 'a' in game mode */
+bool gGameAuto = true;
+
+/* Set when a stable reading was rejected as an outlier, so auto-capture
+ * warns once per sample instead of on every poll. Cleared on each advance */
+bool gGameOutlierWarned = false;
+
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
@@ -202,7 +212,18 @@ void stopGameMode();
 void displayGameInstruction();
 bool readSlotWithStability(uint8_t slotIndex, uint16_t &outMean);
 bool recordAllSlotsEmpty();
-bool attemptGameRecord();
+/* Outcome of one sample attempt in game mode, so the manual SPACE handler
+ * and the auto-capture poll can share the same read/guard logic but react
+ * differently (print vs stay silent, advance vs keep waiting) */
+enum class GameSampleResult : uint8_t
+{
+    Recorded, /* sample added to the cluster */
+    Unstable, /* span too wide, nothing recorded */
+    Outlier,  /* stable but outside the cluster guard, nothing recorded */
+    ReadFail, /* ADS read failed after recovery, nothing recorded */
+};
+GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verbose);
+void pollGameAutoCapture();
 void advanceGameState();
 void emitGameThresholds();
 
@@ -264,7 +285,8 @@ void printUsbHelp()
     Serial.println("   usb: h health, c calibration, s run test, t gaps, x thresholds, ? help");
     Serial.println(
         "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
-    Serial.println("   game (calibration): 'g' start, SPACE record, 'r' retry step, 'q' quit");
+    Serial.println(
+        "   game (calibration): 'g' start, SPACE record, 'a' toggle auto, 'r' retry, 'q' quit");
 }
 
 void handleUsbCommands()
@@ -305,14 +327,22 @@ void handleUsbCommands()
                 }
                 else
                 {
-                    ok = attemptGameRecord();
+                    ok = recordGameSample(gGameSlotIndex, currentPiece, true) ==
+                         GameSampleResult::Recorded;
                 }
                 if (ok)
                 {
+                    gGameOutlierWarned = false;
                     advanceGameState();
                 }
             }
             break;
+            case 'a':
+                gGameAuto = !gGameAuto;
+                Serial.print("   auto-capture ");
+                Serial.println(gGameAuto ? "ON" : "OFF");
+                displayGameInstruction();
+                break;
             case 'r': {
                 const uint8_t slot     = gGameSlotIndex;
                 const BoxPieceId piece = kGamePieces[gGamePieceIndex];
@@ -335,6 +365,7 @@ void handleUsbCommands()
                     Serial.print(labelName(static_cast<int>(piece)));
                     Serial.println(" cluster, retry");
                 }
+                gGameOutlierWarned = false;
                 displayGameInstruction();
             }
             break;
@@ -343,7 +374,7 @@ void handleUsbCommands()
                 break;
             case '?':
                 Serial.println("\n   Game mode commands:");
-                Serial.println("   SPACE = record, 'r' = retry, 'q' = quit");
+                Serial.println("   SPACE = record, 'a' = toggle auto, 'r' = retry, 'q' = quit");
                 displayGameInstruction();
                 break;
             default:
@@ -894,10 +925,11 @@ static uint16_t gameCurrentStep()
 
 void startGameMode()
 {
-    gGameActive      = true;
-    gGamePieceIndex  = 0;
-    gGameSlotIndex   = 0;
-    gGameSampleIndex = 0;
+    gGameActive        = true;
+    gGamePieceIndex    = 0;
+    gGameSlotIndex     = 0;
+    gGameSampleIndex   = 0;
+    gGameOutlierWarned = false;
 
     Serial.println("\n--- GAME MODE STARTED ---");
     Serial.print("   ");
@@ -909,7 +941,9 @@ void startGameMode()
     Serial.print(" slots x ");
     Serial.print(static_cast<int>(kGameSamplesPerCombo));
     Serial.println(" samples)");
-    Serial.println("   SPACE = record, 'r' = retry, 'q' = quit");
+    Serial.print("   auto-capture ");
+    Serial.println(gGameAuto ? "ON" : "OFF");
+    Serial.println("   SPACE = record, 'a' = toggle auto, 'r' = retry, 'q' = quit");
     displayGameInstruction();
 }
 
@@ -952,7 +986,14 @@ void displayGameInstruction()
     Serial.print("/");
     Serial.print(static_cast<int>(kGameSamplesPerCombo));
     Serial.println("]");
-    Serial.println("   -> place/adjust, wait for stability, then SPACE");
+    if (gGameAuto)
+    {
+        Serial.println("   -> place/adjust; auto-records when stable ('a' off, SPACE force)");
+    }
+    else
+    {
+        Serial.println("   -> place/adjust, wait for stability, then SPACE ('a' for auto)");
+    }
 }
 
 /* Read one slot several times and check stability. If stable, write the
@@ -1041,14 +1082,13 @@ bool recordAllSlotsEmpty()
     return true;
 }
 
-/* Read the slot several times and check the span is within the stability
- * threshold. If stable, record one point via addLabelPoint and return
- * true. Otherwise print the span and return false. EMPTY is handled
- * specially by recordAllSlotsEmpty() so this function assumes non-EMPTY */
-bool attemptGameRecord()
+/* Try to record one sample for (slot, piece): read with stability, apply
+ * the outlier guard, then add the point. Returns the outcome instead of
+ * a bool so callers choose their reaction. When verbose is false nothing
+ * is printed for unstable/read-fail (the auto poll retries silently every
+ * loop); an outlier still warns once per sample via gGameOutlierWarned */
+GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verbose)
 {
-    const uint8_t slotIndex   = gGameSlotIndex;
-    const BoxPieceId piece    = kGamePieces[gGamePieceIndex];
     const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
     const uint8_t channel     = slotIndex % 4;
 
@@ -1067,8 +1107,11 @@ bool attemptGameRecord()
         }
         if (!ok)
         {
-            Serial.println("   read FAIL, press SPACE again");
-            return false;
+            if (verbose)
+            {
+                Serial.println("   read FAIL, press SPACE again");
+            }
+            return GameSampleResult::ReadFail;
         }
         const uint16_t uval = static_cast<uint16_t>(raw);
         if (uval < minVal)
@@ -1085,14 +1128,17 @@ bool attemptGameRecord()
     const uint16_t span = maxVal - minVal;
     if (span > kGameStabilitySpanMax)
     {
-        Serial.print("   unstable (span=");
-        Serial.print(span);
-        Serial.print(", min=");
-        Serial.print(minVal);
-        Serial.print(", max=");
-        Serial.print(maxVal);
-        Serial.println("), press SPACE again");
-        return false;
+        if (verbose)
+        {
+            Serial.print("   unstable (span=");
+            Serial.print(span);
+            Serial.print(", min=");
+            Serial.print(minVal);
+            Serial.print(", max=");
+            Serial.print(maxVal);
+            Serial.println("), press SPACE again");
+        }
+        return GameSampleResult::Unstable;
     }
 
     const uint16_t mean = static_cast<uint16_t>(sum / kGameStabilityReadCount);
@@ -1107,26 +1153,57 @@ bool attemptGameRecord()
         const uint32_t spanTop = existing.max + existing.max / 5;
         if (mean < spanBottom || mean > spanTop)
         {
-            Serial.print("   [OUTLIER IGNORED] raw=");
-            Serial.print(mean);
-            Serial.print(" expected ");
-            Serial.print(static_cast<int>(spanBottom));
-            Serial.print("-");
-            Serial.println(static_cast<int>(spanTop));
-            return false;
+            /* Auto poll runs every loop: warn once per sample, not per poll */
+            if (verbose || !gGameOutlierWarned)
+            {
+                Serial.print("   [OUTLIER IGNORED] raw=");
+                Serial.print(mean);
+                Serial.print(" expected ");
+                Serial.print(static_cast<int>(spanBottom));
+                Serial.print("-");
+                Serial.println(static_cast<int>(spanTop));
+            }
+            gGameOutlierWarned = true;
+            return GameSampleResult::Outlier;
         }
     }
 
     addLabelPoint(slotIndex, piece, mean);
 
-    Serial.print("   recorded raw=");
-    Serial.print(mean);
-    Serial.print(" (span=");
-    Serial.print(span);
-    Serial.print(", n=");
-    Serial.print(existing.count + 1);
-    Serial.println(")");
-    return true;
+    if (verbose)
+    {
+        Serial.print("   recorded raw=");
+        Serial.print(mean);
+        Serial.print(" (span=");
+        Serial.print(span);
+        Serial.print(", n=");
+        Serial.print(existing.count + 1);
+        Serial.println(")");
+    }
+    return GameSampleResult::Recorded;
+}
+
+/* Auto-capture poll: attempt one sample for the current combo and advance
+ * on success. Unstable/read-fail is silent (the piece is still settling,
+ * the next loop retries); an outlier leaves the state untouched so the
+ * operator can reseat the piece or press SPACE to force past it */
+void pollGameAutoCapture()
+{
+    const uint8_t slotIndex = gGameSlotIndex;
+    const BoxPieceId piece  = kGamePieces[gGamePieceIndex];
+
+    const GameSampleResult result = recordGameSample(slotIndex, piece, false);
+    if (result == GameSampleResult::Recorded)
+    {
+        Serial.print("   [auto] slot ");
+        Serial.print(static_cast<int>(slotIndex) + 1);
+        Serial.print(" ");
+        Serial.print(labelName(static_cast<int>(piece)));
+        Serial.print(" n=");
+        Serial.println(gPieceClusters[slotIndex][static_cast<uint8_t>(piece)].count);
+        gGameOutlierWarned = false;
+        advanceGameState();
+    }
 }
 
 void advanceGameState()
@@ -2228,9 +2305,16 @@ void loop()
             gCalibrationRailsOn = true;
         }
 
-        /* Game mode: no periodic scan, just USB polling between steps */
+        /* Game mode: auto-capture polls the current slot and records as
+         * soon as the reading settles; otherwise just USB polling between
+         * steps. EMPTY is excluded from auto (it needs one deliberate
+         * SPACE so a board that still holds pieces is not recorded) */
         if (gGameActive)
         {
+            if (gGameAuto && kGamePieces[gGamePieceIndex] != BoxPieceId::EMPTY)
+            {
+                pollGameAutoCapture();
+            }
             delayWithUsb(50);
             return;
         }
