@@ -11,6 +11,17 @@ uint32_t gCalibrationScanCounter = 0;
 bool gMonitorActive = false;
 bool gMonitorExit   = false;
 
+/* Frozen slot monitor ('x'): only the SPACE-opened windows sample, so an
+ * orientation sweep logs one clean line per pose, unpolluted by the
+ * rotations happening between windows */
+bool gFreezeActive    = false;
+bool gFreezeMeasure   = false;
+bool gFreezeMeasuring = false;
+bool gFreezeExit      = false;
+
+/* Length of one frozen-monitor measurement window */
+constexpr uint32_t kFreezeWindowMs = 3000;
+
 /* Defined below, next to the scan that also decodes with it */
 static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw);
 
@@ -136,6 +147,96 @@ void runSlotMonitor(uint8_t slotIndex)
         Serial.print("  ");
         Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(sum / count)));
     }
+}
+
+/* Frozen slot monitor ('x'): waits without sampling; a SPACE opens a fixed
+ * measurement window whose stats print as one self-contained line, so
+ * rotating or placing the piece between two windows cannot pollute any
+ * stat. The quit key stops a window early, the partial line still prints */
+void runFrozenSlotMonitor(uint8_t slotIndex)
+{
+    const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
+    const uint8_t channel     = slotIndex % 4;
+
+    Serial.print("--- FROZEN MONITOR slot ");
+    Serial.print(static_cast<int>(slotIndex) + 1);
+    Serial.print(" (");
+    Serial.print(entry.busName);
+    Serial.println("), SPACE = measure, any other key to quit ---");
+    if (!gCalibrationRailsOn)
+    {
+        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
+    }
+
+    gFreezeActive    = true;
+    gFreezeMeasure   = false;
+    gFreezeMeasuring = false;
+    gFreezeExit      = false;
+    while (!gFreezeExit)
+    {
+        delayWithUsb(50);
+        if (!gFreezeMeasure)
+        {
+            continue;
+        }
+        gFreezeMeasure   = false;
+        gFreezeMeasuring = true;
+
+        uint16_t minRaw        = 0xFFFF;
+        uint16_t maxRaw        = 0;
+        uint32_t count         = 0;
+        uint64_t sum           = 0;
+        const uint32_t startMs = millis();
+        while (millis() - startMs < kFreezeWindowMs && !gFreezeExit)
+        {
+            int16_t rawMean = 0;
+            bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
+            if (!readOk)
+            {
+                recoverAdsModule(&entry);
+                readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+            }
+            if (readOk)
+            {
+                const uint16_t raw = static_cast<uint16_t>(rawMean);
+                if (raw < minRaw)
+                {
+                    minRaw = raw;
+                }
+                if (raw > maxRaw)
+                {
+                    maxRaw = raw;
+                }
+                sum += raw;
+                ++count;
+            }
+            delayWithUsb(20);
+        }
+        gFreezeMeasuring = false;
+
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slotIndex) + 1);
+        if (count == 0)
+        {
+            Serial.println(": no valid reading in window (ADS timeout)");
+            continue;
+        }
+        const uint16_t mean = static_cast<uint16_t>(sum / count);
+        Serial.print(": n=");
+        Serial.print(static_cast<int>(count));
+        Serial.print(" mean=");
+        Serial.print(mean);
+        Serial.print(" min=");
+        Serial.print(static_cast<int>(minRaw));
+        Serial.print(" max=");
+        Serial.print(static_cast<int>(maxRaw));
+        Serial.print(" span=");
+        Serial.print(static_cast<int>(maxRaw - minRaw));
+        Serial.print("  ");
+        Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(mean)));
+    }
+    gFreezeActive = false;
+    Serial.println("--- FROZEN MONITOR stopped ---");
 }
 
 /* Decode one raw reading with this slot's row of the per-slot threshold
