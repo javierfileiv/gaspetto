@@ -11,10 +11,14 @@ uint32_t gCalibrationScanCounter = 0;
 bool gMonitorActive = false;
 bool gMonitorExit   = false;
 
+/* Defined below, next to the scan that also decodes with it */
+static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw);
+
 /* Continuous readout of one slot: ~5 mean reads per second with running
- * min/max. Any usb key stops it. Clamp detection: a max pinned at the
- * top of the scale (near 26400 on the 3V3 rail) means the hall sensor
- * output is saturated, not that the piece reads high */
+ * min/max and the live decoded piece from the slot's compiled row. Any usb
+ * key stops it. Clamp detection: a max pinned at the top of the scale (near
+ * 26400 on the 3V3 rail) means the hall sensor output is saturated, not
+ * that the piece reads high */
 void runSlotMonitor(uint8_t slotIndex)
 {
     const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
@@ -95,7 +99,15 @@ void runSlotMonitor(uint8_t slotIndex)
         {
             Serial.print(static_cast<int>(minRaw));
             Serial.print(" max=");
-            Serial.println(maxRaw);
+            Serial.print(static_cast<int>(maxRaw));
+            if (readOk)
+            {
+                /* What this slot's compiled row sees right now: the same
+                 * decode the scan uses, so a placement can be checked live */
+                Serial.print("  ");
+                Serial.print(pieceLabelForRaw(slotIndex, rawMean));
+            }
+            Serial.println();
         }
         else
         {
@@ -120,7 +132,9 @@ void runSlotMonitor(uint8_t slotIndex)
         Serial.print(" max=");
         Serial.print(static_cast<int>(maxRaw));
         Serial.print(" span=");
-        Serial.println(static_cast<int>(maxRaw - minRaw));
+        Serial.print(static_cast<int>(maxRaw - minRaw));
+        Serial.print("  ");
+        Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(sum / count)));
     }
 }
 

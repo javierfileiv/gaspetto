@@ -24,10 +24,9 @@ The production and test firmware must agree on thresholds, so both read the same
 | `c` | Calibration mode |
 | `s` | Run the active mode test once |
 | `?` | Print the active mode and rail states |
-| `t` | Piece threshold gap analysis — global legacy view (any mode) |
-| `x` | Emit the paste-ready legacy global `#define` block for `piece_thresholds.h` |
-| `m` | Continuous readout of a slot (`<slot>m`; bare `m` reuses the last addressed slot) |
-| `g` | Start game mode (calibration mode only) |
+| `m` | Continuous readout of a slot with a live decoded piece (`<slot>m`, the number is required) |
+| `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
+| `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `D` | Dump all collected piece clusters as text (restore them after a reflash with `i`) |
 | `i` | Import clusters from a paste of the `D` output — clears the table first |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
@@ -36,115 +35,46 @@ Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys al
 
 Typed keys are echoed back so you always see what the board received: `[SP]` marks SPACE, and a new line starts when the board consumes the Enter. The monitor stop echoes its stop key and annotates the burst tail it drains as `[dropped N]`; a cluster import (`i`) echoes each accepted line with a `<<<` prefix instead of echoing the paste character by character.
 
-## Piece Labeling (Calibration Mode)
+## The Pieces
 
-Label a slot by placing the piece and typing `<slot><label>`, e.g. `5f`.
+Four played pieces plus the empty board: FORWARD (green, 4 mm N),
+TURN_RIGHT (yellow, 1 mm N), TURN_LEFT (blue, 4 mm S), LOOP_CALL (red,
+1 mm S). Each carries a magnet glued inside a hole so the piece can be
+placed upside down; the slot hall sensor reads a distinct window per pole
+and per height, which is what the threshold table maps to raw ranges.
+All printed values are raw ADS1115 counts (GAIN_ONE, single-ended, 3V3
+rail) — the same scale the production decode compares against, so pasted
+thresholds need no conversion.
 
-Label keys:
-
-- `e` EMPTY piece slot
-- `f` FORWARD piece
-- `b` BACKWARD piece
-- `r` TURN_RIGHT piece
-- `l` TURN_LEFT piece
-- `L` LOOP_CALL piece
-
-Pieces are detected by a magnet glued inside a hole of the piece so it can be placed upside down. The four played pieces use {1 mm, 4 mm} magnets in opposite poles (N and S each); the slot hall sensor reads a distinct voltage window per piece, which is what the threshold table maps to raw ranges.
-
-The firmware takes one reading of the labeled slot with a 15-sample mean, then prints the raw value and count. Clusters accumulate per slot and per piece type; the same piece may be labeled in several slots to cover different sensors.
-
-- After a first label, a bare label key (e.g. `f`) addresses the previously tagged slot — convenient when re-measuring the same piece several times
-- The first label of a piece type in a slot is always accepted: the outlier guard compares the fresh reading against that piece type's own cluster only, so swapping pieces in a slot never bounces
-- **Outlier guard**: if a re-label of the same piece type strays from `min-20% / max+20%` of the already collected cluster, it is refused with `[OUTLIER IGNORED]` — with the orientation fixed by the glued magnet, a rejection almost always means a badly seated piece or another stray reading
-- **Reset**: `<slot>R` (e.g. `5R`) clears all clusters of that slot; bare `R` clears the previously addressed one. Re-label afterwards to rebuild with clean samples
-
-The capture happens on the label key itself — `s` is only a manual rerun of the active mode test.
-
-## Typical Labeling Workflow
-
-One pass over the real pieces, fewest keystrokes:
-
-```text
-c            # switch to calibration mode (rails make the pieces readable)
-
-# put the FORWARD piece in slot 1, then type:
-1f           # = slot 1, label FORWARD; the firmware reads and stores it
-
-# move the FORWARD piece to slot 5 (different sensor), then type:
-5f
-
-# place the piece again in slot 5, for a second measurement, then type:
-f            # bare key: re-tags slot 5, sees n=2
-
-# put the BACKWARD piece instead, then type:
-5b           # slot 5 gets a BACKWARD cluster; FORWARD stays intact
-
-# piece badly seated (or a hand over the sensor); the firmware refuses it:
-[OUTLIER IGNORED] slot 5 BACKWARD raw=4500 expected.raw 2400-3600
-5R           # clear slot 5 samples (all labels), then re-measure 5b and 5f
-
-# done over the whole board; check the analysis, then the header:
-t            # ranges, ambiguity checks, suggested midpoints
-x            # paste-ready legacy global #define block for piece_thresholds.h
-
-# something needs rework later; samples survive the modes, then:
-R            # targets the last tagged slot, re-tag it right after
-```
-
-Practical hints:
-
-- Cover the meaningful extremes first (EMPTY and LOOP_CALL), then the movement pieces between them — overlaps show up on `t` even with partial coverage
-- A `[AMBIGUOUS]` line usually means too few samples: add more `'slot<label>'` points for the reported pieces and run `t` again
-- All printed values are raw ADS1115 counts (GAIN_ONE, single-ended, 3V3 rail) — the same scale the production decode compares against, so threshold pastes need no conversion
-- Samples survive mode switches — entering calibration only resets the per-slot scan statistics, never the labeled clusters; a power cycle or an explicit `R` are the only ways to clear them
+Capture runs through the guided game mode below; manual per-key labeling
+retired with the global-table workflow (gap analysis `t` and header `x` are gone too; `w` reprints the rows any time).
 
 ## Slot Monitor (`m`)
 
 Continuous readout of one slot while you work it, ~5 readings per second:
 
 ```text
-5m          # monitor slot 5 (bare m: last addressed slot; on a cold board
-            # it has none and answers with the type '<slot>m' hint)
+5m          # monitor slot 5 (the slot number is required)
    [ADS module 2/5: I2C1 0x49, slot 5 = channel 1/4]
-   slot 5: raw=14025 min=14019 max=14027
-   slot 5: raw=14026 min=14019 max=14027
-   slot 5: raw=14024 min=14019 max=14027
-   slot 5: raw=14025 min=14019 max=14027
+   slot 5: raw=14025 min=14019 max=14027  TURN_RIGHT
+   slot 5: raw=14026 min=14019 max=14027  TURN_RIGHT
+   slot 5: raw=14024 min=14019 max=14027  TURN_RIGHT
+   slot 5: raw=14025 min=14019 max=14027  TURN_RIGHT
    [ADS module 2/5: I2C1 0x49, slot 5 = channel 1/4]
-   slot 5: raw=14025 min=14019 max=14027
+   slot 5: raw=14025 min=14019 max=14027  TURN_RIGHT
    ...
 <any key>   # stop, prints a summary (n, mean, min, max, span)
 ```
 
-The readouts are grouped by four — one header per group reminds which ADS module and channel the slot sits on. The running `min`/`max` are the point of the tool:
+The readouts are grouped by four — one header per group reminds which ADS module and channel the slot sits on. Each line ends with the piece this slot's **compiled row** decodes right now (the same table the scan and the future production decode use, so a zeroed or stale row honestly shows `INVALID`/the wrong label — it reflects the firmware, not the RAM clusters). The running `min`/`max` are the point of the tool:
 
 - **Clamp check**: a max pinned near the top of the scale (~26400 on the 3V3 rail) means the 49E hall output is saturated — the piece is too strong or too close, not "reading high". Fix the physics (more air gap, glue spacer under the magnet), not the code
 - **Variance check**: span across a settled reading set shows the class spread; keep it well below the distance to the next class's range when pasting thresholds
-- Readouts sit inside the calibration mode so the labels/parser stay consistent — a stray label key cannot run mid-monitor
+- Readouts sit inside the calibration mode: any typed key stops the monitor before it can consume a command
 - **Stop drains the burst**: the key that stops the monitor also drops the rest of the serial burst typed while it ran, so a command typed mid-monitor must be retyped once the monitor has unwound
 - **Self-recovery**: a failed read re-inits the module (I2C1 bus restart + begin, I2C3 bit-bang re-init) and retries the read once — the `[RECOVERED]`/`[WARN]` line tells which bus healed
 
-## Gap Analysis (`t`)
-
-Aggregates every cluster by piece type across all 20 slots, prints each piece range from lowest raw mean to highest, then checks for overlaps:
-
-- Overlapping piece ranges are flagged `[AMBIGUOUS]` — separate them before trusting thresholds
-- Non-overlapping neighbours suggest the midpoint as a ready-to-paste `#define GASPETTO_ADC_THRESHOLD_<PIECE>_START`
-- The top of the highest labeled piece informs `GASPETTO_ADC_THRESHOLD_LOOP_END`
-- This is the legacy global view: it drives the shared `#define`s only. Per-slot rows (what this firmware decodes with) come from the game campaign below — on a board whose sensors idle up to 940 counts apart, no single global threshold separates the classes
-
-## Threshold Header (`x`)
-
-Prints a complete `#pragma once` block for `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, directly from the labeled samples:
-
-- The gap between two adjacent labeled piece types becomes the upper piece's `*_START`, placed at the raw midpoint — the same scale the production decode compares against
-- Each define carries a comment with the raw gap bounds and the sample count that produced it
-- Overlapping ranges cannot drive a define — the block prints `/* AMBIGUOUS: cannot derive ... */` at that spot instead; fix the ambiguity and re-run
-- `LOOP_END` sits just above the top of the highest labeled piece; label a LOOP_CALL piece so its own range drives it
-
-Paste the block over the defines of `piece_thresholds.h` — the `static_assert`s at the bottom of that header re-validate strict ordering at build time. These defines drive the legacy production decode; this firmware's own scan decodes with the per-slot rows instead.
-
-## Step-by-Step Calibration (Classic)
+## Step-by-Step Calibration
 
 Full campaign recipe, in order:
 
@@ -154,7 +84,9 @@ Full campaign recipe, in order:
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
 5. A reflash wipes the clusters (RAM only): `D` before flashing, `i` and paste after to restore them
 
-The classic manual path (`<slot><label>` + `t` + `x`) still exists and is useful for spot checks: repeated bare label keys thicken the per-slot clusters, and `t`/`x` summarize them globally. It does not produce the per-slot rows, and the legacy defines it feeds are only what production decodes with until production adopts the per-slot scan.
+A slot that needs rework later: `5R` clears its clusters and a fresh game run
+rebuilds them; `D` before, `i` and a paste after, to carry the other slots
+across the rework.
 
 ## Cluster Persistence (`D`/`i`)
 
@@ -201,11 +133,31 @@ At each step, the firmware:
 
 | Key | Action |
 |-----|--------|
-| `SPACE` | Record one sample (auto-capture off) or confirm the EMPTY board sweep |
+| `SPACE` | Record one sample (auto-capture off) or confirm the EMPTY sweep (whole board, or the scoped slot) |
 | `a` | Toggle auto-capture (on by default: readings record themselves when they settle) |
 | `r` | Reset the current (slot, piece) cluster and retry the step from scratch |
 | `q` | Quit game mode and generate thresholds from collected data |
 | `?` | Show game mode commands and current instruction |
+
+### Scoped Retakes
+
+Re-record one sensor without walking the whole campaign. A slot number
+prefixes `g`, then one optional piece letter narrows it further:
+
+```text
+7R      # clear all slot 7 clusters first
+7g      # scope slot 7: waits for a piece letter, or a second g for all five
+7gg     # whole slot campaign (33 steps, EMPTY confirmed for slot 7 only)
+7gf     # only slot 7 FORWARD: 8 captures, then the campaign ends and emits
+```
+
+Piece letters: `e` empty, `f` forward, `L` loop, `r` turn right, `l` turn
+left. Any other key cancels the armed scope. On every end — natural or
+`q` — the firmware re-emits all twelve rows from the RAM clusters, so the
+untouched slots keep the data they already had (imported with `i` or from
+an earlier walk); a scoped run on a cold board will honestly print
+`[NO DATA]` for the others. `w` reprints analysis and rows at any time
+without entering the game.
 
 ### Threshold Generation
 
@@ -302,7 +254,7 @@ mode: health
    [OK]  5V rail must be OFF, LEDs dark
    [OK]  3V3 rail must be OFF, LEDs dark
    ...
-   slot 1: raw=3121 n=2
+   slot 1: raw=13104 min=13101 max=13107
 ```
 
 After the health cycle, the firmware idles silently and only wakes to report probe changes or USB keys — `'s'` re-runs the test at will.

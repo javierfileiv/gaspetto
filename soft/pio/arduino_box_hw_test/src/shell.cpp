@@ -4,17 +4,18 @@
 #include "hwtest.h"
 
 #ifdef TEST_ADS1115
-/* The key list, shown at boot and on demand by '?' */
+/* The key list, shown at boot and on demand by '?'. One line per concern,
+ * commands with their slot prefix spelled out as real examples */
 void printUsbHelp()
 {
-    Serial.println("   usb: h health, c calibration, s run test, t gaps, x thresholds, ? help");
-    Serial.println(
-        "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
-    Serial.println(
-        "   game (calibration): 'g' start, SPACE record, 'a' toggle auto, 'r' retry, 'q' quit");
-    Serial.println("   clusters: 'D' dump, 'i' import (paste dump, finish with a lone .)");
-    Serial.println("   board: type dfu to enter the DFU bootloader (reflash/power-cycle to exit)");
-    Serial.println("   echo: typed keys print back, [SP] marks SPACE, import lines show <<<");
+    Serial.println("   modes: h = health | c = calibration | s = rerun test | ? = this help");
+    Serial.println("   slots: 5m = monitor slot 5 live, decodes each read | 5R = clear slot 5");
+    Serial.println("   game:  g = full campaign | 7g = slot 7 only | 7gf = slot 7 FORWARD only");
+    Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
+    Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
+    Serial.println("   rows:  w = reprint analysis and pasteable table | D = dump clusters");
+    Serial.println("   restore: i = paste a D dump, end with a line holding only .");
+    Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -42,13 +43,17 @@ static void echoTypedKey(int incoming)
 
 void handleUsbCommands()
 {
-    /* pendingSlot collects a typed slot number that prefixes a label key
-     * ('17L'): digits accumulate in a row and the next label letter ends
-     * the slot selection; any other key clears the pending digits. With
-     * no explicit slot the label reuses the previously addressed slot */
-    static uint16_t pendingSlot    = 0;
-    static bool digitsStarted      = false;
-    static uint8_t lastLabeledSlot = kCalibrationSlotCount; /* none selected */
+    /* pendingSlot collects a typed slot number that prefixes a slot command
+     * ('5m', '5R'): digits accumulate in a row and the next command key ends
+     * the selection; any other key clears the pending digits */
+    static uint16_t pendingSlot = 0;
+    static bool digitsStarted   = false;
+
+    /* Armed scoped start: '<slot>g' waits one more key for the piece
+     * letter before launching, so it must survive the Enter that a
+     * line-buffered terminal appends */
+    static bool gameArmed    = false;
+    static uint8_t armedSlot = 0;
 
     while (Serial.available() > 0)
     {
@@ -62,6 +67,7 @@ void handleUsbCommands()
             handleClusterImportChar(static_cast<char>(incoming));
             pendingSlot   = 0;
             digitsStarted = false;
+            gameArmed     = false;
             continue;
         }
 
@@ -73,10 +79,10 @@ void handleUsbCommands()
             gMonitorExit  = true;
             pendingSlot   = 0;
             digitsStarted = false;
+            gameArmed     = false;
             /* Drop the rest of the burst: this stop key cuts a command typed
              * while the monitor ran, and the surviving tail would decode as a
-             * different command (a bare 'm' falls back to the previously
-             * selected slot). The operator retypes it once the monitor has
+             * different command. The operator retypes it once the monitor has
              * unwound, and the count makes the eaten characters visible */
             int dropped = 0;
             while (Serial.available() > 0)
@@ -93,6 +99,38 @@ void handleUsbCommands()
             break;
         }
 
+        /* Armed scoped start: the key after '<slot>g' decides. A piece
+         * letter scopes the campaign to that slot and piece, a second 'g'
+         * walks every entered piece of the slot; line endings keep the
+         * state alive, anything else cancels and is handled normally */
+        if (gameArmed)
+        {
+            if (incoming == '\n' || incoming == '\r')
+            {
+                continue;
+            }
+            gameArmed = false;
+            if (incoming == 'g')
+            {
+                startGameScoped(armedSlot, -1);
+            }
+            else
+            {
+                const int pieceIndex = gamePieceForChar(static_cast<char>(incoming));
+                if (pieceIndex >= 0)
+                {
+                    startGameScoped(armedSlot, pieceIndex);
+                }
+                else
+                {
+                    Serial.println("   [scope cancelled]");
+                }
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
         /* Game mode intercepts its own keys; any other key is dropped so
          * it cannot leak into the normal label/digit handler */
         if (gGameActive)
@@ -104,7 +142,7 @@ void handleUsbCommands()
                 bool ok;
                 if (currentPiece == BoxPieceId::EMPTY)
                 {
-                    ok = recordAllSlotsEmpty();
+                    ok = recordCurrentEmptyStep();
                 }
                 else
                 {
@@ -124,32 +162,9 @@ void handleUsbCommands()
                 Serial.println(gGameAuto ? "ON" : "OFF");
                 displayGameInstruction();
                 break;
-            case 'r': {
-                const uint8_t slot     = gGameSlotIndex;
-                const BoxPieceId piece = kGamePieces[gGamePieceIndex];
-                if (piece == BoxPieceId::EMPTY)
-                {
-                    /* Reset all slots for EMPTY */
-                    for (uint8_t s = 0; s < kGameSlotCount; ++s)
-                    {
-                        resetLabelPiece(s, BoxPieceId::EMPTY);
-                    }
-                    Serial.println("   reset all slots EMPTY cluster, retry");
-                }
-                else
-                {
-                    resetLabelPiece(slot, piece);
-                    gGameSampleIndex = 0;
-                    Serial.print("   reset slot ");
-                    Serial.print(static_cast<int>(slot) + 1);
-                    Serial.print(" ");
-                    Serial.print(labelName(static_cast<int>(piece)));
-                    Serial.println(" cluster, retry");
-                }
-                gGameOutlierWarned = false;
-                displayGameInstruction();
-            }
-            break;
+            case 'r':
+                retryGameStep();
+                break;
             case 'q':
                 stopGameMode();
                 break;
@@ -191,10 +206,6 @@ void handleUsbCommands()
         }
         dfuWordSeen = 0;
 
-        const char ch    = static_cast<char>(incoming);
-        BoxPieceId piece = BoxPieceId::INVALID;
-        (void)labelCharToPiece(ch, piece);
-
         switch (incoming)
         {
         case 'h':
@@ -211,11 +222,13 @@ void handleUsbCommands()
             Serial.println(gMode == TestMode::Health ? "health" : "calibration");
             printUsbHelp();
             break;
-        case 't':
-            runGapAnalysis();
-            break;
-        case 'x':
-            emitThresholdHeader();
+        case 'w':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("row reprints work in calibration mode ('c' to switch)");
+                break;
+            }
+            emitGameThresholds();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)
@@ -228,7 +241,25 @@ void handleUsbCommands()
                 Serial.println("game mode already active ('q' to stop)");
                 break;
             }
-            startGameMode();
+            if (digitsStarted)
+            {
+                if (pendingSlot >= 1 && pendingSlot <= kGameSlotCount)
+                {
+                    gameArmed = true;
+                    armedSlot = static_cast<uint8_t>(pendingSlot - 1);
+                    Serial.print("   game scoped to slot ");
+                    Serial.print(pendingSlot);
+                    Serial.println(": piece letter (e f L r l) or 'g' for all");
+                }
+                else
+                {
+                    Serial.println("slot out of range for the game (1..12)");
+                }
+            }
+            else
+            {
+                startGameMode();
+            }
             break;
         case 'D':
             dumpPieceClusters();
@@ -253,10 +284,6 @@ void handleUsbCommands()
                     Serial.println("slot out of range (1..20)");
                 }
             }
-            else if (lastLabeledSlot < kCalibrationSlotCount)
-            {
-                resetLabeledSlot(lastLabeledSlot);
-            }
             else
             {
                 Serial.println("type '<slot>R' e.g. '5R' (reset slot 5 samples)");
@@ -268,53 +295,14 @@ void handleUsbCommands()
                 Serial.println("slot monitor works in calibration mode ('c' to switch)");
                 break;
             }
-            if (digitsStarted)
-            {
-                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
-                {
-                    lastLabeledSlot = static_cast<uint8_t>(pendingSlot - 1);
-                }
-                else
-                {
-                    Serial.println("slot out of range (1..20)");
-                    break;
-                }
-            }
-            else if (lastLabeledSlot >= kCalibrationSlotCount)
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
             {
                 Serial.println("type '<slot>m' e.g. '5m' (monitor slot 5)");
                 break;
             }
-            runSlotMonitor(lastLabeledSlot);
+            runSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
             break;
         default:
-            if (piece == BoxPieceId::INVALID)
-            {
-                break;
-            }
-            if (gMode != TestMode::Calibration)
-            {
-                Serial.println("labels register in calibration mode ('c' to switch)");
-                break;
-            }
-            if (digitsStarted)
-            {
-                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
-                {
-                    lastLabeledSlot = static_cast<uint8_t>(pendingSlot - 1);
-                }
-                else
-                {
-                    Serial.println("slot out of range (1..20)");
-                    break;
-                }
-            }
-            else if (lastLabeledSlot >= kCalibrationSlotCount)
-            {
-                Serial.println("type '<slot><label>' e.g. '5f' (slot 5 forward)");
-                break;
-            }
-            recordLabelPoint(lastLabeledSlot, piece);
             break;
         }
 

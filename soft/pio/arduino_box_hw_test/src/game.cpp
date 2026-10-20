@@ -2,9 +2,6 @@
  * auto-capture and the per-slot threshold row generation */
 #include "hwtest.h"
 
-/* Row generator, private to the guided walk */
-void emitGameThresholds();
-
 /* Game mode: guided calibration sequence. The operator is prompted for
  * each (piece, slot) combination and presses SPACE to record once the
  * reading stabilizes. The kGamePieces array lists what the walk visits:
@@ -47,29 +44,96 @@ bool gGameAuto = true;
  * warns once per sample instead of on every poll. Cleared on each advance */
 bool gGameOutlierWarned = false;
 
+/* Retake scope: slot -1 walks the whole board, piece -1 every entered
+ * piece. '<slot>g[piece]' sets them through startGameScoped(), so one
+ * sensor can be re-recorded without redoing the 480-step campaign */
+static int16_t gGameScopeSlot  = -1;
+static int16_t gGameScopePiece = -1;
+
+/* Letter of a piece for the scoped command. Indices are resolved against
+ * kGamePieces so the arrays cannot drift apart */
+static int indexOfPiece(BoxPieceId piece)
+{
+    for (uint8_t i = 0; i < kGamePieceCount; ++i)
+    {
+        if (kGamePieces[i] == piece)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int gamePieceForChar(char ch)
+{
+    switch (ch)
+    {
+    case 'e':
+        return indexOfPiece(BoxPieceId::EMPTY);
+    case 'f':
+        return indexOfPiece(BoxPieceId::FORWARD);
+    case 'L':
+        return indexOfPiece(BoxPieceId::LOOP_CALL); /* upper: l means left */
+    case 'r':
+        return indexOfPiece(BoxPieceId::TURN_RIGHT);
+    case 'l':
+        return indexOfPiece(BoxPieceId::TURN_LEFT);
+    default:
+        return -1;
+    }
+}
+
 // GAME MODE — guided piece calibration
 // ==========================================
 
 /* Total steps the game will walk through. Each (piece, slot) combo gets
- * kGameSamplesPerCombo recordings */
+ * kGameSamplesPerCombo recordings; the scope shrinks the product */
 static uint16_t gameTotalSteps()
 {
-    return static_cast<uint16_t>(kGamePieceCount) * kGameSlotCount * kGameSamplesPerCombo;
+    if (gGameScopePiece >= 0)
+    {
+        return kGameSamplesPerCombo;
+    }
+    const uint16_t slots = (gGameScopeSlot >= 0) ? 1U : kGameSlotCount;
+    return static_cast<uint16_t>(kGamePieceCount) * slots * kGameSamplesPerCombo;
 }
 
 /* Current linear step number (1-based) across the whole sequence */
 static uint16_t gameCurrentStep()
 {
+    if (gGameScopePiece >= 0)
+    {
+        return static_cast<uint16_t>(gGameSampleIndex) + 1;
+    }
+    if (gGameScopeSlot >= 0)
+    {
+        return static_cast<uint16_t>(gGamePieceIndex) * kGameSamplesPerCombo +
+               static_cast<uint16_t>(gGameSampleIndex) + 1;
+    }
     return static_cast<uint16_t>(gGamePieceIndex) * kGameSlotCount * kGameSamplesPerCombo +
            static_cast<uint16_t>(gGameSlotIndex) * kGameSamplesPerCombo +
            static_cast<uint16_t>(gGameSampleIndex) + 1;
 }
 
-void startGameMode()
+/* A scoped run re-emits all twelve rows at the end, so the slots it does
+ * not touch must already carry data or their rows drop to [NO DATA] */
+static void warnClustersElsewhere()
+{
+    for (uint8_t slot = 0; slot < kGameSlotCount; ++slot)
+    {
+        if (gPieceClusters[slot][static_cast<uint8_t>(BoxPieceId::FORWARD)].count == 0)
+        {
+            Serial.println("   note: slots without clusters will emit [NO DATA] rows");
+            return;
+        }
+    }
+}
+
+static void startGameWalk()
 {
     gGameActive        = true;
-    gGamePieceIndex    = 0;
-    gGameSlotIndex     = 0;
+    gGamePieceIndex    = (gGameScopePiece >= 0) ? static_cast<uint8_t>(gGameScopePiece) : 0;
+    gGameSlotIndex     = (gGameScopeSlot >= 0) ? static_cast<uint8_t>(gGameScopeSlot) : 0;
     gGameSampleIndex   = 0;
     gGameOutlierWarned = false;
 
@@ -77,16 +141,53 @@ void startGameMode()
     Serial.print("   ");
     Serial.print(gameTotalSteps());
     Serial.print(" steps (");
-    Serial.print(static_cast<int>(kGamePieceCount));
-    Serial.print(" pieces x ");
-    Serial.print(static_cast<int>(kGameSlotCount));
-    Serial.print(" slots x ");
-    Serial.print(static_cast<int>(kGameSamplesPerCombo));
-    Serial.println(" samples)");
+    if (gGameScopePiece >= 0)
+    {
+        Serial.print("slot ");
+        Serial.print(static_cast<int>(gGameScopeSlot) + 1);
+        Serial.print(", ");
+        Serial.print(kGamePieceHints[gGameScopePiece]);
+        warnClustersElsewhere();
+    }
+    else if (gGameScopeSlot >= 0)
+    {
+        Serial.print("slot ");
+        Serial.print(static_cast<int>(gGameScopeSlot) + 1);
+        Serial.print(" only, ");
+        Serial.print(static_cast<int>(kGamePieceCount));
+        Serial.print(" pieces x ");
+        Serial.print(static_cast<int>(kGameSamplesPerCombo));
+        Serial.print(" samples");
+        warnClustersElsewhere();
+    }
+    else
+    {
+        Serial.print(static_cast<int>(kGamePieceCount));
+        Serial.print(" pieces x ");
+        Serial.print(static_cast<int>(kGameSlotCount));
+        Serial.print(" slots x ");
+        Serial.print(static_cast<int>(kGameSamplesPerCombo));
+        Serial.print(" samples");
+    }
+    Serial.println(")");
     Serial.print("   auto-capture ");
     Serial.println(gGameAuto ? "ON" : "OFF");
     Serial.println("   SPACE = record, 'a' = toggle auto, 'r' = retry, 'q' = quit");
     displayGameInstruction();
+}
+
+void startGameMode()
+{
+    gGameScopeSlot  = -1;
+    gGameScopePiece = -1;
+    startGameWalk();
+}
+
+void startGameScoped(uint8_t slotIndex, int pieceIndex)
+{
+    gGameScopeSlot  = slotIndex;
+    gGameScopePiece = pieceIndex;
+    startGameWalk();
 }
 
 void stopGameMode()
@@ -110,6 +211,13 @@ void displayGameInstruction()
         Serial.print(gameTotalSteps());
         Serial.print("] ");
         Serial.print(kGamePieceHints[gGamePieceIndex]);
+        if (gGameScopeSlot >= 0)
+        {
+            Serial.print(" for slot ");
+            Serial.println(static_cast<int>(gGameScopeSlot) + 1);
+            Serial.println("   -> confirm the slot is empty, then SPACE");
+            return;
+        }
         Serial.println(" for all slots");
         Serial.println("   -> confirm all slots empty, then SPACE");
         return;
@@ -206,7 +314,8 @@ bool readSlotWithStability(uint8_t slotIndex, uint16_t &outMean)
 
 /* Record EMPTY for all slots at once. Used when the board starts empty
  * to avoid tedious per-slot confirmation */
-bool recordAllSlotsEmpty()
+/* Bulk EMPTY sweep of the whole board, one stability check per slot */
+static bool recordAllSlotsEmpty()
 {
     Serial.println("   recording EMPTY for all slots...");
 
@@ -222,6 +331,67 @@ bool recordAllSlotsEmpty()
     }
 
     return true;
+}
+
+/* Handle the EMPTY step of the current walk: a scoped run confirms only
+ * the targeted slot, the full board sweep takes the bulk path */
+bool recordCurrentEmptyStep()
+{
+    if (gGameScopeSlot < 0)
+    {
+        return recordAllSlotsEmpty();
+    }
+
+    Serial.print("   recording EMPTY for slot ");
+    Serial.print(static_cast<int>(gGameSlotIndex) + 1);
+    Serial.println("...");
+    uint16_t mean = 0;
+    if (!readSlotWithStability(gGameSlotIndex, mean))
+    {
+        Serial.println("   retry SPACE");
+        return false;
+    }
+    addLabelPoint(gGameSlotIndex, BoxPieceId::EMPTY, mean);
+    return true;
+}
+
+/* Retry the current step: the targeted cluster is cleared and the walk
+ * restarts its samples. EMPTY resets the bulk target: the whole board for
+ * an unscoped walk, the scoped slot alone */
+void retryGameStep()
+{
+    const uint8_t slot     = gGameSlotIndex;
+    const BoxPieceId piece = kGamePieces[gGamePieceIndex];
+    if (piece == BoxPieceId::EMPTY)
+    {
+        if (gGameScopeSlot >= 0)
+        {
+            resetLabelPiece(slot, BoxPieceId::EMPTY);
+            Serial.print("   reset slot ");
+            Serial.print(static_cast<int>(slot) + 1);
+            Serial.println(" EMPTY cluster, retry");
+        }
+        else
+        {
+            for (uint8_t s = 0; s < kGameSlotCount; ++s)
+            {
+                resetLabelPiece(s, BoxPieceId::EMPTY);
+            }
+            Serial.println("   reset all slots EMPTY cluster, retry");
+        }
+    }
+    else
+    {
+        resetLabelPiece(slot, piece);
+        Serial.print("   reset slot ");
+        Serial.print(static_cast<int>(slot) + 1);
+        Serial.print(" ");
+        Serial.print(labelName(static_cast<int>(piece)));
+        Serial.println(" cluster, retry");
+    }
+    gGameSampleIndex   = 0;
+    gGameOutlierWarned = false;
+    displayGameInstruction();
 }
 
 /* True while a stable reading still looks like this slot's empty state, i.e.
@@ -338,7 +508,7 @@ GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verb
         return GameSampleResult::PieceNotPlaced;
     }
 
-    /* Outlier guard: same ±20% logic as recordLabelPoint, so a misplaced
+    /* Outlier guard: ±20% around the cluster range, so a misplaced
      * piece cannot silently stretch the cluster */
     if (existing.count > 0)
     {
@@ -404,12 +574,18 @@ void advanceGameState()
 {
     const BoxPieceId currentPiece = kGamePieces[gGamePieceIndex];
 
-    /* EMPTY is recorded in bulk for all slots at once, so skip all
-     * EMPTY steps and jump directly to the next piece */
+    /* EMPTY is recorded in bulk, so skip all EMPTY steps and jump to the
+     * next piece. A run scoped to one piece is already done after that
+     * single confirmation */
     if (currentPiece == BoxPieceId::EMPTY)
     {
+        if (gGameScopePiece >= 0)
+        {
+            stopGameMode();
+            return;
+        }
         gGameSampleIndex = 0;
-        gGameSlotIndex   = 0;
+        gGameSlotIndex   = (gGameScopeSlot >= 0) ? static_cast<uint8_t>(gGameScopeSlot) : 0;
         ++gGamePieceIndex;
         if (gGamePieceIndex >= kGamePieceCount)
         {
@@ -424,10 +600,17 @@ void advanceGameState()
     if (gGameSampleIndex >= kGameSamplesPerCombo)
     {
         gGameSampleIndex = 0;
-        ++gGameSlotIndex;
-        if (gGameSlotIndex >= kGameSlotCount)
+        if (gGameScopePiece >= 0)
         {
-            gGameSlotIndex = 0;
+            /* The only scoped piece finished its samples: campaign done */
+            stopGameMode();
+            return;
+        }
+        if (gGameScopeSlot >= 0)
+        {
+            /* Slot-scoped: one slot per piece, so advance the piece right
+             * away and pin the slot index back to the scope */
+            gGameSlotIndex = static_cast<uint8_t>(gGameScopeSlot);
             ++gGamePieceIndex;
             if (gGamePieceIndex >= kGamePieceCount)
             {
@@ -441,10 +624,28 @@ void advanceGameState()
         }
         else
         {
-            Serial.println();
-            Serial.print("=== MOVE PIECE TO SLOT ");
-            Serial.print(static_cast<int>(gGameSlotIndex) + 1);
-            Serial.println(" ===");
+            ++gGameSlotIndex;
+            if (gGameSlotIndex >= kGameSlotCount)
+            {
+                gGameSlotIndex = 0;
+                ++gGamePieceIndex;
+                if (gGamePieceIndex >= kGamePieceCount)
+                {
+                    stopGameMode();
+                    return;
+                }
+                Serial.println();
+                Serial.print("=== NEW PIECE: ");
+                Serial.print(kGamePieceHints[gGamePieceIndex]);
+                Serial.println(" ===");
+            }
+            else
+            {
+                Serial.println();
+                Serial.print("=== MOVE PIECE TO SLOT ");
+                Serial.print(static_cast<int>(gGameSlotIndex) + 1);
+                Serial.println(" ===");
+            }
         }
     }
     displayGameInstruction();
