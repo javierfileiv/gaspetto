@@ -9,6 +9,7 @@
 #include "RadioController.h"
 #include "TimeredEventQueue.h"
 #include "config_radio.h"
+#include "dfu_bootloader.h"
 #include "pin_definitions.h"
 
 #include <atomic>
@@ -39,89 +40,7 @@ GBox gbox(context);
 #ifdef ARDUINO
 namespace
 {
-constexpr uint32_t kDfuRequestMagic = 0x44554631UL;
-constexpr uint32_t kSystemMemoryBase = 0x1FFF0000UL;
 constexpr std::size_t kUsbCommandBufferSize = 32;
-
-struct DfuResetState {
-    uint32_t magic;
-};
-
-__attribute__((section(".noinit"))) DfuResetState gDfuResetState;
-
-using BootloaderEntryPoint = void (*)(void);
-
-void clearDfuResetRequest()
-{
-    gDfuResetState.magic = 0;
-}
-
-bool hasSoftwareResetFlag()
-{
-    return __HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST) != RESET;
-}
-
-void requestDfuOnNextBoot()
-{
-    gDfuResetState.magic = kDfuRequestMagic;
-}
-
-void resetIntoDfuBootloader()
-{
-    requestDfuOnNextBoot();
-    Serial.flush();
-    delay(20);
-    NVIC_SystemReset();
-}
-
-[[noreturn]] void jumpToSystemBootloader()
-{
-    const uint32_t systemMemoryStack = *reinterpret_cast<uint32_t *>(kSystemMemoryBase);
-    const uint32_t systemMemoryResetHandler = *reinterpret_cast<uint32_t *>(kSystemMemoryBase + 4U);
-    const BootloaderEntryPoint bootloaderEntry =
-            reinterpret_cast<BootloaderEntryPoint>(systemMemoryResetHandler);
-
-    Serial.flush();
-    Serial.end();
-    delay(20);
-
-    __disable_irq();
-
-    for (uint32_t irq = 0; irq < 8; ++irq) {
-        NVIC->ICER[irq] = 0xFFFFFFFFUL;
-        NVIC->ICPR[irq] = 0xFFFFFFFFUL;
-    }
-
-    SysTick->CTRL = 0;
-    SysTick->LOAD = 0;
-    SysTick->VAL = 0;
-
-    HAL_RCC_DeInit();
-    HAL_DeInit();
-
-    __HAL_RCC_SYSCFG_CLK_ENABLE();
-    __HAL_SYSCFG_REMAPMEMORY_SYSTEMFLASH();
-    SCB->VTOR = kSystemMemoryBase;
-    __set_MSP(systemMemoryStack);
-    __DSB();
-    __ISB();
-
-    bootloaderEntry();
-
-    while (true) {
-    }
-}
-
-void checkForPendingDfuBoot()
-{
-    const bool shouldEnterDfu = gDfuResetState.magic == kDfuRequestMagic && hasSoftwareResetFlag();
-    clearDfuResetRequest();
-    __HAL_RCC_CLEAR_RESET_FLAGS();
-
-    if (shouldEnterDfu) {
-        jumpToSystemBootloader();
-    }
-}
 
 bool isUsbWhitespace(char value)
 {
@@ -173,7 +92,7 @@ void handleUsbMaintenanceCommands()
                 if (commandEqualsIgnoreCase(command, "dfu") ||
                     commandEqualsIgnoreCase(command, "reboot-dfu")) {
                     LOGLN("Entering STM32 DFU bootloader...");
-                    resetIntoDfuBootloader();
+                    enterDfuBootloader();
                 } else if (commandEqualsIgnoreCase(command, "help")) {
                     LOGLN("USB commands: dfu, reboot-dfu, help");
                 } else {
@@ -236,10 +155,6 @@ void enter_low_power_mode()
 
 void setup()
 {
-#ifdef ARDUINO
-    checkForPendingDfuBoot();
-#endif
-
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
     Log::attachNrf24(radio, gbox_log_pipe_name, gbox_pipe_name);
