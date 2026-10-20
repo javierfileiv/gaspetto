@@ -25,6 +25,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `s` | Run the active mode test once |
 | `?` | Print the active mode and rail states |
 | `m` | Continuous readout of a slot with a live decoded piece (`<slot>m`, the number is required) |
+| `x` | Frozen monitor: waits without sampling, SPACE opens one clean 3 s measurement (`<slot>x`, the number is required) |
 | `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `D` | Dump all collected piece clusters as text (restore them after a reflash with `i`) |
@@ -73,6 +74,29 @@ The readouts are grouped by four — one header per group reminds which ADS modu
 - Readouts sit inside the calibration mode: any typed key stops the monitor before it can consume a command
 - **Stop drains the burst**: the key that stops the monitor also drops the rest of the serial burst typed while it ran, so a command typed mid-monitor must be retyped once the monitor has unwound
 - **Self-recovery**: a failed read re-inits the module (I2C1 bus restart + begin, I2C3 bit-bang re-init) and retries the read once — the `[RECOVERED]`/`[WARN]` line tells which bus healed
+
+## Slot Frozen Monitor (`x`)
+
+One clean, self-contained measurement per keystroke: the monitor waits
+**without sampling**, and a SPACE opens a fixed 3 s window whose stats print
+as a single line. Made for orientation sweeps, where rotating the piece
+between two measures would poison a running min/max.
+
+```text
+5x          # frozen monitor on slot 5 (the slot number is required)
+            # waits silently: nothing is read or accumulated
+<SPACE>     # measurement window: continuous reads for 3 s, then one line
+   slot 5: n=9 mean=11342 min=11336 max=11358 span=22  TURN_LEFT
+<SPACE>     # next window, as many as needed
+<any key>   # quit (drains the typed burst like the live monitor)
+```
+
+The windows never accumulate: each line is one measurement (n, mean, min,
+max, span, plus the label the slot's compiled row decodes), so a whole sweep
+can be copied from the log at once. Placing or rotating the piece between
+windows cannot pollute any stat. A key typed mid-window ends the window
+early and still prints the partial line; a SPACE typed mid-window is
+swallowed (one key, one measure).
 
 ## Step-by-Step Calibration
 

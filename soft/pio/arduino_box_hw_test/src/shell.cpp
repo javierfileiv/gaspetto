@@ -9,7 +9,8 @@
 void printUsbHelp()
 {
     Serial.println("   modes: h = health | c = calibration | s = rerun test | ? = this help");
-    Serial.println("   slots: 5m = monitor slot 5 live, decodes each read | 5R = clear slot 5");
+    Serial.println("   slots: 5m = live monitor | 5x = frozen monitor: SPACE = clean 3s");
+    Serial.println("          measure, any other key quits | 5R = clear slot 5 samples");
     Serial.println("   game:  g = full campaign | 7g = slot 7 only | 7gf = slot 7 FORWARD only");
     Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
@@ -97,6 +98,44 @@ void handleUsbCommands()
                 Serial.println("]");
             }
             break;
+        }
+
+        /* Frozen slot monitor: SPACE arms one measurement window (swallowed
+         * while a window already runs: one key, one measure), trailing
+         * newlines are harmless, any other key quits with the same burst
+         * drain as the live monitor */
+        if (gFreezeActive)
+        {
+            if (incoming == ' ')
+            {
+                if (!gFreezeMeasuring)
+                {
+                    gFreezeMeasure = true;
+                }
+            }
+            else if (incoming != '\r' && incoming != '\n')
+            {
+                gFreezeExit = true;
+                int dropped = 0;
+                while (Serial.available() > 0)
+                {
+                    Serial.read();
+                    ++dropped;
+                }
+                if (dropped > 0)
+                {
+                    Serial.print(" [dropped ");
+                    Serial.print(dropped);
+                    Serial.println("]");
+                }
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
+            if (gFreezeExit)
+            {
+                break;
+            }
+            continue;
         }
 
         /* Armed scoped start: the key after '<slot>g' decides. A piece
@@ -301,6 +340,19 @@ void handleUsbCommands()
                 break;
             }
             runSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
+            break;
+        case 'x':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("frozen monitor works in calibration mode ('c' to switch)");
+                break;
+            }
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            {
+                Serial.println("type '<slot>x' e.g. '5x' (frozen monitor slot 5)");
+                break;
+            }
+            runFrozenSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
             break;
         default:
             break;

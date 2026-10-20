@@ -147,7 +147,15 @@ void emitGameThresholds();
 extern bool gMonitorActive;
 extern bool gMonitorExit;
 
+/* Frozen slot monitor state: the shell raises gFreezeMeasure on SPACE
+ * (unless a window is already running) and gFreezeExit on any other key */
+extern bool gFreezeActive;
+extern bool gFreezeMeasure;
+extern bool gFreezeMeasuring;
+extern bool gFreezeExit;
+
 void runSlotMonitor(uint8_t slotIndex);
+void runFrozenSlotMonitor(uint8_t slotIndex);
 void runPieceCalibrationScan();
 
 /* Mode state, defined by main.cpp and read by nearly every module */
