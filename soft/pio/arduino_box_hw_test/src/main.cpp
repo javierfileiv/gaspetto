@@ -150,32 +150,30 @@ bool gMonitorExit   = false;
 
 /* Game mode: guided calibration sequence. The operator is prompted for
  * each (piece, slot) combination and presses SPACE to record once the
- * reading stabilizes. The kGamePieces array lists which pieces are
- * iterated; bumping kGamePieceCount adds a new piece (e.g. LOOP_CALL
- * when the orange magnet is fabricated) without touching the rest.
- * kGameSlotCount is the number of slots covered (currently 4 because
- * only slots 1-4 have sensors soldered, extensible to 20) */
+ * reading stabilizes. The kGamePieces array lists what the walk visits:
+ * the empty board plus the four played pieces. LOOP_CALL plays the band
+ * below idle where the BACKWARD piece used to live.
+ * kGameSlotCount is the number of slots covered (currently 12,
+ * extensible to 20) */
 constexpr uint8_t kGameSlotCount          = 12;
 constexpr uint8_t kGameSamplesPerCombo    = 8;
 constexpr uint16_t kGameStabilitySpanMax  = 100;
 constexpr uint8_t kGameStabilityReadCount = 5;
-/* Added above a slot's highest FORWARD reading when emitting its LOOP_START
- * column: the same piece swings by up to ~1700 counts just by moving in its
- * socket, so the loop band has to sit above that swing or a green piece
- * decodes as LOOP_CALL */
-constexpr uint16_t kGameLoopStartMargin = 1500;
 
+/* Walked pieces: empty board first, then the four played ones. The
+ * backward band of the threshold table keeps no piece anymore; the loop
+ * piece is a 1mm magnet south pole facing, read below idle */
 const BoxPieceId kGamePieces[] = {
-    BoxPieceId::EMPTY,      BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,
-    BoxPieceId::TURN_RIGHT, BoxPieceId::TURN_LEFT, BoxPieceId::LOOP_CALL,
+    BoxPieceId::EMPTY,      BoxPieceId::FORWARD,   BoxPieceId::LOOP_CALL,
+    BoxPieceId::TURN_RIGHT, BoxPieceId::TURN_LEFT,
 };
 
-/* Active piece count. Bump to 6 when the orange LOOP_CALL piece exists */
+/* Entries the walk visits (empty + four played pieces) */
 constexpr uint8_t kGamePieceCount = 5;
 
 const char *kGamePieceHints[] = {
-    "EMPTY (remove piece)",       "FORWARD (green, 3mm)",  "BACKWARD (red, 1mm S)",
-    "TURN_RIGHT (yellow, 1mm N)", "TURN_LEFT (blue, 4mm)", "LOOP_CALL (orange, 2mm)",
+    "EMPTY (remove piece)",       "FORWARD (green, 4mm N)",  "LOOP_CALL (red, 1mm S)",
+    "TURN_RIGHT (yellow, 1mm N)", "TURN_LEFT (blue, 4mm S)",
 };
 
 bool gGameActive         = false;
@@ -1576,11 +1574,12 @@ void emitGameThresholds()
     static_assert(kCalibrationSlotCount == GASPETTO_ADC_SLOTS,
                   "per-slot table size must match the calibration slot count");
 
-    /* Canonical ascending piece order: the table columns follow it, so a
-     * slot whose measured order differs would silently swap two pieces */
-    static const BoxPieceId kCanonicalOrder[GASPETTO_ADC_COLS] = {
-        BoxPieceId::TURN_LEFT,  BoxPieceId::BACKWARD, BoxPieceId::EMPTY,
-        BoxPieceId::TURN_RIGHT, BoxPieceId::FORWARD,  BoxPieceId::LOOP_CALL,
+    /* Canonical ascending piece order: the first table columns follow it,
+     * so a slot whose measured order differs would silently swap two
+     * pieces. The band above FORWARD carries no piece */
+    static const BoxPieceId kCanonicalOrder[] = {
+        BoxPieceId::TURN_LEFT,  BoxPieceId::LOOP_CALL, BoxPieceId::EMPTY,
+        BoxPieceId::TURN_RIGHT, BoxPieceId::FORWARD,
     };
 
     uint16_t slotRows[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {};
@@ -1659,8 +1658,7 @@ void emitGameThresholds()
 
         /* Each column holds the start of its piece: the first keeps its own
          * minimum, the next ones start at the midpoint of the two adjacent
-         * ranges. The loop column starts above the highest FORWARD reading
-         * plus a seating margin until the orange piece exists */
+         * ranges */
         uint16_t row[GASPETTO_ADC_COLS] = {};
         row[0]                          = ranges[0].min;
         int8_t overlapAt                = -1; /* upper piece of the first overlap */
@@ -1689,24 +1687,10 @@ void emitGameThresholds()
             Serial.println(", row zeroed]");
             continue;
         }
-        if (kGamePieceCount < GASPETTO_ADC_COLS)
-        {
-            /* The loop column sits above the highest FORWARD reading plus the
-             * seating margin, and never below the global placeholder. The old
-             * code compared the FORWARD midpoint against the placeholder, so
-             * a slot whose green reads high emitted a loop band the green
-             * itself reaches */
-            const uint32_t forwardTop = ranges[GASPETTO_ADC_SLOT_COL_FORWARD].max;
-            if (forwardTop >= GASPETTO_ADC_THRESHOLD_LOOP_END)
-            {
-                Serial.println("  [FORWARD reaches the top of the scale, row zeroed]");
-                continue;
-            }
-            const uint32_t loopStart              = forwardTop + kGameLoopStartMargin;
-            row[GASPETTO_ADC_SLOT_COL_LOOP_START] = static_cast<uint16_t>(
-                loopStart > GASPETTO_ADC_THRESHOLD_LOOP_START ? loopStart :
-                                                                GASPETTO_ADC_THRESHOLD_LOOP_START);
-        }
+        /* The band above FORWARD carries no piece: pin its start to a value
+         * no reading can reach (raw is an int16_t mean), so the top of the
+         * scale belongs to FORWARD and nothing decodes the old loop band */
+        row[GASPETTO_ADC_SLOT_COL_LOOP_START] = 0xFFFFU;
 
         for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
         {
@@ -2091,7 +2075,9 @@ const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
     {
-        return "BACKWARD";
+        /* Band 1 is the loop piece now; the shared enum column name still
+         * says BACKWARD until the production migration renames it */
+        return "LOOP_CALL";
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
     {
@@ -2104,10 +2090,6 @@ const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
     if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
         return "FORWARD";
-    }
-    if (raw <= GASPETTO_ADC_THRESHOLD_LOOP_END)
-    {
-        return "LOOP_CALL";
     }
     return "INVALID";
 }
