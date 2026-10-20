@@ -28,8 +28,6 @@ The production and test firmware must agree on thresholds, so both read the same
 | `x` | Frozen monitor: waits without sampling, SPACE opens one clean 3 s measurement (`<slot>x`, the number is required) |
 | `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
-| `D` | Dump all collected piece clusters as text (restore them after a reflash with `i`) |
-| `i` | Import clusters from a paste of the `D` output — clears the table first |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
@@ -106,28 +104,9 @@ Full campaign recipe, in order:
 2. Run the guided game (next section): `g`, then follow every prompt until the firmware prints the per-slot analysis and the generated rows
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
-5. A reflash wipes the clusters (RAM only): `D` before flashing, `i` and paste after to restore them
 
 A slot that needs rework later: `5R` clears its clusters and a fresh game run
-rebuilds them; `D` before, `i` and a paste after, to carry the other slots
-across the rework.
-
-## Cluster Persistence (`D`/`i`)
-
-The labeled clusters live in RAM and die with every reflash. To survive one:
-
-```text
-D            # dump: one line per (slot, piece) as
-             #   <slot> <piece> <min> <max> <count> <sum>
-i            # start import: clears the table, then consumes every typed
-             # character as raw text
-<paste the dump exactly as printed>
-             # then a line holding only . ends the import; prints
-             # "restored N"; a malformed line is reported as
-             # [IMPORT] skipped and ignored
-```
-
-Paste the `D` output into the terminal while `i` is armed — the board cannot remember its own campaign otherwise, and a partially restored table silently degrades the analysis.
+rebuilds them.
 
 ## Game Mode (Guided Calibration)
 
@@ -178,10 +157,9 @@ prefixes `g`, then one optional piece letter narrows it further:
 Piece letters: `e` empty, `f` forward, `L` loop, `r` turn right, `l` turn
 left. Any other key cancels the armed scope. On every end — natural or
 `q` — the firmware re-emits all twelve rows from the RAM clusters, so the
-untouched slots keep the data they already had (imported with `i` or from
-an earlier walk); a scoped run on a cold board will honestly print
-`[NO DATA]` for the others. `w` reprints analysis and rows at any time
-without entering the game.
+untouched slots keep the data they already had from an earlier run; a scoped
+run on a cold board will honestly print `[NO DATA]` for the others. `w`
+reprints analysis and rows at any time without entering the game.
 
 ### Threshold Generation
 

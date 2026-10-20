@@ -14,8 +14,7 @@ void printUsbHelp()
     Serial.println("   game:  g = full campaign | 7g = slot 7 only | 7gf = slot 7 FORWARD only");
     Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
-    Serial.println("   rows:  w = reprint analysis and pasteable table | D = dump clusters");
-    Serial.println("   restore: i = paste a D dump, end with a line holding only .");
+    Serial.println("   rows:  w = reprint analysis and pasteable table");
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
 }
 
@@ -59,18 +58,6 @@ void handleUsbCommands()
     while (Serial.available() > 0)
     {
         const int incoming = Serial.read();
-
-        /* Restore mode wins over every key handler: it consumes the raw
-         * text stream instead of interpreting single keys, and echoes whole
-         * lines instead of characters (a paste would drown the screen) */
-        if (gClusterImportActive)
-        {
-            handleClusterImportChar(static_cast<char>(incoming));
-            pendingSlot   = 0;
-            digitsStarted = false;
-            gameArmed     = false;
-            continue;
-        }
 
         echoTypedKey(incoming);
 
@@ -299,12 +286,6 @@ void handleUsbCommands()
             {
                 startGameMode();
             }
-            break;
-        case 'D':
-            dumpPieceClusters();
-            break;
-        case 'i':
-            startClusterImport();
             break;
         case 'R':
             if (gMode != TestMode::Calibration)

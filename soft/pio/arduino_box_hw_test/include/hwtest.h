@@ -77,13 +77,12 @@ inline void delayWithUsb(uint32_t totalMs)
 }
 
 // ==========================================
-// clusters.cpp - label storage, dump and restore
+// clusters.cpp - label storage
 // ==========================================
-/* Accumulated samples per (slot, piece): the operator moves a piece into a
- * slot, types '<slot><label>' and the current mean reading lands in that
- * cluster. Across visits, min/max/count map each piece type per sensor.
- * Label indexes match the BoxPieceId enum order EMPTY..LOOP_CALL; INVALID
- * is never labeled */
+/* Accumulated samples per (slot, piece): the operator places a piece in a
+ * slot, the game records the current mean reading and, across visits,
+ * min/max/count map each piece type per sensor. Label indexes match the
+ * BoxPieceId enum order EMPTY..LOOP_CALL; INVALID is never labeled */
 struct LabelCluster
 {
     uint32_t sum;
@@ -93,15 +92,11 @@ struct LabelCluster
 };
 
 extern LabelCluster gPieceClusters[kCalibrationSlotCount][6];
-extern bool gClusterImportActive;
 
 const char *labelName(int index);
 void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw);
 void resetLabeledSlot(uint8_t slotIndex);
 void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
-void dumpPieceClusters();
-void startClusterImport();
-void handleClusterImportChar(char c);
 
 // ==========================================
 // game.cpp - guided campaign walk and row generation
