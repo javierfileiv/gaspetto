@@ -254,7 +254,7 @@ static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
     {
         return "INVALID";
     }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_BACKWARD])
+    if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
         return "TURN_LEFT";
     }
@@ -272,7 +272,7 @@ static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
     {
         return "TURN_RIGHT";
     }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
+    if (raw < t[GASPETTO_ADC_SLOT_COL_TO_REMOVE])
     {
         return "FORWARD";
     }

@@ -69,22 +69,34 @@ static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= GASPETTO_ADC_THRESHOLD_MAX,
               "GASPETTO_ADC_THRESHOLD_LOOP_END must be <= GASPETTO_ADC_THRESHOLD_MAX");
 
 /* Per-slot ADC thresholds, raw counts at GAIN_ONE, one row per slot and
- * columns in ascending piece order (GASPETTO_ADC_SLOT_COL_*). An all-zero
- * row means the slot is not calibrated: it decodes INVALID rather than
- * guessing, so a slot without thresholds cannot inject a false piece.
- * Main-zone rows are seeded with the global values above until a per-slot
- * campaign is pasted; loop-zone rows are zero because those slots are not
- * soldered. LOOP_START carries the global placeholder in every row until
- * the orange piece exists. GASPETTO_ADC_SLOTS must match BOX_TOTAL_SLOTS. */
+ * columns in ascending piece order (GASPETTO_ADC_SLOT_COL_*). Each column
+ * is the lower edge of a band and the decode walks the row until the first
+ * boundary above the raw reading:
+ *   col 0: TURN_LEFT band start, below it the slot decodes INVALID
+ *   col 1: end of TURN_LEFT, start of LOOP_CALL (plays under the idle
+ *          where BACKWARD used to live; renamed from the historical
+ *          BACKWARD name to stop confusing the manual calibration)
+ *   col 2: end of the loop band, start of EMPTY
+ *   col 3: end of EMPTY, start of TURN_RIGHT
+ *   col 4: end of TURN_RIGHT, start of FORWARD
+ *   col 5: sentinel pinned to 0xFFFF in every generated row, named
+ *          COL_TO_REMOVE: no piece plays above FORWARD so nothing
+ *          reaches this boundary, and the whole column gets dropped
+ *          as soon as the production migration moves GBox.cpp onto
+ *          this per-slot table
+ * An all-zero row means the slot is not calibrated: it decodes INVALID
+ * rather than guessing, so a slot without thresholds cannot inject a false
+ * piece. Loop-zone rows are zero because those slots are not soldered.
+ * GASPETTO_ADC_SLOTS must match BOX_TOTAL_SLOTS. */
 #define GASPETTO_ADC_SLOTS 20
 #define GASPETTO_ADC_COLS 6
 
 #define GASPETTO_ADC_SLOT_COL_TURN_LEFT 0
-#define GASPETTO_ADC_SLOT_COL_BACKWARD 1
+#define GASPETTO_ADC_SLOT_COL_LOOP_START 1
 #define GASPETTO_ADC_SLOT_COL_EMPTY 2
 #define GASPETTO_ADC_SLOT_COL_TURN_RIGHT 3
 #define GASPETTO_ADC_SLOT_COL_FORWARD 4
-#define GASPETTO_ADC_SLOT_COL_LOOP_START 5
+#define GASPETTO_ADC_SLOT_COL_TO_REMOVE 5
 
 /* --- BEGIN GENERATED PER-SLOT ROWS --- */
 static const uint16_t GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {
