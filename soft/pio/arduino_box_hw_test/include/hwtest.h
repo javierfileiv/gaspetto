@@ -96,7 +96,6 @@ extern LabelCluster gPieceClusters[kCalibrationSlotCount][6];
 extern bool gClusterImportActive;
 
 const char *labelName(int index);
-bool labelCharToPiece(char ch, BoxPieceId &piece);
 void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw);
 void resetLabeledSlot(uint8_t slotIndex);
 void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
@@ -131,12 +130,16 @@ enum class GameSampleResult : uint8_t
 };
 
 void startGameMode();
+void startGameScoped(uint8_t slotIndex, int pieceIndex);
 void stopGameMode();
 void displayGameInstruction();
-bool recordAllSlotsEmpty();
+bool recordCurrentEmptyStep();
+void retryGameStep();
+int gamePieceForChar(char ch);
 GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verbose);
 void pollGameAutoCapture();
 void advanceGameState();
+void emitGameThresholds();
 
 // ==========================================
 // scan.cpp - calibration scan and slot monitor
@@ -151,13 +154,6 @@ void runPieceCalibrationScan();
 extern TestMode gMode;
 extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
-
-// ==========================================
-// legacy.cpp - manual labels and global-threshold tools
-// ==========================================
-void recordLabelPoint(uint8_t slotIndex, BoxPieceId piece);
-void runGapAnalysis();
-void emitThresholdHeader();
 
 // ==========================================
 // shell.cpp - usb key dispatch, echo and help

@@ -35,33 +35,6 @@ const char *labelName(int index)
     }
 }
 
-bool labelCharToPiece(char ch, BoxPieceId &piece)
-{
-    switch (ch)
-    {
-    case 'e':
-        piece = BoxPieceId::EMPTY;
-        return true;
-    case 'f':
-        piece = BoxPieceId::FORWARD;
-        return true;
-    case 'b':
-        piece = BoxPieceId::BACKWARD;
-        return true;
-    case 'r':
-        piece = BoxPieceId::TURN_RIGHT;
-        return true;
-    case 'l':
-        piece = BoxPieceId::TURN_LEFT;
-        return true;
-    case 'L':
-        piece = BoxPieceId::LOOP_CALL;
-        return true;
-    default:
-        return false;
-    }
-}
-
 void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw)
 {
     LabelCluster &cluster = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
