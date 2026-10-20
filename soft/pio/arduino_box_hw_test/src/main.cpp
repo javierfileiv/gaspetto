@@ -303,6 +303,30 @@ void printUsbHelp()
         "   game (calibration): 'g' start, SPACE record, 'a' toggle auto, 'r' retry, 'q' quit");
     Serial.println("   clusters: 'd' dump, 'i' import (paste dump, finish with a lone .)");
     Serial.println("   board: type dfu to enter the DFU bootloader (reflash/power-cycle to exit)");
+    Serial.println("   echo: typed keys print back, [SP] marks SPACE, import lines show <<<");
+}
+
+/* Terminal-style echo of typed keys: serial monitors do not echo locally,
+ * so without this the operator types blind. Printable characters print as
+ * they arrive and build the line under the fingers; SPACE is a command key
+ * with no visible glyph so it marks itself; CR is dropped because LF is the
+ * line end (the same convention the import parser follows) */
+void echoTypedKey(int incoming)
+{
+    if (incoming == '\n')
+    {
+        Serial.println();
+        return;
+    }
+    if (incoming == ' ')
+    {
+        Serial.print("[SP]");
+        return;
+    }
+    if (incoming >= '!' && incoming <= '~')
+    {
+        Serial.print(static_cast<char>(incoming));
+    }
 }
 
 void handleUsbCommands()
@@ -320,7 +344,8 @@ void handleUsbCommands()
         const int incoming = Serial.read();
 
         /* Restore mode wins over every key handler: it consumes the raw
-         * text stream instead of interpreting single keys */
+         * text stream instead of interpreting single keys, and echoes whole
+         * lines instead of characters (a paste would drown the screen) */
         if (gClusterImportActive)
         {
             handleClusterImportChar(static_cast<char>(incoming));
@@ -328,6 +353,8 @@ void handleUsbCommands()
             digitsStarted = false;
             continue;
         }
+
+        echoTypedKey(incoming);
 
         /* While the slot monitor runs, any key is a stop request */
         if (gMonitorActive)
@@ -339,10 +366,18 @@ void handleUsbCommands()
              * while the monitor ran, and the surviving tail would decode as a
              * different command (a bare 'm' falls back to the previously
              * selected slot). The operator retypes it once the monitor has
-             * unwound */
+             * unwound, and the count makes the eaten characters visible */
+            int dropped = 0;
             while (Serial.available() > 0)
             {
                 Serial.read();
+                ++dropped;
+            }
+            if (dropped > 0)
+            {
+                Serial.print(" [dropped ");
+                Serial.print(dropped);
+                Serial.println("]");
             }
             break;
         }
@@ -1088,6 +1123,7 @@ void handleClusterImportChar(char c)
         if (gClusterImportBuf[0] == '.' && gClusterImportBuf[1] == '\0')
         {
             gClusterImportActive = false;
+            Serial.println("<<< .");
             Serial.print("--- CLUSTER IMPORT DONE, restored ");
             Serial.print(gClusterImported);
             Serial.println(" ---");
@@ -1101,6 +1137,11 @@ void handleClusterImportChar(char c)
         if (applyClusterLine(gClusterImportBuf))
         {
             ++gClusterImported;
+            /* Per-line echo of the accepted paste: progress without drowning
+             * the screen in characters; rejected lines already print
+             * themselves in the [IMPORT] skipped report */
+            Serial.print("<<< ");
+            Serial.println(gClusterImportBuf);
         }
         else
         {
@@ -2450,6 +2491,11 @@ void setup()
     leds.clear();
     leds.show();
 #endif
+
+    /* The heartbeat writes PC13 from the first idle pass: without output
+     * mode it toggles a floating input and the LED stays dark */
+    pinMode(PIN_LED, OUTPUT);
+    digitalWrite(PIN_LED, HIGH); /* active-low: dark until the first blink */
 
     // --- MOSFETs Configuration (Active-Low Logic) ---
     // IMPORTANT: PB14 must be OPEN DRAIN to safely handle 5V!
