@@ -28,8 +28,8 @@ The production and test firmware must agree on thresholds, so both read the same
 | `x` | Emit the paste-ready legacy global `#define` block for `piece_thresholds.h` |
 | `m` | Continuous readout of a slot (`<slot>m`; bare `m` reuses the last addressed slot) |
 | `g` | Start game mode (calibration mode only) |
-| `d` | Dump all collected piece clusters as text (restore them after a reflash with `i`) |
-| `i` | Import clusters from a paste of the `d` output — clears the table first |
+| `D` | Dump all collected piece clusters as text (restore them after a reflash with `i`) |
+| `i` | Import clusters from a paste of the `D` output — clears the table first |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
@@ -152,26 +152,26 @@ Full campaign recipe, in order:
 2. Run the guided game (next section): `g`, then follow every prompt until the firmware prints the per-slot analysis and the generated rows
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
-5. A reflash wipes the clusters (RAM only): `d` before flashing, `i` and paste after to restore them
+5. A reflash wipes the clusters (RAM only): `D` before flashing, `i` and paste after to restore them
 
 The classic manual path (`<slot><label>` + `t` + `x`) still exists and is useful for spot checks: repeated bare label keys thicken the per-slot clusters, and `t`/`x` summarize them globally. It does not produce the per-slot rows, and the legacy defines it feeds are only what production decodes with until production adopts the per-slot scan.
 
-## Cluster Persistence (`d`/`i`)
+## Cluster Persistence (`D`/`i`)
 
 The labeled clusters live in RAM and die with every reflash. To survive one:
 
 ```text
-d            # dump: one line per (slot, piece) as
+D            # dump: one line per (slot, piece) as
              #   <slot> <piece> <min> <max> <count> <sum>
-             # followed by a line holding only .
 i            # start import: clears the table, then consumes every typed
              # character as raw text
-<paste the dump exactly as printed, ending with its lone .>
-             # import stops, prints "restored N"; a malformed line is
-             # reported as [IMPORT] skipped and ignored
+<paste the dump exactly as printed>
+             # then a line holding only . ends the import; prints
+             # "restored N"; a malformed line is reported as
+             # [IMPORT] skipped and ignored
 ```
 
-Paste the `d` output into the terminal while `i` is armed — the board cannot remember its own campaign otherwise, and a partially restored table silently degrades the analysis.
+Paste the `D` output into the terminal while `i` is armed — the board cannot remember its own campaign otherwise, and a partially restored table silently degrades the analysis.
 
 ## Game Mode (Guided Calibration)
 
