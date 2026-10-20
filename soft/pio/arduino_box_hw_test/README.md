@@ -49,7 +49,7 @@ Label keys:
 - `l` TURN_LEFT piece
 - `L` LOOP_CALL piece
 
-Pieces are detected by a magnet glued inside a hole of the piece so it can be placed upside down. Two or three magnet sizes exist; the slot hall sensor reads a distinct voltage window per piece, which is what the threshold table maps to raw ranges.
+Pieces are detected by a magnet glued inside a hole of the piece so it can be placed upside down. The four played pieces use {1 mm, 4 mm} magnets in opposite poles (N and S each); the slot hall sensor reads a distinct voltage window per piece, which is what the threshold table maps to raw ranges.
 
 The firmware takes one reading of the labeled slot with a 15-sample mean, then prints the raw value and count. Clusters accumulate per slot and per piece type; the same piece may be labeled in several slots to cover different sensors.
 
@@ -181,11 +181,11 @@ Game mode replaces manual `<slot><label>` typing with a guided sequence that pre
 
 The firmware walks through all (piece, slot) combinations in a fixed order:
 
-1. **By piece**: EMPTY → FORWARD → BACKWARD → TURN_RIGHT → TURN_LEFT (and LOOP_CALL when the orange piece exists)
+1. **By piece**: EMPTY → FORWARD → LOOP_CALL → TURN_RIGHT → TURN_LEFT
 2. **By slot**: for each piece, all slots 1–12 — the soldered main zone (`kGameSlotCount` extends to 20 with the loop zone)
 3. **By sample**: 8 readings per combination (configurable via `kGameSamplesPerCombo`)
 
-Total: 5 pieces × 12 slots × 8 samples = **480 steps** (576 once LOOP_CALL is added). EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
+Total: 5 pieces × 12 slots × 8 samples = **480 steps**. EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
 
 ### Sequence
 
@@ -215,9 +215,8 @@ When the game completes all steps (or you press `q`), the firmware analyzes **ea
 - `[OVERLAP A/B gap=N, row zeroed]` — two classes overlap on this slot; its row decodes INVALID
 - `[NO DATA]` / `[INCOMPLETE, row zeroed]` — this slot was not fully recorded
 - `[BAD ORDER, row zeroed]` — this slot's means sort the classes differently than the canonical ascending order: a mislabeled piece or a wildly foreign idle level
-- `[FORWARD reaches the top of the scale, row zeroed]` — FORWARD sits at or above `LOOP_END`: a saturated reading, not a piece range
 
-A zeroed row decodes INVALID on purpose — an untrusted slot must never inject a false piece. Then `--- GENERATED PER-SLOT ROWS ---` prints the full paste-ready `GASPETTO_ADC_SLOT_THRESHOLDS` table between the `BEGIN/END GENERATED PER-SLOT ROWS` markers. Columns are ascending piece starts; the last one (`LOOP_START`) sits above the slot's highest FORWARD reading plus a seating margin: a single game placement underestimates re-seating variance (swings up to ~1700 counts while moving a piece inside its socket), and the loop band must stay clear of them until the orange piece exists.
+A zeroed row decodes INVALID on purpose — an untrusted slot must never inject a false piece. Then `--- GENERATED PER-SLOT ROWS ---` prints the full paste-ready `GASPETTO_ADC_SLOT_THRESHOLDS` table between the `BEGIN/END GENERATED PER-SLOT ROWS` markers. Columns are ascending piece starts; the loop piece occupies the band below the EMPTY idle, and the last column (`LOOP_START`) is pinned to 65535: no piece plays above FORWARD, so no reading can ever reach that band and FORWARD's range simply extends to the top of the scale.
 
 ### Configuration
 
@@ -226,13 +225,7 @@ Game mode parameters are defined near the top of `main.cpp`:
 - `kGameSlotCount` — number of slots covered (12 currently, the soldered main zone; up to 20)
 - `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
 - `kGameStabilitySpanMax` — max span for stability check (default 100 counts)
-- `kGamePieceCount` — number of active pieces (5 currently, bump to 6 when LOOP_CALL piece exists)
-
-To add the LOOP_CALL piece when the orange magnet is ready:
-
-1. Fabricate the orange piece (2mm magnet, likely south pole)
-2. Change `kGamePieceCount = 6` in `main.cpp`
-3. Rebuild and flash — game mode now walks 576 steps (6 × 12 × 8)
+- `kGamePieceCount` — entries the walk visits (5: the empty board plus the four played pieces)
 
 ### Example Session
 
@@ -245,16 +238,16 @@ g                    # start game mode
    -> place/adjust, wait for stability, then SPACE
 SPACE                # one SPACE for the EMPTY sweep records every slot
 ...
-   [121/480] slot 2, FORWARD (green, 3mm) [1/8]   # auto-capture mode:
+   [121/480] slot 2, FORWARD (green, 4mm N) [1/8]   # auto-capture mode:
    recorded raw=15276 (span=3)                     # no SPACE, the settle does it
 ...
-   [480/480] slot 12, TURN_LEFT (blue, 4mm) [8/8]
+   [480/480] slot 12, TURN_LEFT (blue, 4mm S) [8/8]
    recorded raw=8763 (span=2)
 
 --- GAME MODE ENDED ---
 
 --- PER-SLOT THRESHOLD ANALYSIS ---
-   slot 1  [OK] TURN_LEFT[10848..10848] BACKWARD[13104..13106] EMPTY[13472..13472]
+   slot 1  [OK] TURN_LEFT[10848..10848] LOOP_CALL[13104..13106] EMPTY[13472..13472]
               TURN_RIGHT[14224..14224] FORWARD[14896..14896] gaps 2256,366,752,672
    slot 10 [OVERLAP TURN_RIGHT/FORWARD gap=-48, row zeroed]
    ...
