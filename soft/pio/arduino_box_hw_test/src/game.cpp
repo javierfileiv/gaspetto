@@ -779,7 +779,7 @@ void emitGameThresholds()
         /* The band above FORWARD carries no piece: pin its start to a value
          * no reading can reach (raw is an int16_t mean), so the top of the
          * scale belongs to FORWARD and nothing decodes the old loop band */
-        row[GASPETTO_ADC_SLOT_COL_LOOP_START] = 0xFFFFU;
+        row[GASPETTO_ADC_SLOT_COL_TO_REMOVE] = 0xFFFFU;
 
         for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
         {
