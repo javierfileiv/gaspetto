@@ -220,7 +220,7 @@ A zeroed row decodes INVALID on purpose — an untrusted slot must never inject 
 
 ### Configuration
 
-Game mode parameters are defined near the top of `main.cpp`:
+Game mode parameters are defined in `src/game.cpp`:
 
 - `kGameSlotCount` — number of slots covered (12 currently, the soldered main zone; up to 20)
 - `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
