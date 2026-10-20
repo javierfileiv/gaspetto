@@ -159,6 +159,11 @@ constexpr uint8_t kGameSlotCount          = 12;
 constexpr uint8_t kGameSamplesPerCombo    = 8;
 constexpr uint16_t kGameStabilitySpanMax  = 100;
 constexpr uint8_t kGameStabilityReadCount = 5;
+/* Added above a slot's highest FORWARD reading when emitting its LOOP_START
+ * column: the same piece swings by up to ~1700 counts just by moving in its
+ * socket, so the loop band has to sit above that swing or a green piece
+ * decodes as LOOP_CALL */
+constexpr uint16_t kGameLoopStartMargin = 1500;
 
 const BoxPieceId kGamePieces[] = {
     BoxPieceId::EMPTY,      BoxPieceId::FORWARD,   BoxPieceId::BACKWARD,
@@ -301,7 +306,7 @@ void printUsbHelp()
         "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
     Serial.println(
         "   game (calibration): 'g' start, SPACE record, 'a' toggle auto, 'r' retry, 'q' quit");
-    Serial.println("   clusters: 'd' dump, 'i' import (paste dump, finish with a lone .)");
+    Serial.println("   clusters: 'D' dump, 'i' import (paste dump, finish with a lone .)");
     Serial.println("   board: type dfu to enter the DFU bootloader (reflash/power-cycle to exit)");
     Serial.println("   echo: typed keys print back, [SP] marks SPACE, import lines show <<<");
 }
@@ -519,7 +524,7 @@ void handleUsbCommands()
             }
             startGameMode();
             break;
-        case 'd':
+        case 'D':
             dumpPieceClusters();
             break;
         case 'i':
@@ -1108,15 +1113,12 @@ static bool applyClusterLine(const char *line)
     return true;
 }
 
-/* Restore mode sink: accumulate raw characters into lines, apply each one
- * and stop on a line holding only "." (the END marker of the dump) */
+/* Restore mode sink: accumulate raw characters into lines terminated by CR
+ * or LF (a Windows paste sends CR alone and lines would never complete),
+ * apply each one and stop on a line holding only "." */
 void handleClusterImportChar(char c)
 {
-    if (c == '\r')
-    {
-        return;
-    }
-    if (c == '\n')
+    if (c == '\r' || c == '\n')
     {
         gClusterImportBuf[gClusterImportLen] = '\0';
         gClusterImportLen                    = 0;
@@ -1127,7 +1129,7 @@ void handleClusterImportChar(char c)
             Serial.print("--- CLUSTER IMPORT DONE, restored ");
             Serial.print(gClusterImported);
             Serial.println(" ---");
-            Serial.println("   'd' re-dumps to verify");
+            Serial.println("   'D' re-dumps to verify");
             return;
         }
         if (gClusterImportBuf[0] == '\0')
@@ -1657,8 +1659,8 @@ void emitGameThresholds()
 
         /* Each column holds the start of its piece: the first keeps its own
          * minimum, the next ones start at the midpoint of the two adjacent
-         * ranges. The loop column keeps the global placeholder until the
-         * orange piece exists */
+         * ranges. The loop column starts above the highest FORWARD reading
+         * plus a seating margin until the orange piece exists */
         uint16_t row[GASPETTO_ADC_COLS] = {};
         row[0]                          = ranges[0].min;
         int8_t overlapAt                = -1; /* upper piece of the first overlap */
@@ -1675,10 +1677,6 @@ void emitGameThresholds()
                 overlapGap = gap;
             }
         }
-        if (kGamePieceCount < GASPETTO_ADC_COLS)
-        {
-            row[GASPETTO_ADC_SLOT_COL_LOOP_START] = GASPETTO_ADC_THRESHOLD_LOOP_START;
-        }
 
         if (overlapAt >= 0)
         {
@@ -1691,10 +1689,23 @@ void emitGameThresholds()
             Serial.println(", row zeroed]");
             continue;
         }
-        if (row[GASPETTO_ADC_SLOT_COL_FORWARD] >= row[GASPETTO_ADC_SLOT_COL_LOOP_START])
+        if (kGamePieceCount < GASPETTO_ADC_COLS)
         {
-            Serial.println("  [FORWARD reaches LOOP band, row zeroed]");
-            continue;
+            /* The loop column sits above the highest FORWARD reading plus the
+             * seating margin, and never below the global placeholder. The old
+             * code compared the FORWARD midpoint against the placeholder, so
+             * a slot whose green reads high emitted a loop band the green
+             * itself reaches */
+            const uint32_t forwardTop = ranges[GASPETTO_ADC_SLOT_COL_FORWARD].max;
+            if (forwardTop >= GASPETTO_ADC_THRESHOLD_LOOP_END)
+            {
+                Serial.println("  [FORWARD reaches the top of the scale, row zeroed]");
+                continue;
+            }
+            const uint32_t loopStart              = forwardTop + kGameLoopStartMargin;
+            row[GASPETTO_ADC_SLOT_COL_LOOP_START] = static_cast<uint16_t>(
+                loopStart > GASPETTO_ADC_THRESHOLD_LOOP_START ? loopStart :
+                                                                GASPETTO_ADC_THRESHOLD_LOOP_START);
         }
 
         for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
@@ -2129,22 +2140,10 @@ void runPieceCalibrationScan()
     Serial.println(++gCalibrationScanCounter);
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
-    /* Piece START thresholds in decode order (ascending raw), matching
-     * pieceLabelForRaw. LOOP_CALL is the last piece; LOOP_END is only the
-     * top of its range, not a piece, so it is not listed here */
-    Serial.print(" thresholds=[LEFT:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START);
-    Serial.print(" BACK:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_BACKWARD_START);
-    Serial.print(" EMPTY:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_EMPTY_START);
-    Serial.print(" RIGHT:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START);
-    Serial.print(" FWD:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_FORWARD_START);
-    Serial.print(" LOOP:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_START);
-    Serial.println("]");
+    /* Decoding compares against each slot's own row, printed on every slot
+     * line below; the global macros this header used to list are the
+     * production legacy table and the scan never used them */
+    Serial.println("decode: per-slot rows, see row=[...] on each slot line");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
     {
@@ -2193,6 +2192,28 @@ void runPieceCalibrationScan()
             Serial.print(" ch");
             Serial.print(ch);
             Serial.print("] ");
+
+            /* The slot's own decode boundaries, the exact numbers
+             * pieceLabelForRaw just compared against; uncalibrated slots
+             * decode INVALID whatever they read */
+            const uint16_t *row = GASPETTO_ADC_SLOT_THRESHOLDS[slotIndex];
+            if (row[GASPETTO_ADC_SLOT_COL_TURN_LEFT] == 0U)
+            {
+                Serial.print("row=uncalibrated ");
+            }
+            else
+            {
+                Serial.print("row=[");
+                for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
+                {
+                    if (c > 0)
+                    {
+                        Serial.print(' ');
+                    }
+                    Serial.print(row[c]);
+                }
+                Serial.print("] ");
+            }
 
             if (!readOk)
             {
