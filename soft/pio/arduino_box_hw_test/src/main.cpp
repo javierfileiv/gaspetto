@@ -11,6 +11,7 @@
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "CommandPacket.h"
+#include "dfu_bootloader.h"
 #include "i2c3_bitbang.h"
 #include "piece_thresholds.h"
 #include "pin_definitions.h"
@@ -154,7 +155,7 @@ bool gMonitorExit   = false;
  * when the orange magnet is fabricated) without touching the rest.
  * kGameSlotCount is the number of slots covered (currently 4 because
  * only slots 1-4 have sensors soldered, extensible to 20) */
-constexpr uint8_t kGameSlotCount          = 4;
+constexpr uint8_t kGameSlotCount          = 12;
 constexpr uint8_t kGameSamplesPerCombo    = 8;
 constexpr uint16_t kGameStabilitySpanMax  = 100;
 constexpr uint8_t kGameStabilityReadCount = 5;
@@ -187,6 +188,15 @@ bool gGameAuto = true;
  * warns once per sample instead of on every poll. Cleared on each advance */
 bool gGameOutlierWarned = false;
 
+/* Cluster restore mode: while active every serial character goes to the
+ * cluster parser instead of the key handler, until a lone "." line ends it.
+ * A reflashed board loses gPieceClusters (RAM only), so this is how a
+ * finished campaign survives a reflash */
+bool gClusterImportActive  = false;
+char gClusterImportBuf[48] = {};
+uint8_t gClusterImportLen  = 0;
+uint16_t gClusterImported  = 0;
+
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
@@ -204,6 +214,9 @@ void runSlotMonitor(uint8_t slotIndex);
 void runGapAnalysis();
 void recoverAdsModule(const AdsTestEntry *entry);
 void emitThresholdHeader();
+void dumpPieceClusters();
+void startClusterImport();
+void handleClusterImportChar(char c);
 void printUsbHelp();
 bool labelCharToPiece(char ch, BoxPieceId &piece);
 const char *labelName(int index);
@@ -217,10 +230,11 @@ bool recordAllSlotsEmpty();
  * differently (print vs stay silent, advance vs keep waiting) */
 enum class GameSampleResult : uint8_t
 {
-    Recorded, /* sample added to the cluster */
-    Unstable, /* span too wide, nothing recorded */
-    Outlier,  /* stable but outside the cluster guard, nothing recorded */
-    ReadFail, /* ADS read failed after recovery, nothing recorded */
+    Recorded,       /* sample added to the cluster */
+    Unstable,       /* span too wide, nothing recorded */
+    Outlier,        /* stable but outside the cluster guard, nothing recorded */
+    ReadFail,       /* ADS read failed after recovery, nothing recorded */
+    PieceNotPlaced, /* stable but the slot still reads empty: piece not placed yet */
 };
 GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verbose);
 void pollGameAutoCapture();
@@ -287,6 +301,8 @@ void printUsbHelp()
         "   calibration: '<slot><label>' e.g. '5f' (e f b r l L), m = monitor slot, R = reset");
     Serial.println(
         "   game (calibration): 'g' start, SPACE record, 'a' toggle auto, 'r' retry, 'q' quit");
+    Serial.println("   clusters: 'd' dump, 'i' import (paste dump, finish with a lone .)");
+    Serial.println("   board: type dfu to enter the DFU bootloader (reflash/power-cycle to exit)");
 }
 
 void handleUsbCommands()
@@ -303,13 +319,32 @@ void handleUsbCommands()
     {
         const int incoming = Serial.read();
 
+        /* Restore mode wins over every key handler: it consumes the raw
+         * text stream instead of interpreting single keys */
+        if (gClusterImportActive)
+        {
+            handleClusterImportChar(static_cast<char>(incoming));
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
         /* While the slot monitor runs, any key is a stop request */
         if (gMonitorActive)
         {
             gMonitorExit  = true;
             pendingSlot   = 0;
             digitsStarted = false;
-            continue;
+            /* Drop the rest of the burst: this stop key cuts a command typed
+             * while the monitor ran, and the surviving tail would decode as a
+             * different command (a bare 'm' falls back to the previously
+             * selected slot). The operator retypes it once the monitor has
+             * unwound */
+            while (Serial.available() > 0)
+            {
+                Serial.read();
+            }
+            break;
         }
 
         /* Game mode intercepts its own keys; any other key is dropped so
@@ -392,6 +427,24 @@ void handleUsbCommands()
             continue;
         }
 
+        /* Typing dfu (three letters in a row) enters the DFU bootloader.
+         * The letters are consumed only while the word still matches: any
+         * other character breaks the sequence and is handled normally. The
+         * shared enterDfuBootloader() never returns */
+        static const char kDfuWord[] = "dfu";
+        static uint8_t dfuWordSeen   = 0;
+        if (incoming == kDfuWord[dfuWordSeen])
+        {
+            if (++dfuWordSeen == sizeof(kDfuWord) - 1U)
+            {
+                dfuWordSeen = 0;
+                Serial.println("\n--- DFU: reflash or power-cycle to exit ---");
+                enterDfuBootloader();
+            }
+            continue;
+        }
+        dfuWordSeen = 0;
+
         const char ch    = static_cast<char>(incoming);
         BoxPieceId piece = BoxPieceId::INVALID;
         (void)labelCharToPiece(ch, piece);
@@ -430,6 +483,12 @@ void handleUsbCommands()
                 break;
             }
             startGameMode();
+            break;
+        case 'd':
+            dumpPieceClusters();
+            break;
+        case 'i':
+            startClusterImport();
             break;
         case 'R':
             if (gMode != TestMode::Calibration)
@@ -904,6 +963,160 @@ void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece)
     gPieceClusters[slotIndex][static_cast<uint8_t>(piece)] = LabelCluster{};
 }
 
+/* Serial dump of every cluster, one line per (slot, label), so a campaign
+ * survives a reflash: gPieceClusters lives in RAM only. Line format is
+ * "<slot 1-based> <label index> <min> <max> <count> <sum>" */
+void dumpPieceClusters()
+{
+    Serial.println("--- CLUSTER DUMP (slot label min max count sum) ---");
+    uint16_t dumped = 0;
+    for (uint8_t slot = 0; slot < kCalibrationSlotCount; ++slot)
+    {
+        for (int label = 0; label < 6; ++label)
+        {
+            const LabelCluster &cl = gPieceClusters[slot][label];
+            if (cl.count == 0)
+            {
+                continue;
+            }
+            Serial.print(static_cast<int>(slot) + 1);
+            Serial.print(' ');
+            Serial.print(label);
+            Serial.print(' ');
+            Serial.print(cl.min);
+            Serial.print(' ');
+            Serial.print(cl.max);
+            Serial.print(' ');
+            Serial.print(cl.count);
+            Serial.print(' ');
+            Serial.println(cl.sum);
+            ++dumped;
+        }
+    }
+    Serial.print("   clusters: ");
+    Serial.println(dumped);
+    Serial.println("--- END CLUSTER DUMP ---");
+}
+
+/* Enter restore mode: the whole set is cleared first, so a pasted dump
+ * replaces the data instead of merging into stale clusters */
+void startClusterImport()
+{
+    for (uint8_t slot = 0; slot < kCalibrationSlotCount; ++slot)
+    {
+        for (int label = 0; label < 6; ++label)
+        {
+            gPieceClusters[slot][label] = LabelCluster{};
+        }
+    }
+    gClusterImportActive = true;
+    gClusterImportLen    = 0;
+    gClusterImported     = 0;
+    Serial.println("--- CLUSTER IMPORT: paste the dump, then a line with only . ---");
+    Serial.println("   (existing clusters were cleared)");
+}
+
+/* Read one decimal token, leaving p on the character after it */
+static bool clusterToken(const char *&p, uint32_t &out)
+{
+    while (*p == ' ')
+    {
+        ++p;
+    }
+    if (*p < '0' || *p > '9')
+    {
+        return false;
+    }
+    uint32_t value = 0;
+    while (*p >= '0' && *p <= '9')
+    {
+        value = value * 10U + static_cast<uint32_t>(*p - '0');
+        ++p;
+    }
+    out = value;
+    return true;
+}
+
+/* Apply one dump line back into the cluster table */
+static bool applyClusterLine(const char *line)
+{
+    const char *p = line;
+    uint32_t v[6] = {};
+    for (uint8_t i = 0; i < 6; ++i)
+    {
+        if (!clusterToken(p, v[i]))
+        {
+            return false;
+        }
+    }
+    while (*p == ' ')
+    {
+        ++p;
+    }
+    if (*p != '\0')
+    {
+        return false; /* trailing garbage */
+    }
+    if (v[0] < 1 || v[0] > kCalibrationSlotCount || v[1] >= 6 || v[4] == 0)
+    {
+        return false;
+    }
+    if (v[2] > 0xFFFFU || v[3] > 0xFFFFU || v[4] > 0xFFFFU || v[3] < v[2])
+    {
+        return false;
+    }
+    LabelCluster &cl = gPieceClusters[v[0] - 1][v[1]];
+    cl.min           = static_cast<uint16_t>(v[2]);
+    cl.max           = static_cast<uint16_t>(v[3]);
+    cl.count         = static_cast<uint16_t>(v[4]);
+    cl.sum           = v[5];
+    return true;
+}
+
+/* Restore mode sink: accumulate raw characters into lines, apply each one
+ * and stop on a line holding only "." (the END marker of the dump) */
+void handleClusterImportChar(char c)
+{
+    if (c == '\r')
+    {
+        return;
+    }
+    if (c == '\n')
+    {
+        gClusterImportBuf[gClusterImportLen] = '\0';
+        gClusterImportLen                    = 0;
+        if (gClusterImportBuf[0] == '.' && gClusterImportBuf[1] == '\0')
+        {
+            gClusterImportActive = false;
+            Serial.print("--- CLUSTER IMPORT DONE, restored ");
+            Serial.print(gClusterImported);
+            Serial.println(" ---");
+            Serial.println("   'd' re-dumps to verify");
+            return;
+        }
+        if (gClusterImportBuf[0] == '\0')
+        {
+            return;
+        }
+        if (applyClusterLine(gClusterImportBuf))
+        {
+            ++gClusterImported;
+        }
+        else
+        {
+            Serial.print("   [IMPORT] skipped: ");
+            Serial.println(gClusterImportBuf);
+        }
+        return;
+    }
+    if (static_cast<size_t>(gClusterImportLen) + 1U >= sizeof(gClusterImportBuf))
+    {
+        gClusterImportLen = 0; /* line too long: drop it */
+        return;
+    }
+    gClusterImportBuf[gClusterImportLen++] = c;
+}
+
 // ==========================================
 // GAME MODE — guided piece calibration
 // ==========================================
@@ -1082,6 +1295,33 @@ bool recordAllSlotsEmpty()
     return true;
 }
 
+/* True while a stable reading still looks like this slot's empty state, i.e.
+ * the piece has not been placed yet. Auto-capture must not start sampling a
+ * non-EMPTY piece before it is physically present: the slot is perfectly
+ * stable while empty, so without this check the empty reading becomes the
+ * first sample of the piece and the outlier guard cannot catch it (the
+ * cluster is still empty, so it has nothing to compare against). The band is
+ * this slot's own EMPTY reading +/- 100 counts, not a global threshold:
+ * idle levels differ by ~900 counts across sensors. The margin stays small
+ * because empty readings are stable to a few counts within a run and the
+ * nearest piece (TURN_RIGHT) sits only ~250 counts above EMPTY. */
+bool slotReadsEmpty(uint8_t slotIndex, BoxPieceId piece, uint16_t mean)
+{
+    if (piece == BoxPieceId::EMPTY)
+    {
+        return false; /* EMPTY is recorded on purpose by the operator */
+    }
+    const LabelCluster &empty = gPieceClusters[slotIndex][static_cast<uint8_t>(BoxPieceId::EMPTY)];
+    if (empty.count == 0)
+    {
+        return false; /* no reference yet: fall back to the outlier guard */
+    }
+    constexpr uint16_t kMargin = 100;
+    const uint32_t bottom      = empty.min > kMargin ? empty.min - kMargin : 0;
+    const uint32_t top         = static_cast<uint32_t>(empty.max) + kMargin;
+    return mean >= bottom && mean <= top;
+}
+
 /* Try to record one sample for (slot, piece): read with stability, apply
  * the outlier guard, then add the point. Returns the outcome instead of
  * a bool so callers choose their reaction. When verbose is false nothing
@@ -1092,11 +1332,22 @@ GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verb
     const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
     const uint8_t channel     = slotIndex % 4;
 
+    const LabelCluster &existing = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
+
+    /* The piece is placed once and then held still, so re-running the full
+     * stability window for every sample would cost kGameStabilityReadCount
+     * times the ADC time for no extra information: 12 samples would mean 12
+     * times five mean reads on the same settled sensor. Only the first
+     * sample of a combo (empty cluster) and every manual SPACE keep the full
+     * window, because both follow a fresh placement of the piece. Later
+     * samples take a single mean read and rely on the outlier guard below */
+    const uint8_t readCount = (verbose || existing.count == 0) ? kGameStabilityReadCount : 1;
+
     uint16_t minVal = 0xFFFF;
     uint16_t maxVal = 0;
     int32_t sum     = 0;
 
-    for (uint8_t i = 0; i < kGameStabilityReadCount; ++i)
+    for (uint8_t i = 0; i < readCount; ++i)
     {
         int16_t raw = 0;
         bool ok     = readAdsSingleEndedMean(&entry, channel, raw);
@@ -1141,11 +1392,25 @@ GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verb
         return GameSampleResult::Unstable;
     }
 
-    const uint16_t mean = static_cast<uint16_t>(sum / kGameStabilityReadCount);
+    const uint16_t mean = static_cast<uint16_t>(sum / readCount);
+
+    /* Auto capture only: while the slot still reads empty the piece is not
+     * down yet, so waiting gives the operator the time to place it. SPACE
+     * forces past this gate for a manual record */
+    if (!verbose && slotReadsEmpty(slotIndex, piece, mean))
+    {
+        if (!gGameOutlierWarned)
+        {
+            Serial.print("   [WAIT] slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.println(" still reads empty, place the piece (SPACE forces)");
+            gGameOutlierWarned = true;
+        }
+        return GameSampleResult::PieceNotPlaced;
+    }
 
     /* Outlier guard: same ±20% logic as recordLabelPoint, so a misplaced
      * piece cannot silently stretch the cluster */
-    const LabelCluster &existing = gPieceClusters[slotIndex][static_cast<uint8_t>(piece)];
     if (existing.count > 0)
     {
         const uint32_t spanBottom =
@@ -1177,7 +1442,7 @@ GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verb
         Serial.print(" (span=");
         Serial.print(span);
         Serial.print(", n=");
-        Serial.print(existing.count + 1);
+        Serial.print(existing.count);
         Serial.println(")");
     }
     return GameSampleResult::Recorded;
@@ -1256,189 +1521,196 @@ void advanceGameState()
     displayGameInstruction();
 }
 
-/* Compute per-piece aggregated stats across game slots, sort by mean,
- * place thresholds at midpoints between adjacent classes and emit
- * #define blocks in the same format as piece_thresholds.h */
+/* Compute a threshold row per slot from that slot's own clusters, print the
+ * per-slot gap analysis and emit the pasteable table block. Each sensor idles
+ * at its own level (12675..13616 counts on the 12-slot board), so a class gap
+ * that is clean on one slot can overlap on the next: no global threshold can
+ * separate the five classes on every slot at once. A slot whose classes do not
+ * separate cleanly keeps an all-zero row, which decodes INVALID instead of
+ * guessing a false piece */
 void emitGameThresholds()
 {
-    /* Aggregate min/max/sum/count per piece across the kGameSlotCount slots */
-    struct PieceRange
-    {
-        BoxPieceId piece;
-        uint16_t gmin;
-        uint16_t gmax;
-        uint32_t gsum;
-        uint32_t gcount;
+    static_assert(kCalibrationSlotCount == GASPETTO_ADC_SLOTS,
+                  "per-slot table size must match the calibration slot count");
+
+    /* Canonical ascending piece order: the table columns follow it, so a
+     * slot whose measured order differs would silently swap two pieces */
+    static const BoxPieceId kCanonicalOrder[GASPETTO_ADC_COLS] = {
+        BoxPieceId::TURN_LEFT,  BoxPieceId::BACKWARD, BoxPieceId::EMPTY,
+        BoxPieceId::TURN_RIGHT, BoxPieceId::FORWARD,  BoxPieceId::LOOP_CALL,
     };
-    PieceRange ranges[kGamePieceCount];
 
-    for (uint8_t p = 0; p < kGamePieceCount; ++p)
+    uint16_t slotRows[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {};
+    uint8_t slotsCalibrated                                  = 0;
+
+    Serial.println("\n--- PER-SLOT THRESHOLD ANALYSIS ---");
+    for (uint8_t slot = 0; slot < kCalibrationSlotCount; ++slot)
     {
-        PieceRange &r = ranges[p];
-        r.piece       = kGamePieces[p];
-        r.gmin        = 0xFFFF;
-        r.gmax        = 0;
-        r.gsum        = 0;
-        r.gcount      = 0;
-
-        for (uint8_t s = 0; s < kGameSlotCount; ++s)
+        struct PieceRange
         {
-            const LabelCluster &cl = gPieceClusters[s][static_cast<uint8_t>(r.piece)];
+            BoxPieceId piece;
+            uint16_t min;
+            uint16_t max;
+            uint32_t count;
+            int32_t mean;
+        };
+        PieceRange ranges[kGamePieceCount];
+        uint8_t written = 0;
+
+        for (uint8_t p = 0; p < kGamePieceCount; ++p)
+        {
+            const LabelCluster &cl = gPieceClusters[slot][static_cast<uint8_t>(kGamePieces[p])];
             if (cl.count == 0)
             {
                 continue;
             }
-            if (cl.min < r.gmin)
-            {
-                r.gmin = cl.min;
-            }
-            if (cl.max > r.gmax)
-            {
-                r.gmax = cl.max;
-            }
-            r.gsum += cl.sum;
-            r.gcount += cl.count;
+            PieceRange &r = ranges[written];
+            r.piece       = kGamePieces[p];
+            r.min         = cl.min;
+            r.max         = cl.max;
+            r.count       = cl.count;
+            r.mean        = static_cast<int32_t>(cl.sum / cl.count);
+            ++written;
         }
-    }
 
-    /* Print per-piece ranges */
-    Serial.println("\n--- PER-PIECE RANGES (game data) ---");
-    for (uint8_t p = 0; p < kGamePieceCount; ++p)
-    {
-        const PieceRange &r = ranges[p];
-        Serial.print("   ");
-        Serial.print(labelName(static_cast<int>(r.piece)));
-        if (r.gcount == 0)
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slot) + 1);
+        if (written == 0)
         {
-            Serial.println("  : NO DATA");
+            Serial.println("  [NO DATA]");
             continue;
         }
-        Serial.print("  : min=");
-        Serial.print(r.gmin);
-        Serial.print(" max=");
-        Serial.print(r.gmax);
-        Serial.print(" mean=");
-        Serial.println(static_cast<int32_t>(r.gsum / r.gcount));
-    }
-
-    /* Sort ranges by mean (insertion sort, 5-6 elements) */
-    for (uint8_t i = 1; i < kGamePieceCount; ++i)
-    {
-        PieceRange tmp  = ranges[i];
-        int32_t tmpMean = tmp.gcount > 0 ? static_cast<int32_t>(tmp.gsum / tmp.gcount) :
-                                           static_cast<int32_t>(tmp.gmin);
-        uint8_t j       = i;
-        while (j > 0)
+        if (written != kGamePieceCount)
         {
-            const PieceRange &prev = ranges[j - 1];
-            int32_t prevMean = prev.gcount > 0 ? static_cast<int32_t>(prev.gsum / prev.gcount) :
-                                                 static_cast<int32_t>(prev.gmin);
-            if (prevMean > tmpMean)
+            Serial.println("  [INCOMPLETE, row zeroed]");
+            continue;
+        }
+
+        /* Insertion sort by mean (5-6 elements) */
+        for (uint8_t i = 1; i < written; ++i)
+        {
+            PieceRange tmp = ranges[i];
+            uint8_t j      = i;
+            while (j > 0 && ranges[j - 1].mean > tmp.mean)
             {
                 ranges[j] = ranges[j - 1];
                 --j;
             }
-            else
+            ranges[j] = tmp;
+        }
+
+        bool orderOk = true;
+        for (uint8_t i = 0; i < written; ++i)
+        {
+            if (ranges[i].piece != kCanonicalOrder[i])
             {
+                orderOk = false;
                 break;
             }
         }
-        ranges[j] = tmp;
-    }
-
-    /* Print sorted order + midpoints */
-    Serial.println("\n--- SORTED ORDER (ascending mean) ---");
-    uint16_t thresholds[kGamePieceCount];
-    for (uint8_t i = 0; i < kGamePieceCount; ++i)
-    {
-        const PieceRange &r = ranges[i];
-        const int32_t mean  = r.gcount > 0 ? static_cast<int32_t>(r.gsum / r.gcount) : 0;
-        Serial.print("   ");
-        Serial.print(static_cast<int>(i));
-        Serial.print(". ");
-        Serial.print(labelName(static_cast<int>(r.piece)));
-        Serial.print("  mean=");
-        Serial.print(mean);
-        Serial.print(" [");
-        Serial.print(r.gmin);
-        Serial.print("..");
-        Serial.print(r.gmax);
-        Serial.println("]");
-
-        if (i == 0)
+        if (!orderOk)
         {
-            thresholds[i] = r.gmin;
+            Serial.println("  [BAD ORDER, row zeroed]");
+            continue;
         }
-        else
+
+        /* Each column holds the start of its piece: the first keeps its own
+         * minimum, the next ones start at the midpoint of the two adjacent
+         * ranges. The loop column keeps the global placeholder until the
+         * orange piece exists */
+        uint16_t row[GASPETTO_ADC_COLS] = {};
+        row[0]                          = ranges[0].min;
+        int8_t overlapAt                = -1; /* upper piece of the first overlap */
+        int32_t overlapGap              = 0;
+        for (uint8_t i = 1; i < written; ++i)
         {
-            const PieceRange &below = ranges[i - 1];
-            thresholds[i]           = static_cast<uint16_t>(
-                (static_cast<uint32_t>(below.gmax) + static_cast<uint32_t>(r.gmin)) / 2);
+            const int32_t gap =
+                static_cast<int32_t>(ranges[i].min) - static_cast<int32_t>(ranges[i - 1].max);
+            row[i] = static_cast<uint16_t>(
+                (static_cast<uint32_t>(ranges[i - 1].max) + ranges[i].min) / 2U);
+            if (gap <= 0 && overlapAt < 0)
+            {
+                overlapAt  = static_cast<int8_t>(i);
+                overlapGap = gap;
+            }
         }
-    }
+        if (kGamePieceCount < GASPETTO_ADC_COLS)
+        {
+            row[GASPETTO_ADC_SLOT_COL_LOOP_START] = GASPETTO_ADC_THRESHOLD_LOOP_START;
+        }
 
-    /* Print gap analysis */
-    Serial.println("\n--- GAPS (between adjacent sorted classes) ---");
-    for (uint8_t i = 1; i < kGamePieceCount; ++i)
-    {
-        const PieceRange &below = ranges[i - 1];
-        const PieceRange &above = ranges[i];
-        Serial.print("   ");
-        Serial.print(labelName(static_cast<int>(below.piece)));
-        Serial.print(" -> ");
-        Serial.print(labelName(static_cast<int>(above.piece)));
-        Serial.print(" : gap=");
-        Serial.print(static_cast<int>(above.gmin) - static_cast<int>(below.gmax));
-        Serial.print(" threshold=");
-        Serial.println(thresholds[i]);
-    }
+        if (overlapAt >= 0)
+        {
+            Serial.print("  [OVERLAP ");
+            Serial.print(labelName(static_cast<int>(ranges[overlapAt - 1].piece)));
+            Serial.print('/');
+            Serial.print(labelName(static_cast<int>(ranges[overlapAt].piece)));
+            Serial.print(" gap=");
+            Serial.print(overlapGap);
+            Serial.println(", row zeroed]");
+            continue;
+        }
+        if (row[GASPETTO_ADC_SLOT_COL_FORWARD] >= row[GASPETTO_ADC_SLOT_COL_LOOP_START])
+        {
+            Serial.println("  [FORWARD reaches LOOP band, row zeroed]");
+            continue;
+        }
 
-    /* Emit #define block in the piece_thresholds.h format. Map each
-     * threshold to the macro name that corresponds to the piece ABOVE
-     * the boundary. The lowest piece's threshold is its own start */
-    Serial.println("\n--- GENERATED piece_thresholds.h ---");
-    Serial.println("#pragma once");
-    Serial.println();
-    Serial.println("#include <stdint.h>");
-    Serial.println();
+        for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
+        {
+            slotRows[slot][c] = row[c];
+        }
+        ++slotsCalibrated;
 
-    /* Map BoxPieceId -> macro suffix. Uses the same names as the
-     * existing header so the output can be pasted directly */
-    const char *macroSuffix[kGamePieceCount];
-    for (uint8_t i = 0; i < kGamePieceCount; ++i)
-    {
-        macroSuffix[i] = labelName(static_cast<int>(ranges[i].piece));
-    }
-
-    for (uint8_t i = 0; i < kGamePieceCount; ++i)
-    {
-        const uint16_t value = thresholds[i];
-        /* Build the macro name: GASPETTO_ADC_THRESHOLD_<PIECE>_START.
-         * The label names use the same wording as the existing macros
-         * (FORWARD, BACKWARD, TURN_RIGHT, TURN_LEFT, LOOP_CALL). EMPTY
-         * gets a new EMPTY_START for the restructured decode table */
-        Serial.print("#ifndef GASPETTO_ADC_THRESHOLD_");
-        Serial.print(macroSuffix[i]);
-        Serial.println("_START");
-        Serial.print("#define GASPETTO_ADC_THRESHOLD_");
-        Serial.print(macroSuffix[i]);
-        Serial.print("_START ");
-        Serial.println(value);
-        Serial.println("#endif");
+        /* Class ranges and the gaps between them, for a human check */
+        Serial.print("  [OK] ");
+        for (uint8_t i = 0; i < written; ++i)
+        {
+            Serial.print(labelName(static_cast<int>(ranges[i].piece)));
+            Serial.print('[');
+            Serial.print(ranges[i].min);
+            Serial.print("..");
+            Serial.print(ranges[i].max);
+            Serial.print(i + 1 < written ? "] " : "] gaps ");
+        }
+        for (uint8_t i = 1; i < written; ++i)
+        {
+            const int32_t gap =
+                static_cast<int32_t>(ranges[i].min) - static_cast<int32_t>(ranges[i - 1].max);
+            Serial.print(gap);
+            if (i + 1 < written)
+            {
+                Serial.print(',');
+            }
+        }
         Serial.println();
     }
 
-    Serial.print("#define GASPETTO_ADC_THRESHOLD_MAX ");
-    /* MAX = one full-scale margin above the highest piece max. Use the
-     * highest observed max + 10% headroom, capped at 26400 (ADS1115
-     * 16-bit unsigned full scale) */
-    const PieceRange &top = ranges[kGamePieceCount - 1];
-    uint32_t maxCeil = top.gcount > 0 ? static_cast<uint32_t>(top.gmax) + top.gmax / 10 : 26400;
-    if (maxCeil > 26400)
+    Serial.print("   calibrated slots: ");
+    Serial.print(slotsCalibrated);
+    Serial.print('/');
+    Serial.println(kGameSlotCount);
+
+    /* Emit the table between the piece_thresholds.h markers, so it pastes
+     * over the placeholder rows in a single selection */
+    Serial.println("\n--- GENERATED PER-SLOT ROWS ---");
+    Serial.println("/* --- BEGIN GENERATED PER-SLOT ROWS --- */");
+    Serial.println("static const uint16_t "
+                   "GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {");
+    for (uint8_t slot = 0; slot < GASPETTO_ADC_SLOTS; ++slot)
     {
-        maxCeil = 26400;
+        Serial.print("    /* slot ");
+        Serial.print(static_cast<int>(slot) + 1);
+        Serial.print(" */ { ");
+        for (uint8_t c = 0; c < GASPETTO_ADC_COLS; ++c)
+        {
+            Serial.print(slotRows[slot][c]);
+            Serial.print(c + 1 < GASPETTO_ADC_COLS ? ", " : " }");
+        }
+        Serial.println(",");
     }
-    Serial.println(maxCeil);
+    Serial.println("};");
+    Serial.println("/* --- END GENERATED PER-SLOT ROWS --- */");
 }
 
 /* Continuous readout of one slot: ~5 mean reads per second with running
@@ -1746,33 +2018,38 @@ void emitThresholdHeader()
     Serial.println("--- END BLOCK: paste over the defines of piece_thresholds.h ---");
 }
 
-const char *pieceLabelForRaw(int16_t raw)
+/* Decode one raw reading with this slot's row of the per-slot threshold
+ * table. The columns are ascending piece starts, so the first column below
+ * which nothing matches means the slot is not calibrated: it decodes
+ * INVALID rather than guessing with the global fallbacks */
+const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
 {
     if (raw < 0)
     {
         return "INVALID";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_TURN_LEFT_START)
+    const uint16_t *t = GASPETTO_ADC_SLOT_THRESHOLDS[slotIndex];
+    if (t[GASPETTO_ADC_SLOT_COL_TURN_LEFT] == 0 || raw < t[GASPETTO_ADC_SLOT_COL_TURN_LEFT])
     {
         return "INVALID";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_BACKWARD_START)
+    if (raw < t[GASPETTO_ADC_SLOT_COL_BACKWARD])
     {
         return "TURN_LEFT";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_EMPTY_START)
+    if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
     {
         return "BACKWARD";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START)
+    if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
     {
         return "EMPTY";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_FORWARD_START)
+    if (raw < t[GASPETTO_ADC_SLOT_COL_FORWARD])
     {
         return "TURN_RIGHT";
     }
-    if (raw < GASPETTO_ADC_THRESHOLD_LOOP_START)
+    if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
         return "FORWARD";
     }
@@ -1811,18 +2088,21 @@ void runPieceCalibrationScan()
     Serial.println(++gCalibrationScanCounter);
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
-    Serial.print(" thresholds=[FWD:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_FORWARD_START);
+    /* Piece START thresholds in decode order (ascending raw), matching
+     * pieceLabelForRaw. LOOP_CALL is the last piece; LOOP_END is only the
+     * top of its range, not a piece, so it is not listed here */
+    Serial.print(" thresholds=[LEFT:");
+    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START);
     Serial.print(" BACK:");
     Serial.print(GASPETTO_ADC_THRESHOLD_BACKWARD_START);
+    Serial.print(" EMPTY:");
+    Serial.print(GASPETTO_ADC_THRESHOLD_EMPTY_START);
     Serial.print(" RIGHT:");
     Serial.print(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START);
-    Serial.print(" LEFT:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START);
+    Serial.print(" FWD:");
+    Serial.print(GASPETTO_ADC_THRESHOLD_FORWARD_START);
     Serial.print(" LOOP:");
     Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_START);
-    Serial.print(" LOOPEND:");
-    Serial.print(GASPETTO_ADC_THRESHOLD_LOOP_END);
     Serial.println("]");
 
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
@@ -1891,7 +2171,7 @@ void runPieceCalibrationScan()
             Serial.print(" span=");
             Serial.print(stats.maxRaw - stats.minRaw);
             Serial.print(" => ");
-            Serial.println(pieceLabelForRaw(rawMean));
+            Serial.println(pieceLabelForRaw(slotIndex, rawMean));
         }
     }
 

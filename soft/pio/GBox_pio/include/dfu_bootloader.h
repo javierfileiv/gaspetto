@@ -1,0 +1,1 @@
+../../../emu-pc/targets/gbox/include/dfu_bootloader.h
