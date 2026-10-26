@@ -30,23 +30,46 @@ static const I2CProbeEntry kI2CProbes[] = {
 };
 constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
 
+/* Probe one module with retries: right after the 3V3 rail powers up the
+ * modules are still coming up and a bare transaction can NACK — all four
+ * addresses of the I2C1 bus miss together while each module answers fine a
+ * few seconds later. A miss is therefore retried with pauses before it is
+ * believed */
+static bool probeOneDevice(bool useBitBang, TwoWire *wire, uint8_t address)
+{
+    constexpr uint8_t kProbeRetries  = 2;
+    constexpr uint16_t kProbeRetryMs = 200;
+    for (uint8_t attempt = 0; attempt <= kProbeRetries; ++attempt)
+    {
+        bool ack;
+        if (useBitBang)
+        {
+            ack = i2c3_bb_probe(address);
+        }
+        else
+        {
+            wire->beginTransmission(address);
+            ack = (wire->endTransmission() == 0);
+        }
+        if (ack)
+        {
+            return true;
+        }
+        if (attempt < kProbeRetries)
+        {
+            delay(kProbeRetryMs);
+        }
+    }
+    return false;
+}
+
 void probeI2CDevices()
 {
     Serial.println("\n--- ADS1115 I2C PROBE (3V3 rail ON) ---");
     for (uint8_t i = 0; i < kProbeCount; ++i)
     {
         const I2CProbeEntry &e = kI2CProbes[i];
-        bool ack;
-
-        if (e.useBitBang)
-        {
-            ack = i2c3_bb_probe(e.address);
-        }
-        else
-        {
-            e.wire->beginTransmission(e.address);
-            ack = (e.wire->endTransmission() == 0);
-        }
+        const bool ack         = probeOneDevice(e.useBitBang, e.wire, e.address);
 
         if (ack)
         {
@@ -98,15 +121,7 @@ void reportProbeChanges()
     for (uint8_t i = 0; i < kAdsCount; ++i)
     {
         const AdsTestEntry &entry = kAdsTests[i];
-        if (entry.useBitBang)
-        {
-            current[i] = i2c3_bb_probe(entry.address);
-        }
-        else
-        {
-            Adafruit_ADS1115 ads;
-            current[i] = ads.begin(entry.address, entry.wire);
-        }
+        current[i]                = probeOneDevice(entry.useBitBang, entry.wire, entry.address);
     }
     current[kAdsCount] = radio.isChipConnected();
 
