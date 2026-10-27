@@ -27,9 +27,9 @@ constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 
 TestMode gMode           = TestMode::Health;
 bool gCalibrationRailsOn = false;
-/* One test run is pending. True at boot so the first health pass runs
- * without a keystroke, then set again by 's' from any mode */
-bool gRunTestRequested = true;
+/* One test run is pending, set by 's' from any mode. False at boot: the
+ * board waits for a key instead of running the health cycle on its own */
+bool gRunTestRequested = false;
 
 void enterMode(TestMode mode)
 {
@@ -249,8 +249,7 @@ void setup()
     printUsbHelp();
     Serial.print("   mode: ");
     Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
-
-    Serial.println("\n--- POWER RAILS TEST CYCLE ---");
+    Serial.println("   waiting for a key ('?' for help)");
 }
 
 // ==========================================
