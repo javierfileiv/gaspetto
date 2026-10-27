@@ -102,7 +102,7 @@ void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
 // game.cpp - guided campaign walk and row generation
 // ==========================================
 /* Slots covered by the guided walk (the soldered main zone, up to 20) */
-constexpr uint8_t kGameSlotCount = 12;
+constexpr uint8_t kGameSlotCount = 20;
 
 extern const BoxPieceId kGamePieces[];
 extern bool gGameActive;

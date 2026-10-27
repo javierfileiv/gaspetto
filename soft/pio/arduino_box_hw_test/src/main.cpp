@@ -68,7 +68,6 @@ void enterMode(TestMode mode)
 void runI2CTests()
 {
     Serial.println("\n--- ADS1115 I2C TEST (3V3 rail ON) ---");
-    Serial.println("   NOTE: ADC channels are floating in this test; values are not validated.");
 
     for (uint8_t i = 0; i < kAdsCount; ++i)
     {
