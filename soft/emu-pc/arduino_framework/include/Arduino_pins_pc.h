@@ -21,7 +21,8 @@
 #define PB7 7
 #define PB10 10
 #define PB11 11
-#define PB12 12
+#define PB8 114
+#define PB9 12
 #define PB14 14
 #define PB15 15
 #define PB_10 10
@@ -30,7 +31,6 @@
 #define PB_14 14
 #define PB_15 15
 #define PC13 113
-#define PC14 114
 #define PC_13 13
 #define RISING 0
 #define FALLING 1
