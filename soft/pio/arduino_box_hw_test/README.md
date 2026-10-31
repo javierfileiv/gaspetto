@@ -30,10 +30,11 @@ The production and test firmware must agree on thresholds, so both read the same
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
+| `reset` | Type the five letters in a row to reboot the MCU |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
 
-Typed keys are echoed back so you always see what the board received: `[SP]` marks SPACE, and a new line starts when the board consumes the Enter. The monitor stop echoes its stop key and annotates the burst tail it drains as `[dropped N]`; a cluster import (`i`) echoes each accepted line with a `<<<` prefix instead of echoing the paste character by character.
+Typed keys are echoed back so you always see what the board received: `[SP]` marks SPACE, and a new line starts when the board consumes the Enter. The monitor stop echoes its stop key and annotates the burst tail it drains as `[dropped N]`.
 
 ## The Pieces
 
@@ -118,10 +119,10 @@ Game mode replaces manual `<slot><label>` typing with a guided sequence that pre
 The firmware walks through all (piece, slot) combinations in a fixed order:
 
 1. **By piece**: EMPTY → FORWARD → LOOP_CALL → TURN_RIGHT → TURN_LEFT
-2. **By slot**: for each piece, all slots 1–12 — the soldered main zone (`kGameSlotCount` extends to 20 with the loop zone)
+2. **By slot**: for each piece, all 20 slots (`kGameSlotCount = 20`, the fully populated board)
 3. **By sample**: 8 readings per combination (configurable via `kGameSamplesPerCombo`)
 
-Total: 5 pieces × 12 slots × 8 samples = **480 steps**. EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
+Total: 5 pieces × 20 slots × 8 samples = **800 steps**. EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
 
 ### Sequence
 
@@ -151,13 +152,13 @@ prefixes `g`, then one optional piece letter narrows it further:
 ```text
 7R      # clear all slot 7 clusters first
 7g      # scope slot 7: waits for a piece letter, or a second g for all five
-7gg     # whole slot campaign (33 steps, EMPTY confirmed for slot 7 only)
+7gg     # whole slot campaign (40 steps, EMPTY confirmed for slot 7 only)
 7gf     # only slot 7 FORWARD: 8 captures, then the campaign ends and emits
 ```
 
 Piece letters: `e` empty, `f` forward, `L` loop, `r` turn right, `l` turn
 left. Any other key cancels the armed scope. On every end — natural or
-`q` — the firmware re-emits all twelve rows from the RAM clusters, so the
+`q` — the firmware re-emits all twenty rows from the RAM clusters, so the
 untouched slots keep the data they already had from an earlier run; a scoped
 run on a cold board will honestly print `[NO DATA]` for the others. `w`
 reprints analysis and rows at any time without entering the game.
@@ -177,7 +178,7 @@ A zeroed row decodes INVALID on purpose — an untrusted slot must never inject 
 
 Game mode parameters are defined in `src/game.cpp`:
 
-- `kGameSlotCount` — number of slots covered (12 currently, the soldered main zone; up to 20)
+- `kGameSlotCount` — number of slots covered (20, the fully populated board)
 - `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
 - `kGameStabilitySpanMax` — max span for stability check (default 100 counts)
 - `kGamePieceCount` — entries the walk visits (5: the empty board plus the four played pieces)
@@ -188,15 +189,15 @@ Game mode parameters are defined in `src/game.cpp`:
 c                    # calibration mode
 g                    # start game mode
 --- GAME MODE STARTED ---
-   480 steps (5 pieces x 12 slots x 8 samples)
-   [1/480] slot 1, EMPTY (remove piece) [1/8]
+   800 steps (5 pieces x 20 slots x 8 samples)
+   [1/800] slot 1, EMPTY (remove piece) [1/8]
    -> place/adjust, wait for stability, then SPACE
 SPACE                # one SPACE for the EMPTY sweep records every slot
 ...
-   [121/480] slot 2, FORWARD (green, 4mm N) [1/8]   # auto-capture mode:
+   [169/800] slot 2, FORWARD (green, 4mm N) [1/8]   # auto-capture mode:
    recorded raw=15276 (span=3)                     # no SPACE, the settle does it
 ...
-   [480/480] slot 12, TURN_LEFT (blue, 4mm S) [8/8]
+   [800/800] slot 20, TURN_LEFT (blue, 4mm S) [8/8]
    recorded raw=8763 (span=2)
 
 --- GAME MODE ENDED ---
@@ -206,7 +207,7 @@ SPACE                # one SPACE for the EMPTY sweep records every slot
               TURN_RIGHT[14224..14224] FORWARD[14896..14896] gaps 2256,366,752,672
    slot 10 [OVERLAP TURN_RIGHT/FORWARD gap=-48, row zeroed]
    ...
-   calibrated slots: 11/12
+   calibrated slots: 19/20
 
 --- GENERATED PER-SLOT ROWS ---
 /* --- BEGIN GENERATED PER-SLOT ROWS --- */
@@ -249,14 +250,20 @@ pio device monitor -b 115200
 
 ## Expected Output
 
-At boot (then again on `s`, with the LED menu and animations in between):
+At boot — the firmware ends on a waiting hint (the cycle no longer starts by itself):
 
 ```
 --- HARDWARE TEST STARTED ---
 1. MOSFETs initialized and TURNED OFF.
    5V LED rail ON (settled) before APA106 init
-[led] APA106 init: 3 pixel(s) on PB8, first frame sent (all dark)
+APA106 init: 3 pixel(s) on PB8, first frame sent (all dark)
 ...
+   waiting for a key ('?' for help)
+```
+
+Then on `s` (the LED menu and animations can run in between with `l`):
+
+```
 [health] cycle start ('c' = calibration, '?' = status)
 -> TURNING ON 5V_SWITCHED (LED Cache)...
 ...
