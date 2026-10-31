@@ -16,6 +16,7 @@ void printUsbHelp()
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
     Serial.println("   rows:  w = reprint analysis and pasteable table");
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
+    Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -213,6 +214,26 @@ void handleUsbCommands()
             digitsStarted = true;
             continue;
         }
+
+        /* Typing reset (five letters in a row) reboots the MCU, same
+         * matcher style as dfu above; the letters are consumed only while
+         * the word still matches, any other character breaks the sequence
+         * and is handled normally. NVIC_SystemReset never returns: it goes
+         * through the full boot path (rails, APA106 dark frame, menus) */
+        static const char kResetWord[] = "reset";
+        static uint8_t resetWordSeen   = 0;
+        if (incoming == kResetWord[resetWordSeen])
+        {
+            if (++resetWordSeen == sizeof(kResetWord) - 1U)
+            {
+                resetWordSeen = 0;
+                Serial.println("\n--- MCU RESET ---");
+                delay(50); /* let the line flush before the USB link drops */
+                NVIC_SystemReset();
+            }
+            continue;
+        }
+        resetWordSeen = 0;
 
         /* Typing dfu (three letters in a row) enters the DFU bootloader.
          * The letters are consumed only while the word still matches: any
