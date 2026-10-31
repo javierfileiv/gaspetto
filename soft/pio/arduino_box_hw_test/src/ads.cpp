@@ -6,15 +6,15 @@
 
 #include <Adafruit_ADS1X15.h>
 
-// ==========================================
-// BASIC I2C PROBE (always enabled)
-// Checks each expected ADS1115 address responds with ACK.
-// ==========================================
+/* ========================================== */
+/* BASIC I2C PROBE (always enabled) */
+/* Checks each expected ADS1115 address responds with ACK. */
+/* ========================================== */
 
 struct I2CProbeEntry
 {
-    bool useBitBang; // true = use bit-banging, false = use TwoWire
-    TwoWire *wire;   // only used if useBitBang is false
+    bool useBitBang; /* true = use bit-banging, false = use TwoWire */
+    TwoWire *wire;   /* only used if useBitBang is false */
     uint8_t address;
     const char *label;
 };
@@ -85,8 +85,8 @@ void probeI2CDevices()
 }
 
 #ifdef TEST_ADS1115
-// Slot ranges (wired on the board): 1-4=0x4B(SCL), 5-8=0x48(GND),
-// 9-12=0x4A(SDA), 13-16=0x49(VCC), 17-20=I2C3 0x4A (bit-bang)
+/* Slot ranges (wired on the board): 1-4=0x4B(SCL), 5-8=0x48(GND), */
+/* 9-12=0x4A(SDA), 13-16=0x49(VCC), 17-20=I2C3 0x4A (bit-bang) */
 AdsTestEntry kAdsTests[] = {
     {false, &i2c1, 0x4B, "I2C1", "ADDR->SCL"},  {false, &i2c1, 0x48, "I2C1", "ADDR->GND"},
     {false, &i2c1, 0x4A, "I2C1", "ADDR->SDA"},  {false, &i2c1, 0x49, "I2C1", "ADDR->VCC"},
@@ -212,24 +212,24 @@ bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
     TwoWire *wire   = entry->wire;
     uint8_t address = entry->address;
 
-    // Transaction 1: Write register pointer
+    /* Transaction 1: Write register pointer */
     wire->beginTransmission(address);
     wire->write(ADS1X15_REG_POINTER_CONFIG);
-    const uint8_t txErr = wire->endTransmission(); // Stop condition (no repeated start)
+    const uint8_t txErr = wire->endTransmission(); /* Stop condition (no repeated start) */
     if (txErr != 0)
     {
         return false;
     }
 
-    // Transaction 2: Read data
+    /* Transaction 2: Read data */
     const uint8_t rxCount = wire->requestFrom(address, static_cast<uint8_t>(2));
     if (rxCount != 2 || wire->available() < 2)
     {
         return false;
     }
 
-    // Two read() calls in one expression would be unsequenced: the byte order of the
-    // resulting word would then be unspecified. Sequence them explicitly.
+    /* Two read() calls in one expression would be unsequenced: the byte order of
+     * the resulting word would then be unspecified. Sequence them explicitly. */
     const uint16_t high = static_cast<uint16_t>(wire->read());
     const uint16_t low  = static_cast<uint16_t>(wire->read());
     config              = static_cast<uint16_t>((high << 8) | low);
@@ -256,7 +256,7 @@ static bool readAdsSingleEnded(const AdsTestEntry *entry, uint8_t channel, int16
 
     if (entry->useBitBang)
     {
-        // Use bit-banging for I2C3
+        /* Use bit-banging for I2C3 */
         if (!i2c3_bb_write_register(entry->address, ADS1X15_REG_POINTER_CONFIG, config))
         {
             return false;

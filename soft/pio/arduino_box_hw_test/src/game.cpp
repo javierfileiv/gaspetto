@@ -83,8 +83,8 @@ int gamePieceForChar(char ch)
     }
 }
 
-// GAME MODE — guided piece calibration
-// ==========================================
+/* GAME MODE — guided piece calibration */
+/* ========================================== */
 
 /* Total steps the game will walk through. Each (piece, slot) combo gets
  * kGameSamplesPerCombo recordings; the scope shrinks the product */

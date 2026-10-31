@@ -14,10 +14,10 @@
 #include "piece_thresholds.h"
 #include "pin_definitions.h"
 
-// Initialize radio object
+/* Initialize radio object */
 RF24 radio(NRF24_CE, NRF24_CSN);
 
-// I2C1 uses the global Wire instance
+/* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
 
 constexpr uint16_t kRailSettleDelayMs       = 250;
@@ -61,9 +61,9 @@ void enterMode(TestMode mode)
     }
 }
 
-// ==========================================
-// ADS1115 TEST
-// ==========================================
+/* ========================================== */
+/* ADS1115 TEST */
+/* ========================================== */
 
 void runI2CTests()
 {
@@ -73,7 +73,7 @@ void runI2CTests()
     {
         const AdsTestEntry &entry = kAdsTests[i];
 
-        // Check if device is accessible
+        /* Check if device is accessible */
         bool deviceFound;
         if (entry.useBitBang)
         {
@@ -121,7 +121,7 @@ void runI2CTests()
         Serial.print(config, BIN);
         Serial.print(") ");
 
-        // Compare with ADS1115 reset value (0x8583)
+        /* Compare with ADS1115 reset value (0x8583) */
         const uint16_t ADS1115_RESET_CONFIG = 0x8583;
         if (config == ADS1115_RESET_CONFIG)
         {
@@ -172,18 +172,18 @@ void runI2CTests()
 
     Serial.println("--- ADS1115 TEST DONE ---");
 }
-#endif // TEST_ADS1115
+#endif /* TEST_ADS1115 */
 
 #define DELAY 3000
 
-// ==========================================
-// SETUP
-// ==========================================
+/* ========================================== */
+/* SETUP */
+/* ========================================== */
 void setup()
 {
-    // Initialize USB CDC Serial Monitor
+    /* Initialize USB CDC Serial Monitor */
     Serial.begin(115200);
-    delay(3000); // Wait for Serial Monitor to open
+    delay(3000); /* Wait for Serial Monitor to open */
     Serial.println("\n\n--- HARDWARE TEST STARTED ---");
 
     /* The heartbeat writes PC13 from the first idle pass: without output
@@ -191,12 +191,12 @@ void setup()
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, HIGH); /* active-low: dark until the first blink */
 
-    // --- MOSFETs Configuration (Active-Low Logic) ---
-    // IMPORTANT: PB14 must be OPEN DRAIN to safely handle 5V!
+    /* --- MOSFETs Configuration (Active-Low Logic) --- */
+    /* IMPORTANT: PB14 must be OPEN DRAIN to safely handle 5V! */
     pinMode(PIN_MOSFET_5V_LEDS, OUTPUT_OPEN_DRAIN);
     pinMode(PIN_MOSFET_3V3_SENSORS, OUTPUT_OPEN_DRAIN);
 
-    // Turn OFF all rails by default (HIGH = OFF for P-Channel MOSFETs)
+    /* Turn OFF all rails by default (HIGH = OFF for P-Channel MOSFETs) */
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     Serial.println("1. MOSFETs initialized and TURNED OFF.");
@@ -212,14 +212,14 @@ void setup()
     Serial.print(kApaPixelCount);
     Serial.println(" pixel(s) on PB8, first frame sent (all dark)");
 
-    // --- nRF24L01+ SPI Test ---
+    /* --- nRF24L01+ SPI Test --- */
     Serial.println("\n2. Testing nRF24L01+ SPI communication...");
 
     if (radio.begin())
     {
         Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
-        radio.setPALevel(RF24_PA_LOW); // Set low power for testing
-        radio.printDetails();          // Print chip info to Serial
+        radio.setPALevel(RF24_PA_LOW); /* Set low power for testing */
+        radio.printDetails();          /* Print chip info to Serial */
     }
     else
     {
@@ -228,19 +228,19 @@ void setup()
         Serial.println("   -> Check if 3.3V is reaching the nRF board.");
     }
 
-    // --- I2C init ---
+    /* --- I2C init --- */
     Serial.println("\n3. Initializing I2C buses...");
     i2c1.begin();
     i2c1.setClock(kI2c1ClockHz);
     Serial.println("   I2C1 (SCL=PB6, SDA=PB7) @ 100kHz initialized.");
 
-    // Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered
+    /* Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered */
     Serial.println("\n4. Turning ON 3V3_SWITCHED to power ADS1115 modules...");
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); // Turn ON Q2
-    delay(kRailSettleDelayMs);                 // Wait for modules to initialize
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
+    delay(kRailSettleDelayMs);                 /* Wait for modules to initialize */
     Serial.println("   [OK] 3V3_SWITCHED activated - ADS1115 modules should be powered");
 
-    // Initialize I2C3 bit-banging
+    /* Initialize I2C3 bit-banging */
     Serial.println("\n5. Initializing I2C3 bit-banging (PB4=SDA, PA8=SCL)...");
     i2c3_bb_init();
     Serial.println("   [OK] I2C3 bit-banging initialized.");
@@ -254,12 +254,12 @@ void setup()
     Serial.println("   waiting for a key ('?' for help)");
 }
 
-// ==========================================
-// HEALTH CYCLE (runs on demand)
-// ==========================================
+/* ========================================== */
+/* HEALTH CYCLE (runs on demand) */
+/* ========================================== */
 void runHealthCycle()
 {
-    // Quick double blink visual check on builtin LED.
+    /* Quick double blink visual check on builtin LED. */
     for (int i = 0; i < 2; i++)
     {
         digitalWrite(PIN_LED, LOW);
@@ -271,26 +271,26 @@ void runHealthCycle()
     Serial.println("[health] cycle start ('c' = calibration, '?' = status)");
 
     Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
-    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);     // Turn ON Q1
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);     /* Turn ON Q1 */
     Serial.println("-> TURNING ON 3V3_SWITCHED (Sensors)...");
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); // Turn ON Q2
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
 
-    delay(kRailSettleDelayMs);                 // Let rails settle before I2C
+    delay(kRailSettleDelayMs);                 /* Let rails settle before I2C */
 
     probeI2CDevices();
 
 #ifdef TEST_ADS1115
-    // Test ADS1115 modules while 3V3 is active
+    /* Test ADS1115 modules while 3V3 is active */
     runI2CTests();
 #endif
 
-    // APA106 animation must be sent while 5V LED rail is still powered.
+    /* APA106 animation must be sent while 5V LED rail is still powered. */
     runPowerOnCycleAnimation();
     runPowerOffCycleAnimation();
 
     reportProbeChanges();
 
-    // Quick double blink visual check on builtin LED.
+    /* Quick double blink visual check on builtin LED. */
     for (int i = 0; i < 2; i++)
     {
         digitalWrite(PIN_LED, LOW);
@@ -308,17 +308,17 @@ void runHealthCycle()
     }
 
     Serial.println("-> TURNING OFF 5V_SWITCHED...");
-    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     // Turn OFF Q1
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     /* Turn OFF Q1 */
     Serial.println("-> TURNING OFF 3V3_SWITCHED...");
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); // Turn OFF Q2
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); /* Turn OFF Q2 */
 
     Serial.println("Cycle complete. 's' reruns the test.");
     delayWithUsb(DELAY);
 }
 
-// ==========================================
-// MAIN LOOP
-// ==========================================
+/* ========================================== */
+/* MAIN LOOP */
+/* ========================================== */
 void loop()
 {
     handleUsbCommands();
@@ -347,7 +347,7 @@ void loop()
             return;
         }
 
-        // Quick double blink visual check on builtin LED.
+        /* Quick double blink visual check on builtin LED. */
         for (int i = 0; i < 2; i++)
         {
             digitalWrite(PIN_LED, LOW);
@@ -381,7 +381,7 @@ void loop()
     }
 #endif
 
-    // Quiet idle: heartbeat only, no probes, no tests between demands.
+    /* Quiet idle: heartbeat only, no probes, no tests between demands. */
     for (int i = 0; i < 2; i++)
     {
         digitalWrite(PIN_LED, LOW);

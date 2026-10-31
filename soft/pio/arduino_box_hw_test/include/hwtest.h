@@ -41,8 +41,8 @@ enum class TestMode : uint8_t
 
 struct AdsTestEntry
 {
-    bool useBitBang; // true = use bit-banging, false = use TwoWire
-    TwoWire *wire;   // only used if useBitBang is false
+    bool useBitBang; /* true = use bit-banging, false = use TwoWire */
+    TwoWire *wire;   /* only used if useBitBang is false */
     uint8_t address;
     const char *busName;
     const char *addrNote;
@@ -72,9 +72,9 @@ inline void delayWithUsb(uint32_t totalMs)
     }
 }
 
-// ==========================================
-// clusters.cpp - label storage
-// ==========================================
+/* ========================================== */
+/* clusters.cpp - label storage */
+/* ========================================== */
 /* Accumulated samples per (slot, piece): the operator places a piece in a
  * slot, the game records the current mean reading and, across visits,
  * min/max/count map each piece type per sensor. Label indexes match the
@@ -94,9 +94,9 @@ void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw);
 void resetLabeledSlot(uint8_t slotIndex);
 void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
 
-// ==========================================
-// game.cpp - guided campaign walk and row generation
-// ==========================================
+/* ========================================== */
+/* game.cpp - guided campaign walk and row generation */
+/* ========================================== */
 /* Slots covered by the guided walk (the soldered main zone, up to 20) */
 constexpr uint8_t kGameSlotCount = 20;
 
@@ -132,9 +132,9 @@ void pollGameAutoCapture();
 void advanceGameState();
 void emitGameThresholds();
 
-// ==========================================
-// scan.cpp - calibration scan and slot monitor
-// ==========================================
+/* ========================================== */
+/* scan.cpp - calibration scan and slot monitor */
+/* ========================================== */
 extern bool gMonitorActive;
 extern bool gMonitorExit;
 
@@ -155,15 +155,15 @@ extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
 extern bool gLedMenuActive;
 
-// ==========================================
-// shell.cpp - usb key dispatch, echo and help
-// ==========================================
+/* ========================================== */
+/* shell.cpp - usb key dispatch, echo and help */
+/* ========================================== */
 void enterMode(TestMode mode);
 void printUsbHelp();
 
-// ==========================================
-// ads.cpp - I2C bus layer, ADS1115 reads, recovery and probe history
-// ==========================================
+/* ========================================== */
+/* ads.cpp - I2C bus layer, ADS1115 reads, recovery and probe history */
+/* ========================================== */
 extern TwoWire &i2c1;
 extern RF24 radio;
 extern AdsTestEntry kAdsTests[kAdsCount];
@@ -180,9 +180,9 @@ void recoverAdsModule(const AdsTestEntry *entry);
 bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config);
 bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw);
 
-// ==========================================
-// leds.cpp - APA106 status LEDs and animations
-// ==========================================
+/* ========================================== */
+/* leds.cpp - APA106 status LEDs and animations */
+/* ========================================== */
 /* The chain is driven by the FastLED library (dedicated APA106
  * controller, RGB wire order measured on this batch) */
 

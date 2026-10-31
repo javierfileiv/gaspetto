@@ -295,7 +295,7 @@ void runPieceCalibrationScan()
     {
         const AdsTestEntry &entry = kAdsTests[deviceIndex];
 
-        // Check if device is accessible
+        /* Check if device is accessible */
         bool deviceFound;
         if (entry.useBitBang)
         {
