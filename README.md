@@ -2,7 +2,7 @@
 
 Gaspetto is an open-source robotics project inspired by Cubetto, with:
 
-- embedded firmware targets (car, box, NRF sender)
+- embedded firmware targets (car, box)
 - a PC emulation layer for fast iteration and unit testing
 - CI pipelines for build, tests, and coverage
 
@@ -61,7 +61,11 @@ goes quiet to save power until the next button press.
 ## Repository Layout
 
 - `soft/emu-pc`: host-side CMake project with GoogleTest-based tests and coverage
-- `soft/pio`: PlatformIO firmware projects (`GCar_pio`, `GBox_pio`, `NrfSender_pio`, hardware test apps)
+- `soft/pio`: PlatformIO firmware projects
+	- `GCar_pio`, `GBox_pio`: robot and box firmware
+	- `NrfLink_pio`: radio link test tool for Arduino Uno + NRF24L01 — sends motor
+	commands to the car over the radio
+	- hardware test apps
 - `tools`: helper scripts used locally and in CI
 - `.github/workflows`: CI workflows
 

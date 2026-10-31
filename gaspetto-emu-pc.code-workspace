@@ -7,7 +7,7 @@
             "path": "soft/pio/GBox_pio"
         },
         {
-            "path": "soft/pio/NrfSender_pio"
+            "path": "soft/pio/NrfLink_pio"
         },
         {
             "path": "tools"

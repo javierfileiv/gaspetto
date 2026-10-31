@@ -21,7 +21,7 @@ void setup()
         delay(10);
     }
 #endif
-    Serial.println("NRF Event Sender - Sends commands over radio");
+    Serial.println("NrfLink - Gaspetto radio link tool");
     if (!radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
@@ -33,7 +33,10 @@ void setup()
     /* Support CommandPacket (32 bytes) for multi-command programs. */
     radio.setPayloadSize(sizeof(CommandPacket));
     radio.openWritingPipe(gcar_pipe_name);
-    radio.openReadingPipe(2, gcar_telemetry_pipe_name);
+    /* Pipe 1, not pipe 2: RF24 writes a single address byte for pipes 2-5
+     * and takes the other four from pipe 1, so every Gaspetto address
+     * (they all start with "_") would collapse back onto pipe 1 */
+    radio.openReadingPipe(1, gcar_telemetry_pipe_name);
     radio.powerUp();
     radio.printDetails();
     radio.printPrettyDetails();
@@ -100,12 +103,12 @@ void clearProgram()
 
 void loop()
 {
-    /* Drain RX FIFO: check for incoming telemetry from GCar (pipe 2 = _tel_). */
+    /* Drain RX FIFO: check for incoming telemetry from GCar (pipe 1 = _tel_). */
     uint8_t pipe;
     while (radio.available(&pipe)) {
         TelemetryPacket telemetry;
         radio.read(&telemetry, sizeof(telemetry));
-        if (pipe == 2) {
+        if (pipe == 1) {
             displayTelemetry(telemetry);
         }
     }
@@ -167,7 +170,7 @@ void loop()
 
 void printHelp()
 {
-    Serial.println("\n=== NRF Sender - CommandPacket Mode ===");
+    Serial.println("\n=== NrfLink - CommandPacket Mode ===");
     Serial.println("Single commands (send immediately):");
     Serial.println("  w/W: Forward");
     Serial.println("  s/S: Backward");
