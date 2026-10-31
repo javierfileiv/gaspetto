@@ -71,17 +71,6 @@
       }
     },
     {
-      "name": "nrf-release",
-      "displayName": "NRF Sender Release",
-      "description": "Release build for NRF Sender target",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-nrf",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "NRF_SENDER": "ON"
-      }
-    },
-    {
       "name": "tests",
       "displayName": "Unit Tests",
       "description": "Build all unit tests",

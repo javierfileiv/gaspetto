@@ -8,7 +8,6 @@ Gaspetto consists of:
 
 - **Gaspetto Car** — motors, IMU, NRF24 receiver
 - **Gaspetto Box** — ADC slot sensors, APA106 status LEDs, NRF24 transmitter
-- **NRF Sender** — standalone radio test utility
 
 Both car and box use the Active Object pattern with a small state machine (`IdleState` ↔ `ProcessingState`).
 
@@ -41,8 +40,7 @@ emu-pc/
 │   ├── gcar/      # Car firmware
 │   │   ├── movement_controller/  # Motor + IMU control with PID
 │   │   └── src/           # State implementations
-    ├── gbox/      # Box firmware (GBox + states + pin defs)
-│   └── nrf_sender/        # Radio test utility
+│   └── gbox/      # Box firmware (GBox + states + pin defs)
 └── tests/                 # Google Test unit tests
     ├── gcar/      # Car-specific tests
     ├── gbox/      # Box-specific tests (program builder)
@@ -78,7 +76,7 @@ cmake --preset car-release && cmake --build build-car --target gcar
 cmake --preset box-release && cmake --build build-box --target gbox
 ```
 
-Debug presets (`car-debug`, `box-debug`, `nrf-debug`) and NRF sender targets follow the same pattern.
+Debug presets (`car-debug`, `box-debug`) follow the same pattern.
 
 ### VS Code tasks
 
