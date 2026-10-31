@@ -4,16 +4,16 @@ Hardware validation and piece calibration firmware for the Gaspetto GBox program
 
 ## Purpose
 
-The GBox programming board reads 20 piece slots through five ADS1115 ADCs and lights them with the NeoPixel ring. This firmware runs two runtime test modes over the same build:
+The GBox programming board reads 20 piece slots through five ADS1115 ADCs and drives three APA106 status LEDs (dedicated FastLED APA106 controller on PB8). This firmware runs two runtime test modes over the same build:
 
-1. **Health mode** — power rails, LED strip, five ADS1115 probes and the NRF24 radio are exercised once at boot, then each probe change is reported as it happens
+1. **Health mode** — power rails, the APA106 chain, five ADS1115 probes and the NRF24 radio are exercised on demand (`s`), then each probe change is reported as it happens
 2. **Calibration mode** — a capture of how the positive hall sensor reads each actual piece, used to derive the per-slot threshold table
 
 The production and test firmware must agree on thresholds, so both read the same header `soft/emu-pc/targets/gbox/include/piece_thresholds.h` (symlinked into this project's `include/`). Both tables live in that header: production `GBox.cpp` still decodes with the legacy global defines, while this firmware decodes with the per-slot rows. Porting production to the per-slot scan and dropping the legacy defines is a planned separate step.
 
 ## Runtime Modes
 
-- **Health** (default at boot) — runs one test cycle, then sits quiet with the board LED heartbeat; re-running it (`s`) re-tests everything and reports probe/radio changes against the previous cycle
+- **Health** (default at boot) — idles until a key asks for a test (`s` runs the cycle); the board LED heartbeat runs while quiet, and each cycle reports probe/radio changes against the previous one
 - **Calibration** — keeps the 5V LED rail off, powers the 3V3 sensor rail, and allows piece labeling
 
 ## USB Commands
@@ -28,6 +28,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `x` | Frozen monitor: waits without sampling, SPACE opens one clean 3 s measurement (`<slot>x`, the number is required) |
 | `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
+| `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
@@ -224,7 +225,7 @@ Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/inclu
 - **Slots**: 20 piece slots, each with a positive hall sensor wired to one of 20 ADC channels (five ADS1115 modules × 4 channels)
 - **I2C buses**: four ADS1115 on hardware I2C1 (PB6/PB7), one on bit-banged I2C3 (PB4/PA8) — the I2C3 bus needs bit-bang recovery when it hangs
 - **Slot wiring**: slots 1-4 on the 0x4B module (ADDR→SCL), 5-8 on 0x48 (ADDR→GND), 9-12 on 0x4A (ADDR→SDA), 13-16 on 0x49 (ADDR→VCC), 17-20 on I2C3 0x4A (ADDR→SDA)
-- **LED**: NeoPixel strip (PC14), powered from the 5V rail
+- **LED**: 3-APA106 chain (data on PB8), powered from the 5V rail
 - **Rails**: 5V LED rail (PB14) and 3V3 sensor rail (PB15), each driven through an open-drain MOSFET gate (LOW = ON)
 - **Radio**: NRF24L01 as in production
 - **Board LED** (PC13): heartbeat while idle
@@ -248,15 +249,20 @@ pio device monitor -b 115200
 
 ## Expected Output
 
+At boot (then again on `s`, with the LED menu and animations in between):
+
 ```
---- BOX HW TEST ---
-mode: health
---- POWER RAILS TEST CYCLE ---
-   5V rail OFF, 3V3 OFF: LEDs must be dark
-   [OK]  5V rail must be OFF, LEDs dark
-   [OK]  3V3 rail must be OFF, LEDs dark
-   ...
-   slot 1: raw=13104 min=13101 max=13107
+--- HARDWARE TEST STARTED ---
+1. MOSFETs initialized and TURNED OFF.
+   5V LED rail ON (settled) before APA106 init
+[led] APA106 init: 3 pixel(s) on PB8, first frame sent (all dark)
+...
+[health] cycle start ('c' = calibration, '?' = status)
+-> TURNING ON 5V_SWITCHED (LED Cache)...
+...
+--- ADS1115 TEST DONE ---
+[led] scan test: cyan bounce, 2 trips
+Cycle complete. 's' reruns the test.
 ```
 
-After the health cycle, the firmware idles silently and only wakes to report probe changes or USB keys — `'s'` re-runs the test at will.
+After the health cycle, the firmware idles silently and only wakes to report probe changes or USB keys — `'s'` re-runs the test at will, `'l'` opens the LED test menu.

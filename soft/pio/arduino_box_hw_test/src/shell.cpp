@@ -15,6 +15,7 @@ void printUsbHelp()
     Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
     Serial.println("   rows:  w = reprint analysis and pasteable table");
+    Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
 }
@@ -123,6 +124,17 @@ void handleUsbCommands()
             {
                 break;
             }
+            continue;
+        }
+
+        if (gLedMenuActive)
+        {
+            if (incoming != '\n' && incoming != '\r')
+            {
+                runLedTestKey(static_cast<char>(incoming));
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
             continue;
         }
 
@@ -276,6 +288,13 @@ void handleUsbCommands()
                 break;
             }
             emitGameThresholds();
+            break;
+        case 'l':
+            if (gLedMenuActive)
+            {
+                break; /* unreachable: the menu intercepts before the switch */
+            }
+            startLedTestMenu();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)

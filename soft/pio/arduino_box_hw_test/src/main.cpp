@@ -186,15 +186,6 @@ void setup()
     delay(3000); // Wait for Serial Monitor to open
     Serial.println("\n\n--- HARDWARE TEST STARTED ---");
 
-#ifdef TEST_LED_ANIMATIONS
-    // --- APA106 LED Configuration ---
-    pinMode(PIN_LED_DATA, OUTPUT);
-    digitalWrite(PIN_LED_DATA, LOW);
-    leds.begin();
-    leds.clear();
-    leds.show();
-#endif
-
     /* The heartbeat writes PC13 from the first idle pass: without output
      * mode it toggles a floating input and the LED stays dark */
     pinMode(PIN_LED, OUTPUT);
@@ -209,6 +200,17 @@ void setup()
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     Serial.println("1. MOSFETs initialized and TURNED OFF.");
+
+    /* --- APA106 LED Configuration --- */
+    /* The 5V rail comes up BEFORE the first frames: the APA106 ignores
+     * every frame sent while unpowered */
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
+    delay(kRailSettleDelayMs);
+    Serial.println("   5V LED rail ON (settled) before APA106 init");
+    ledsBegin();
+    Serial.print("APA106 init: ");
+    Serial.print(kApaPixelCount);
+    Serial.println(" pixel(s) on PB8, first frame sent (all dark)");
 
     // --- nRF24L01+ SPI Test ---
     Serial.println("\n2. Testing nRF24L01+ SPI communication...");
@@ -282,11 +284,9 @@ void runHealthCycle()
     runI2CTests();
 #endif
 
-#ifdef TEST_LED_ANIMATIONS
     // APA106 animation must be sent while 5V LED rail is still powered.
     runPowerOnCycleAnimation();
     runPowerOffCycleAnimation();
-#endif
 
     reportProbeChanges();
 

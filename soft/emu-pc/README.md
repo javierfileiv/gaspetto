@@ -7,7 +7,7 @@ PC emulation environment for Gaspetto. Build and run the same car and box firmwa
 Gaspetto consists of:
 
 - **Gaspetto Car** — motors, IMU, NRF24 receiver
-- **Gaspetto Box** — ADC slot sensors, NeoPixel LEDs, NRF24 transmitter
+- **Gaspetto Box** — ADC slot sensors, APA106 status LEDs, NRF24 transmitter
 - **NRF Sender** — standalone radio test utility
 
 Both car and box use the Active Object pattern with a small state machine (`IdleState` ↔ `ProcessingState`).
@@ -196,7 +196,7 @@ Each slot holds an ADC-decoded command piece (`BoxPieceId`):
 
 ### LED Signaling Guide
 
-The Gaspetto Box uses a 3-LED NeoPixel strip (WS2812B daisy chain on pin PC_14) to provide visual feedback during operation. Each LED is assigned a specific role:
+The Gaspetto Box uses a 3-LED APA106 chain (data on PB8) to provide visual feedback during operation. Each LED is assigned a specific role:
 
 | LED | Position | Role | States |
 |-----|----------|------|--------|
@@ -332,7 +332,7 @@ Slots 14–19  →  Loop sub-program   ( 6 slots)
 
 ### LED signaling
 
-3-LED NeoPixel strip (WS2812B on `PC_14`):
+3-LED APA106 chain (data on `PB8`):
 
 | LED | Role | Idle | Active states |
 |-----|------|------|---------------|
@@ -400,7 +400,7 @@ These PIO projects live alongside production firmware under `soft/pio/`:
 
 | Project | Purpose |
 |---------|---------|
-| `arduino_box_hw_test` | ADS1115, NeoPixel, NRF bring-up |
+| `arduino_box_hw_test` | ADS1115, APA106, NRF bring-up |
 | `arduino_car_hw_test` | Motors, IMU bring-up |
 | `arduino_straight_drive` | PWM threshold + PID straight-drive tuning |
 | `mpu_plot` | IMU plotting utility |

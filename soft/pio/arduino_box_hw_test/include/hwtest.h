@@ -10,10 +10,6 @@
 #include <RF24.h>
 #include <Wire.h>
 
-#ifdef TEST_LED_ANIMATIONS
-#include <Adafruit_NeoPixel.h>
-#endif
-
 /* Piece thresholds come from the shared piece_thresholds.h with their
  * static asserts: same numbers as the production firmware */
 
@@ -157,6 +153,7 @@ void runPieceCalibrationScan();
 extern TestMode gMode;
 extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
+extern bool gLedMenuActive;
 
 // ==========================================
 // shell.cpp - usb key dispatch, echo and help
@@ -186,18 +183,39 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
 // ==========================================
 // leds.cpp - APA106 status LEDs and animations
 // ==========================================
-#ifdef TEST_LED_ANIMATIONS
-extern Adafruit_NeoPixel leds;
+/* The chain is driven by the FastLED library (dedicated APA106
+ * controller, RGB wire order measured on this batch) */
 
+/* Pixels on the chain: each APA106 regenerates the signal for the next
+ * one, so a pixel soldered later lights as soon as it is wired after the
+ * previous DOUT. Override without editing: -D APA_LED_COUNT=n */
+#ifndef APA_LED_COUNT
+#define APA_LED_COUNT 3
+#endif
+constexpr uint16_t kApaPixelCount = APA_LED_COUNT;
+
+/* Global output level handed to FastLED (255 = full); override with
+ * -D APA_LED_INTENSITY=n when full scale is too harsh on the bench */
+#ifndef APA_LED_INTENSITY
+#define APA_LED_INTENSITY 80
+#endif
+constexpr uint8_t kApaIntensity = APA_LED_INTENSITY;
+
+/* Prepare the data pin and send one dark frame; call it AFTER the 5V
+ * rail is up and settled (the APA106 ignores frames while unpowered) */
+void ledsBegin();
 void blackoutLeds();
 void setOneLed(uint8_t led, uint8_t r, uint8_t g, uint8_t b);
 void setTwoLeds(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
                 uint8_t gB, uint8_t bB);
+void runLedWalkTest();
 void runScanAnimationTest();
 void runSuccessAnimationTest();
 void runBuildErrorAnimationTest();
 void runEmptyBoardAnimationTest();
 void runRfErrorAnimationTest();
+void runChannelOrderTest(uint8_t led);
 void runPowerOnCycleAnimation();
 void runPowerOffCycleAnimation();
-#endif /* TEST_LED_ANIMATIONS */
+void startLedTestMenu();
+void runLedTestKey(char key);
