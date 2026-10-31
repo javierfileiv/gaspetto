@@ -6,9 +6,9 @@
 #include <stdint.h>
 
 constexpr size_t BOX_TOTAL_SLOTS = 20;
-constexpr size_t BOX_MAIN_SLOTS = 14;
-constexpr size_t BOX_LOOP_SLOTS = 6;
-constexpr size_t BOX_LED_SLOTS = 3;
+constexpr size_t BOX_MAIN_SLOTS = 12;
+constexpr size_t BOX_LOOP_SLOTS = 8;
+constexpr size_t BOX_LED_COUNT = 3;
 constexpr size_t BOX_MAX_PAYLOAD_COMMANDS = 31;
 
 enum class BoxPieceId : uint8_t {
@@ -17,7 +17,6 @@ enum class BoxPieceId : uint8_t {
     BACKWARD,
     TURN_RIGHT,
     TURN_LEFT,
-    STOP,
     LOOP_CALL,
     INVALID,
 };

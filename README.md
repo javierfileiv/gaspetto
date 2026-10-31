@@ -9,6 +9,55 @@ Gaspetto is an open-source robotics project inspired by Cubetto, with:
 [![Gaspetto CI](https://github.com/javierfileiv/gaspetto/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/javierfileiv/gaspetto/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://javierfileiv.github.io/gaspetto/coverage-badge.json&cacheSeconds=300)](https://javierfileiv.github.io/gaspetto/coverage/coverage.html)
 
+## How It Works
+
+Gaspetto is a physical programming game: instead of tapping blocks on a
+screen, the player builds a program out of tangible pieces on the Box,
+and a small robot car executes it.
+
+- **GBox** — the programming board. The player arranges command pieces
+  on the sensor slots and presses the button. The Box reads the board,
+  builds the program and beams it to the car.
+- **GCar** — the robot. It receives the program and runs it step by
+  step, driving forward, backward and turning until the program ends.
+
+### The Pieces
+
+- `FORWARD`, `BACKWARD`, `TURN_RIGHT`, `TURN_LEFT` — movement commands
+- `LOOP_CALL` — replays the loop zone right where it sits
+
+The board has two zones: the main zone and the loop zone. Pieces in
+the loop zone are not run directly; each LOOP_CALL piece in the main
+zone replays them at that point in the program. With a full loop zone,
+up to three LOOP_CALLs fit in one program. There is no STOP piece —
+the car stops by itself when the program ends.
+
+### The Lights
+
+Three LEDs on the Box speak a small language:
+
+- on startup, the left LED lights green when every part of the Box is
+  healthy, or red if something is wrong
+- while the board is scanned, a cyan dot bounces across the three LEDs
+- when the program is accepted, green lights flow from left to right
+  and all three stay green while the car runs
+- if the pieces make an invalid program, the right LED blinks red and
+  stays lit
+- if the board is empty, the right LED blinks amber and stays lit
+- if the car could not be reached, the center LED blinks red and stays
+  lit next to the green left LED
+
+In all end cases the pattern holds for about a minute, then the Box
+goes quiet to save power until the next button press.
+
+### A Round Of Play
+
+1. Lay pieces on the board
+2. Press the Box button
+3. The Box scans the board, builds the program and sends it to the car
+4. The car executes the moves in order
+5. Pressing the button again stops the car and empties the program
+
 ## Repository Layout
 
 - `soft/emu-pc`: host-side CMake project with GoogleTest-based tests and coverage
