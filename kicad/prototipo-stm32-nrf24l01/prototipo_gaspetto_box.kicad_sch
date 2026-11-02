@@ -2896,6 +2896,312 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Switch:SW_MEC_5G_LED"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "SW"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "SW_MEC_5G_LED"
+				(at 0 -3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://www.apem.com/medias/download/MEC_switches_serie_MULTIMEC5G.pdf"
+				(at 0 -6.35 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "MEC 5G single pole normally-open illuminated tactile switch"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "switch normally-open pushbutton push-button LED"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "SW*MEC*5G*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "SW_MEC_5G_LED_0_0"
+				(polyline
+					(pts
+						(xy -2.54 0) (xy 2.54 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.286 -1.524) (xy -2.286 -2.159) (xy -1.651 -2.159)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.286 -2.159) (xy -1.016 -0.889)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.016 -1.524) (xy -1.016 -2.159) (xy -0.381 -2.159)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.016 -2.159) (xy 0.254 -0.889)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -0.635 1.27) (xy -0.635 -1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -0.635 0) (xy 1.27 1.27) (xy 1.27 -1.27) (xy -0.635 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+			)
+			(symbol "SW_MEC_5G_LED_0_1"
+				(circle
+					(center -2.032 2.54)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 3.81) (xy 0 5.588)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 2.54)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 3.81) (xy -2.54 3.81)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -5.08 2.54 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 0 180)
+					(length 2.54)
+					(name "K"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 2.54 180)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(symbol "SW_MEC_5G_LED_1_1"
+				(rectangle
+					(start -3.175 5.715)
+					(end 3.175 -2.54)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Transistor_FET:AO3401A"
 			(pin_names
 				(hide yes)
@@ -6315,6 +6621,12 @@
 		(uuid "ad7b91bc-3ddb-454c-85f0-9bb0ad93ffd1")
 	)
 	(junction
+		(at 182.88 223.52)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "affc94d1-bd70-426e-bc15-0d3cc7ff877e")
+	)
+	(junction
 		(at 534.67 217.17)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6942,6 +7254,16 @@
 	)
 	(wire
 		(pts
+			(xy 185.42 223.52) (xy 182.88 223.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "158f5203-018d-40e3-8e49-0c6a61d5e8e1")
+	)
+	(wire
+		(pts
 			(xy 50.8 127) (xy 46.99 127)
 		)
 		(stroke
@@ -7159,6 +7481,16 @@
 			(type default)
 		)
 		(uuid "22c1079e-c233-4468-ad5b-71a5780aa5ce")
+	)
+	(wire
+		(pts
+			(xy 182.88 223.52) (xy 182.88 226.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "22c623a1-b6e3-42c9-bbef-5413fa336bdf")
 	)
 	(wire
 		(pts
@@ -8982,6 +9314,16 @@
 	)
 	(wire
 		(pts
+			(xy 185.42 210.82) (xy 185.42 207.01)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "92e557fe-c71d-427f-ae75-b38275ec2ecc")
+	)
+	(wire
+		(pts
 			(xy 420.37 299.72) (xy 420.37 219.71)
 		)
 		(stroke
@@ -9219,6 +9561,16 @@
 			(type default)
 		)
 		(uuid "9e5f46bb-6f87-40d4-b8be-2f1d9be3c4b0")
+	)
+	(wire
+		(pts
+			(xy 185.42 220.98) (xy 185.42 223.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9e9536b7-d010-4c96-89e0-ca8ca529d0d9")
 	)
 	(wire
 		(pts
@@ -10272,6 +10624,16 @@
 	)
 	(wire
 		(pts
+			(xy 182.88 200.66) (xy 182.88 210.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d8e075e9-a612-43f1-991c-845457481b08")
+	)
+	(wire
+		(pts
 			(xy 213.36 67.31) (xy 213.36 72.39)
 		)
 		(stroke
@@ -10702,6 +11064,16 @@
 	)
 	(wire
 		(pts
+			(xy 185.42 207.01) (xy 191.77 207.01)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "edc3b3cc-ca6b-49e9-a42e-fb9628a491d5")
+	)
+	(wire
+		(pts
 			(xy 218.44 67.31) (xy 213.36 67.31)
 		)
 		(stroke
@@ -10929,6 +11301,16 @@
 			(type default)
 		)
 		(uuid "fccc953f-d0d2-4551-8833-ecd92de2fe8b")
+	)
+	(wire
+		(pts
+			(xy 182.88 220.98) (xy 182.88 223.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fd47e8a2-afa2-4795-bac1-4cea24a9f0e7")
 	)
 	(wire
 		(pts
@@ -13801,6 +14183,16 @@
 		)
 		(uuid "b72ecab5-a96b-4df6-8b3b-739257670586")
 	)
+	(label "WAKE_BUTTON"
+		(at 182.88 200.66 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "bad6810e-a53f-48f6-9d09-8d6f8720020d")
+	)
 	(label "I2C3_SCL"
 		(at 353.06 367.03 0)
 		(effects
@@ -13850,6 +14242,16 @@
 			(justify left bottom)
 		)
 		(uuid "cf464584-9f40-4051-90dc-08b88e87e7a1")
+	)
+	(label "5V_SWITCHED"
+		(at 191.77 207.01 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "cfe46327-0261-4b77-9ccd-9d3df89997bf")
 	)
 	(label "3V3_SWITCHED"
 		(at 468.63 160.02 0)
@@ -17943,6 +18345,83 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 182.88 226.06 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "95d9c4d1-a2a7-45b0-98f9-cb8a7a0af415")
+		(property "Reference" "#PWR028"
+			(at 182.88 232.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 187.452 226.06 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 182.88 226.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 182.88 226.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 182.88 226.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "6e9dbc6c-15a0-498d-9b5b-43e03816b76d")
+		)
+		(instances
+			(project "prototipo_gaspetto_box"
+				(path "/95fd997f-7b80-4306-8939-e017af4540ba"
+					(reference "#PWR028")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x02")
 		(at 80.01 71.12 180)
 		(unit 1)
@@ -20157,6 +20636,94 @@
 			(project "prototipo_gaspetto_box"
 				(path "/95fd997f-7b80-4306-8939-e017af4540ba"
 					(reference "C1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Switch:SW_MEC_5G_LED")
+		(at 185.42 215.9 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e3fc7d61-59e3-4b52-9176-1819098dca14")
+		(property "Reference" "WAKE_BUTTON"
+			(at 189.23 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "SW_MEC_5G_LED"
+			(at 189.23 217.1699 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Button_Switch_THT:SW_NKK_GW12LJP"
+			(at 177.8 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.apem.com/medias/download/MEC_switches_serie_MULTIMEC5G.pdf"
+			(at 191.77 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "MEC 5G single pole normally-open illuminated tactile switch"
+			(at 185.42 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "988b931f-ab5c-436a-bed7-fee111b4d1f6")
+		)
+		(pin "2"
+			(uuid "af046e0a-4ee9-4e9e-9791-47836b30b008")
+		)
+		(pin "1"
+			(uuid "1f1a2789-d16f-41f9-92d8-e68ec8491aa1")
+		)
+		(pin "4"
+			(uuid "edf1725c-4aa9-486d-bd90-1d9880bd8120")
+		)
+		(instances
+			(project "prototipo_gaspetto_box"
+				(path "/95fd997f-7b80-4306-8939-e017af4540ba"
+					(reference "WAKE_BUTTON")
 					(unit 1)
 				)
 			)
