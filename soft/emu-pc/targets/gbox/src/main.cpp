@@ -123,21 +123,16 @@ void handleUsbMaintenanceCommands()
 }
 #endif
 
-#ifdef ARDUINO
 /* Arduino-specific function for button interrupt */
-void wakeButton()
+void ISR()
 {
+#ifdef ARDUINO
     Event evt(EventId::BUTTON_PRESSED);
-    gbox.debounceAndEnqueue(evt, millis());
-}
 #else
-/* Button press simulation thread. */
-void ISR(void)
-{
     Event evt = getEmulatedEvent();
+#endif
     gbox.debounceAndEnqueue(evt, millis());
 }
-#endif /* ARDUINO */
 
 void enter_low_power_mode()
 {
@@ -181,13 +176,8 @@ void setup()
 #endif
     gbox.init(StateId::IDLE);
 
-#ifdef ARDUINO
     /* Set up ISR for wake button. */
-    attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), wakeButton, FALLING);
-#else
-    /* Set up ISR for button press simulation. */
     attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), ISR, FALLING);
-#endif /* ARDUINO */
 }
 
 void loop()
