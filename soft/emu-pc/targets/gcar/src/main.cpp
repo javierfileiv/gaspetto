@@ -67,7 +67,7 @@ void setup()
 {
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
-    Log::attachNrf24(radio, gcar_log_pipe_name, gcar_pipe_name);
+    Log::attachNrf24(radio, gcar_log_pipe_name, gbox_pipe_name);
 #endif
 #ifdef ARDUINO
     while (!Serial) {
