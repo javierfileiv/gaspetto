@@ -18,6 +18,7 @@ void printUsbHelp()
     Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
+    Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -295,6 +296,10 @@ void handleUsbCommands()
                 break; /* unreachable: the menu intercepts before the switch */
             }
             startLedTestMenu();
+            break;
+
+        case 'b':
+            runDeepSleepTest();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)

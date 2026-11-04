@@ -31,6 +31,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
+| `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
 

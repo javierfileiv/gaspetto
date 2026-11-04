@@ -14,6 +14,9 @@
 #include "piece_thresholds.h"
 #include "pin_definitions.h"
 
+#include <stm32f4xx_hal.h>
+#include <usbd_if.h>
+
 /* Initialize radio object */
 RF24 radio(NRF24_CE, NRF24_CSN);
 
@@ -319,6 +322,95 @@ void runHealthCycle()
 /* ========================================== */
 /* MAIN LOOP */
 /* ========================================== */
+/* ========================================== */
+/* Deep sleep (STOP) test, key "b"            */
+/* ========================================== */
+
+/* Set by the wake ISR: proves the EXTI path ran, not just "some pending
+ * interrupt happened to restart the chip" */
+static volatile bool gWakeButtonFired = false;
+
+static void wakeButtonIsr()
+{
+    gWakeButtonFired = true;
+}
+
+/* STOP-mode test: the sequence production GBox will run under
+ * LOW_POWER_MODE, with the clock restore that production still lacks
+ * (its SystemClock_Config() is an empty placeholder on ARDUINO). Only
+ * PB9 can bring the chip back: USB is dead while asleep. After the wake
+ * the board returns to the rest state of the active mode and the shell
+ * keeps running, so "b" can sleep again. */
+void runDeepSleepTest()
+{
+    Serial.println();
+    Serial.println("[stop] entering STOP mode: only the wake button (PB9) wakes the chip");
+    Serial.println("[stop] the USB port drops now; it returns a few seconds after the wake");
+    Serial.flush(); /* the warning must reach the host before clocks die */
+
+    blackoutLeds();
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+
+    pinMode(PIN_WAKE_BUTTON, INPUT_PULLUP);
+    gWakeButtonFired = false;
+    /* Interrupt mode (not event) is mandatory: from STOP only an EXTI
+     * interrupt restarts the core, and PB9 to GND gives the FALLING edge */
+    attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), wakeButtonIsr, FALLING);
+
+    const uint32_t sleepEntryMs = millis();
+
+    HAL_SuspendTick();
+    HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+
+    /* --- Asleep here: HSI 16 MHz, PLL off, USB dead. The button pulled
+     * PB9 to GND, the EXTI fired and the core resumes after the WFI. --- */
+
+    /* Clock restore, the step production does not have yet: the
+     * framework resume hook = configIPClock() + SystemClock_Config(),
+     * the same weak variant function hw_config.c runs at boot */
+    USBD_SystemClockConfigFromResume();
+    HAL_ResumeTick();
+
+    /* The host saw a dead device, which is not the same as an unplug:
+     * force a clean detach/attach so the CDC port comes back either way */
+    USBD_reenumerate();
+    delay(2000); /* host re-enumeration time */
+
+    /* LEDs usable again, then the dark frame (the rail cut dropped the
+     * chip state) and the confirmation flashes */
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
+    delay(kRailSettleDelayMs);
+    blackoutLeds();
+
+    detachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON));
+
+    const uint32_t awakeMs = millis() - sleepEntryMs; /* sleep time not counted */
+    Serial.println(gWakeButtonFired ? "[stop] woke up by the wake button (EXTI fired)" :
+                                      "[stop] woke up, but the button ISR did NOT run (?)");
+    Serial.print("[stop] awake ms since sleep entry: ");
+    Serial.print(awakeMs);
+    Serial.println(" (millis does not count the sleeping time)");
+
+    /* Proof independent from USB: three green flashes on all LEDs */
+    for (uint8_t flash = 0; flash < 3; ++flash)
+    {
+        for (uint16_t led = 0; led < kApaPixelCount; ++led)
+        {
+            setOneLed(static_cast<uint8_t>(led), 0, 100, 0);
+        }
+        blackoutLeds();
+        delay(150);
+    }
+
+    /* Hand the board back with the rest state of the active mode: health
+     * keeps the LED rail up, calibration keeps it down; the sensor rail
+     * follows the calibration latch */
+    digitalWrite(PIN_MOSFET_5V_LEDS, gMode == TestMode::Calibration ? HIGH : LOW);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, gCalibrationRailsOn ? LOW : HIGH);
+    Serial.println("[stop] test done, back in the shell ('b' sleeps again)");
+}
+
 void loop()
 {
     handleUsbCommands();
