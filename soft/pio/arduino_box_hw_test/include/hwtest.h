@@ -155,6 +155,9 @@ extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
 extern bool gLedMenuActive;
 
+/* main.cpp: deep sleep (STOP) test driven by the "b" shell key */
+void runDeepSleepTest();
+
 /* ========================================== */
 /* shell.cpp - usb key dispatch, echo and help */
 /* ========================================== */
