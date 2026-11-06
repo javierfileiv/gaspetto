@@ -287,10 +287,8 @@ void runHealthCycle()
     runI2CTests();
 #endif
 
-    /* APA106 animation must be sent while 5V LED rail is still powered. */
-    runPowerOnCycleAnimation();
-    runPowerOffCycleAnimation();
-
+    /* The APA106 animations left this cycle: they cost several seconds each,
+     * the LED menu ('l', key 0) runs them on demand instead */
     reportProbeChanges();
 
     /* Quick double blink visual check on builtin LED. */
