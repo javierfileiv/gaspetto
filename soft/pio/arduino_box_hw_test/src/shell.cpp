@@ -19,6 +19,9 @@ void printUsbHelp()
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
     Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
+    Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
+    Serial.println(
+        "           green = ACK, amber = empty board, red = refused, RF error = no answer");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -300,6 +303,9 @@ void handleUsbCommands()
 
         case 'b':
             runDeepSleepTest();
+            break;
+        case 'p':
+            runSendPiecesTest();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)

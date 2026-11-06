@@ -20,6 +20,8 @@ const char *labelName(int index)
         return "TURN_LEFT";
     case 5:
         return "LOOP_CALL";
+    case 6: /* INVALID: the decode name, never a cluster label */
+        return "INVALID";
     default:
         return "?";
     }

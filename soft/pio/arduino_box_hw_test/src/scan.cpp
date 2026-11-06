@@ -242,41 +242,50 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
 /* Decode one raw reading with this slot's row of the per-slot threshold
  * table. The columns are ascending piece starts, so the first column below
  * which nothing matches means the slot is not calibrated: it decodes
- * INVALID rather than guessing with the global fallbacks */
-static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
+ * INVALID rather than guessing with the global fallbacks. This is the only
+ * decode in the firmware: the monitors, the scan and the radio send all go
+ * through it, so a label printed here and a piece sent over the air can
+ * never come from two different walks */
+BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
 {
     if (raw < 0)
     {
-        return "INVALID";
+        return BoxPieceId::INVALID;
     }
     const uint16_t *t = GASPETTO_ADC_SLOT_THRESHOLDS[slotIndex];
     if (t[GASPETTO_ADC_SLOT_COL_TURN_LEFT] == 0 || raw < t[GASPETTO_ADC_SLOT_COL_TURN_LEFT])
     {
-        return "INVALID";
+        return BoxPieceId::INVALID;
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
-        return "TURN_LEFT";
+        return BoxPieceId::TURN_LEFT;
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
     {
         /* Band 1 is the loop piece now; the shared enum column name still
          * says BACKWARD until the production migration renames it */
-        return "LOOP_CALL";
+        return BoxPieceId::LOOP_CALL;
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
     {
-        return "EMPTY";
+        return BoxPieceId::EMPTY;
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_FORWARD])
     {
-        return "TURN_RIGHT";
+        return BoxPieceId::TURN_RIGHT;
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TO_REMOVE])
     {
-        return "FORWARD";
+        return BoxPieceId::FORWARD;
     }
-    return "INVALID";
+    return BoxPieceId::INVALID;
+}
+
+/* What the scan prints: the enum above under its label */
+static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
+{
+    return labelName(static_cast<int>(pieceForRaw(slotIndex, raw)));
 }
 
 void runPieceCalibrationScan()
