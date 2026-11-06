@@ -1,5 +1,6 @@
 #include "Adafruit_ADS1X15.h"
 #include "GBox.h"
+#include "PieceProgram.h"
 #include "Wire.h"
 #include "board_presets.h"
 
@@ -23,7 +24,7 @@ TEST(GBoxProgramBuilderTest, ExpandsLoopSequenceIntoPayload)
     board[13] = BoxPieceId::FORWARD;
     board[14] = BoxPieceId::BACKWARD;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     ASSERT_TRUE(ok);
     ASSERT_FALSE(isEmpty);
@@ -43,7 +44,7 @@ TEST(GBoxProgramBuilderTest, RejectsEmptyBoard)
     CommandPacket packet{};
     bool isEmpty = false;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_TRUE(isEmpty);
@@ -57,7 +58,7 @@ TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
     CommandPacket packet{};
     bool isEmpty = false;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
@@ -74,7 +75,7 @@ TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopAreaWhenNoOtherPieces)
     board[0] = BoxPieceId::LOOP_CALL;
     board[14] = BoxPieceId::LOOP_CALL;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_TRUE(isEmpty);
@@ -92,7 +93,7 @@ TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopArea)
     board[14] = BoxPieceId::LOOP_CALL;
     board[15] = BoxPieceId::FORWARD;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     ASSERT_TRUE(ok);
     ASSERT_FALSE(isEmpty);
@@ -122,7 +123,7 @@ TEST(GBoxProgramBuilderTest, SupportsThreeLoopCallsWithFullLoopZone)
     board[18] = BoxPieceId::TURN_RIGHT;
     board[19] = BoxPieceId::BACKWARD;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     ASSERT_TRUE(ok);
     ASSERT_FALSE(isEmpty);
@@ -152,7 +153,7 @@ TEST(GBoxProgramBuilderTest, RejectsFourthLoopCallWithFullLoopZone)
     board[18] = BoxPieceId::TURN_RIGHT;
     board[19] = BoxPieceId::BACKWARD;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
@@ -168,7 +169,7 @@ TEST(GBoxProgramBuilderTest, RejectsInvalidTokenInMainArea)
 
     board[0] = BoxPieceId::INVALID;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
@@ -183,7 +184,7 @@ TEST(GBoxProgramBuilderTest, RejectsUnknownMainTokenValue)
 
     board[0] = static_cast<BoxPieceId>(0xFF);
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
@@ -214,7 +215,7 @@ TEST(GBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece)
     board[18] = BoxPieceId::BACKWARD;
     board[19] = BoxPieceId::FORWARD;
 
-    const bool ok = GBox::buildProgramFromPieces(board, packet, isEmpty);
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
     EXPECT_FALSE(ok);
     EXPECT_FALSE(isEmpty);
