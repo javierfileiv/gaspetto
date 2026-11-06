@@ -8,6 +8,7 @@
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "CommandPacket.h"
+#include "PieceProgram.h"
 #include "dfu_bootloader.h"
 #include "hwtest.h"
 #include "i2c3_bitbang.h"
@@ -19,6 +20,10 @@
 
 /* Initialize radio object */
 RF24 radio(NRF24_CE, NRF24_CSN);
+
+/* Set by setup() once the chip answered: without it the send test would
+ * report a missing car instead of a missing radio */
+static bool gRadioOk = false;
 
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
@@ -221,14 +226,23 @@ void setup()
     if (radio.begin())
     {
         Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
-        radio.setPALevel(RF24_PA_LOW); /* Set low power for testing */
-        radio.printDetails();          /* Print chip info to Serial */
+        /* Same line as production RadioController::begin(): the bench must
+         * put the chip in the exact state the GBox will, or the link it
+         * validates is not the link production will run */
+        radio.setPALevel(PA_LEVEL);
+        radio.setDataRate(DATA_RATE);
+        radio.setAddressWidth(5);
+        radio.setPayloadSize(sizeof(CommandPacket));
+        radio.openWritingPipe(gcar_pipe_name); /* the GBox writes to the car */
+        radio.printDetails();                  /* Print chip info to Serial */
+        gRadioOk = true;
     }
     else
     {
         Serial.println("   [ERROR] nRF24L01+ not found!");
         Serial.println("   -> Check soldering on PA3, PA4, PA5, PA6, PA7.");
         Serial.println("   -> Check if 3.3V is reaching the nRF board.");
+        Serial.println("   -> 'p' (send pieces) stays disabled until it answers.");
     }
 
     /* --- I2C init --- */
@@ -500,6 +514,140 @@ void runDeepSleepTest()
     digitalWrite(PIN_MOSFET_5V_LEDS, gMode == TestMode::Calibration ? HIGH : LOW);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, gCalibrationRailsOn ? LOW : HIGH);
     Serial.println("[stop] test done, back in the shell ('b' sleeps again)");
+}
+
+/* ========================================== */
+/* Send the scanned board over the radio, key "p" */
+/* ========================================== */
+
+/* The LED verdict only shows if the 5V rail is up; calibration keeps it
+ * down, so raise it for the animation and put it back, the same contract
+ * the LED menu uses */
+static void runSendFeedback(void (*animation)())
+{
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
+    delay(kRailSettleDelayMs);
+    animation();
+    blackoutLeds();
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+}
+
+/* Scan -> build -> transmit, the chain production GBox runs when it
+ * validates a program, without GBox itself: the decode is the compiled
+ * per-slot row (pieceForRaw, the one walk), the build is the shared
+ * buildProgramFromPieces, only the transport is this bench. The verdict
+ * mirrors the production LED semantics: green on ACK, amber on an empty
+ * board, red on a refused build, RF error when the car does not answer */
+void runSendPiecesTest()
+{
+    BoxBoardPieces board = {};
+    CommandPacket packet = {};
+    bool isEmpty         = true;
+    uint8_t readFailures = 0;
+    bool built           = false;
+
+    Serial.println("\n--- SEND PIECES: scan -> build -> radio ---");
+
+    if (!gRadioOk)
+    {
+        Serial.println("[send] radio is not up: re-probe with 's' in health mode");
+        return;
+    }
+    if (!gCalibrationRailsOn)
+    {
+        Serial.println("[send] 3V3 sensor rail is OFF, readings would be garbage ('c' to switch)");
+        return;
+    }
+
+    /* One mean reading per slot, the same read the monitors use; a module
+     * that fails is recovered once, then honestly reported as INVALID
+     * rather than guessed */
+    for (uint8_t slot = 0; slot < BOX_TOTAL_SLOTS; ++slot)
+    {
+        const AdsTestEntry &entry = kAdsTests[slot / 4];
+        const uint8_t channel     = slot % 4;
+        int16_t rawMean           = 0;
+
+        bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        if (!readOk)
+        {
+            recoverAdsModule(&entry);
+            readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        }
+
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slot) + 1);
+        if (!readOk)
+        {
+            ++readFailures;
+            board[slot] = BoxPieceId::INVALID;
+            Serial.println(": READ FAIL -> INVALID");
+            continue;
+        }
+
+        board[slot] = pieceForRaw(slot, rawMean);
+        Serial.print(": raw=");
+        Serial.print(rawMean);
+        Serial.print("  ");
+        Serial.println(labelName(static_cast<int>(board[slot])));
+    }
+
+    if (readFailures > 0)
+    {
+        Serial.print("[send] ");
+        Serial.print(readFailures);
+        Serial.println(" slot read(s) failed, they decode INVALID");
+    }
+
+    built = buildProgramFromPieces(board, packet, isEmpty);
+    if (!built)
+    {
+        if (isEmpty)
+        {
+            Serial.println("[send] empty board: no command to send");
+            runSendFeedback(runEmptyBoardAnimationTest);
+        }
+        else
+        {
+            Serial.println("[send] build FAILED: invalid slot or payload overflow");
+            Serial.println("[send] nothing sent");
+            runSendFeedback(runBuildErrorAnimationTest);
+        }
+        return;
+    }
+
+    Serial.print("[send] program: ");
+    Serial.print(static_cast<int>(packet.count));
+    Serial.print(" command(s) [");
+    for (uint8_t i = 0; i < packet.count; ++i)
+    {
+        if (i > 0)
+        {
+            Serial.print(' ');
+        }
+        Serial.print(static_cast<int>(packet.commands[i]));
+    }
+    Serial.println("]");
+
+    /* The bench never listens: nothing puts the radio in RX, so
+     * stopListening() states the intent before the burst. The car's ACK
+     * comes back over the auto-ack channel and write() reports it, which
+     * is the delivery proof the link validation needs */
+    radio.stopListening();
+    const bool sent = radio.write(&packet, sizeof(packet));
+    Serial.print("[send] radio.write ");
+    Serial.print(sizeof(packet));
+    Serial.print(" bytes -> ");
+    Serial.println(sent ? "ACK (car answered)" : "NO ACK (car absent or not listening)");
+
+    if (sent)
+    {
+        runSendFeedback(runSuccessAnimationTest);
+    }
+    else
+    {
+        runSendFeedback(runRfErrorAnimationTest);
+    }
 }
 
 void loop()

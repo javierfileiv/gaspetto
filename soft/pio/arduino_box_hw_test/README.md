@@ -29,6 +29,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
+| `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
 | `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
@@ -220,6 +221,51 @@ static const uint16_t GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_
 ```
 
 Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h` and rebuild. This firmware decodes with those rows right away; production keeps using the legacy global defines until it adopts the same per-slot scan.
+
+## Send Pieces (`p`)
+
+The radio link check: one key runs the whole chain production GBox runs when
+it validates a program, without running GBox itself.
+
+1. **Scan** — one mean reading per slot on all 20 slots, decoded by
+   `pieceForRaw`, the single threshold walk every consumer of this firmware
+   uses (monitors, scan and send cannot disagree)
+2. **Build** — `buildProgramFromPieces` from `shared_types/PieceProgram`
+   (symlinked here), the very function the production GBox links
+3. **Send** — the resulting 32-byte `CommandPacket` on the `_car_` pipe
+
+The chip is set up exactly like production `RadioController::begin()`: PA
+level and data rate from `config_radio.h` (1 MBps), 5-byte address, 32-byte
+payload, writing pipe `_car_`. The bench only transmits, so `write()`
+returning **true** means the car's radio answered the auto-ack — that is the
+delivery proof.
+
+```text
+c                    # calibration mode: the 3V3 sensor rail must be up
+p                    # scan + build + transmit
+--- SEND PIECES: scan -> build -> radio ---
+   slot 1: raw=13472  EMPTY
+   slot 2: raw=14896  FORWARD
+   ...
+[send] program: 3 command(s) [13 1 13]
+[send] radio.write 32 bytes -> ACK (car answered)
+```
+
+The 20 slot lines are the decode itself, so they are the first place to look
+when a build is refused: a slot reading `INVALID` (failed read or
+uncalibrated row) makes `buildProgramFromPieces` reject the board rather
+than send a wrong program, and a payload over 31 commands is refused the
+same way. The car can never receive more than it can run.
+
+The verdict also shows on the LEDs (the 5V rail is raised for the animation
+and put back after, like the LED menu):
+
+| Feedback | Meaning |
+|----------|---------|
+| green cascade | the car acknowledged the payload |
+| amber blink | empty board, nothing to send |
+| red blink | build refused (invalid slot or overflow), nothing transmitted |
+| RF error | transmitted but no ACK: the car is absent or not listening |
 
 ## Hardware Setup
 
