@@ -302,7 +302,6 @@ TelemetryPacket MovementController::buildTelemetryPacket() const
 
     telemetry.targetYaw = telemTargetYaw;
     telemetry.yaw = imuOk ? _imu.yaw() : 0.0f;
-    telemetry.err = (currentState == MovementState::IDLE) ? 0.0f : pidError;
     telemetry.pwmFreq = telemPwmFreq;
     telemetry.kp = static_cast<float>(Kp);
     telemetry.ki = static_cast<float>(Ki);

@@ -69,6 +69,7 @@ TEST_F(RadioControllerUnitTest, ProcessRadioTransmitsQueuedEvent)
                                 ASSERT_EQ(len, Event::packetSize());
                                 EventPacket expected{};
                                 evt.toPacket(expected);
+                                expected.tag = static_cast<uint8_t>(PacketTag::Event);
                                 EXPECT_EQ(std::memcmp(buf, &expected, len), 0);
                             }),
                             Return(true)));
@@ -108,11 +109,12 @@ TEST_F(RadioControllerUnitTest, ProcessRadioDecodesCommandPacketIntoActionEvents
     EXPECT_EQ(e2.getPayload(), CommandId::MOTOR_STOP);
 }
 
-TEST_F(RadioControllerUnitTest, ProcessRadioFallsBackToEventPacketPath)
+TEST_F(RadioControllerUnitTest, ProcessRadioDecodesTaggedEventPacket)
 {
     EventPacket packet{};
+    packet.tag = static_cast<uint8_t>(PacketTag::Event);
     packet.eventId = static_cast<uint8_t>(EventId::ACTION);
-    packet.payload = static_cast<uint8_t>(CommandId::MAX_COMMAND_ID); /* force fallback */
+    packet.payload = static_cast<uint8_t>(CommandId::MOTOR_STOP);
 
     EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
     EXPECT_CALL(rf, _read(_, sizeof(CommandPacket)))
@@ -125,6 +127,84 @@ TEST_F(RadioControllerUnitTest, ProcessRadioFallsBackToEventPacketPath)
     controller.processRadio();
 
     EXPECT_EQ(appQueue.GetSize(), 1);
+}
+
+TEST_F(RadioControllerUnitTest, ProcessRadioRoutesTaggedTelemetryWithoutQueuing)
+{
+    TelemetryPacket telemetry{};
+    telemetry.tag = static_cast<uint8_t>(PacketTag::Telemetry);
+    telemetry.yaw = 12.5f;
+
+    EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _read(_, sizeof(CommandPacket)))
+            .WillOnce(Invoke([&telemetry](void *buf, uint8_t len) {
+                std::memset(buf, 0, len);
+                std::memcpy(buf, &telemetry, sizeof(telemetry));
+            }));
+
+    testing::internal::CaptureStdout();
+    controller.processRadio();
+    const std::string out = testing::internal::GetCapturedStdout();
+
+    /* Telemetry is watched, never turned into an action event */
+    EXPECT_TRUE(appQueue.IsEmpty());
+    EXPECT_NE(out.find("Telemetry"), std::string::npos);
+}
+
+TEST_F(RadioControllerUnitTest, ProcessRadioReassemblesLogFragments)
+{
+    uint8_t first[32] = {};
+    uint8_t last[32] = {};
+
+    first[0] = static_cast<uint8_t>(PacketTag::Log);
+    first[1] = static_cast<uint8_t>(0x80 | 6); /* continuation, 6 bytes */
+    std::memcpy(&first[2], "hello ", 6);
+
+    last[0] = static_cast<uint8_t>(PacketTag::Log);
+    last[1] = 5; /* final piece, 5 bytes */
+    std::memcpy(&last[2], "world", 5);
+
+    {
+        InSequence seq;
+        EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+        EXPECT_CALL(rf, _read(_, sizeof(CommandPacket)))
+                .WillOnce(
+                        Invoke([&first](void *buf, uint8_t len) { std::memcpy(buf, first, len); }));
+        EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+        EXPECT_CALL(rf, _read(_, sizeof(CommandPacket)))
+                .WillOnce(Invoke([&last](void *buf, uint8_t len) { std::memcpy(buf, last, len); }));
+    }
+
+    /* Nothing is printed while the line is only half received */
+    testing::internal::CaptureStdout();
+    controller.processRadio();
+    const std::string halfway = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(halfway.find("hello"), std::string::npos);
+
+    testing::internal::CaptureStdout();
+    controller.processRadio();
+    const std::string done = testing::internal::GetCapturedStdout();
+    EXPECT_NE(done.find("hello world"), std::string::npos);
+    EXPECT_TRUE(appQueue.IsEmpty());
+}
+
+TEST_F(RadioControllerUnitTest, ProcessRadioDropsUnknownPacketTag)
+{
+    uint8_t unknown[32] = {};
+    unknown[0] = 0xF0; /* neither a command count nor a known tag */
+    unknown[1] = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
+
+    EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _read(_, sizeof(CommandPacket)))
+            .WillOnce(
+                    Invoke([&unknown](void *buf, uint8_t len) { std::memcpy(buf, unknown, len); }));
+
+    testing::internal::CaptureStdout();
+    controller.processRadio();
+    const std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_TRUE(appQueue.IsEmpty());
+    EXPECT_NE(out.find("unknown packet tag"), std::string::npos);
 }
 
 TEST_F(RadioControllerUnitTest, CommandPacketRxStopsWhenAppQueueIsFull)
@@ -168,41 +248,49 @@ TEST_F(RadioControllerUnitTest, SendBufferReturnsFalseOnWriteFailure)
     EXPECT_FALSE(controller.sendBuffer(payload, sizeof(payload)));
 }
 
-TEST_F(RadioControllerUnitTest, SendTelemetrySuccessUsesTelemetryPipeAndRestoresCommandPipe)
+TEST_F(RadioControllerUnitTest, SendTelemetryStaysOnCommandPipeAndStampsTag)
 {
     TelemetryPacket telemetry{};
+    bool stamped = false;
+
+    /* No address switch any more: telemetry rides the writing pipe like
+     * every other packet this device sends */
+    EXPECT_CALL(rf, _openWritingPipe(_)).Times(0);
 
     {
         InSequence seq;
-        EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gcar_telemetry_pipe_name));
-        }));
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(true));
+        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket)))
+                .WillOnce(Invoke([&stamped](const void *buf, uint8_t len) {
+                    TelemetryPacket sent{};
+                    /* A wrong length leaves stamped false, which fails the
+                     * assertion below just as loudly */
+                    if (len == sizeof(sent)) {
+                        std::memcpy(&sent, buf, sizeof(sent));
+                        stamped = (sent.tag == static_cast<uint8_t>(PacketTag::Telemetry));
+                    }
+                    return true;
+                }));
         EXPECT_CALL(rf, _startListening());
-        EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gbox_pipe_name));
-        }));
     }
 
     EXPECT_TRUE(controller.sendTelemetry(telemetry));
+    EXPECT_TRUE(stamped);
+    /* The tag is stamped on the copy: the caller's packet is untouched */
+    EXPECT_EQ(telemetry.tag, 0);
 }
 
-TEST_F(RadioControllerUnitTest, SendTelemetryFailureStillRestoresCommandPipe)
+TEST_F(RadioControllerUnitTest, SendTelemetryFailurePropagatesWithoutPipeSwitch)
 {
     TelemetryPacket telemetry{};
 
+    EXPECT_CALL(rf, _openWritingPipe(_)).Times(0);
+
     {
         InSequence seq;
-        EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gcar_telemetry_pipe_name));
-        }));
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(&telemetry, sizeof(telemetry))).WillOnce(Return(false));
+        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket))).WillOnce(Return(false));
         EXPECT_CALL(rf, _startListening());
-        EXPECT_CALL(rf, _openWritingPipe(_)).WillOnce(Invoke([](const uint8_t *addr) {
-            EXPECT_TRUE(same5(addr, gbox_pipe_name));
-        }));
     }
 
     EXPECT_FALSE(controller.sendTelemetry(telemetry));
