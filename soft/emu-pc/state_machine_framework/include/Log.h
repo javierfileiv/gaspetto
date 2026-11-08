@@ -25,6 +25,11 @@
 namespace gaspetto_log
 {
 #ifdef GASPETTO_LOG_OVER_NRF24
+/* Radio payload width of a log fragment: every Gaspetto packet is 32 bytes.
+ * Named because an array parameter decays to a pointer, so sizeof() on one
+ * would give the pointer size (2 on AVR) instead of this */
+constexpr uint8_t kLogPayloadSize = 32;
+
 class NrfLogOutput : public Print {
 public:
     NrfLogOutput()
@@ -99,11 +104,15 @@ private:
         _lineLen = 0;
     }
 
-    void sendPayload(const uint8_t payload[32])
+    void sendPayload(const uint8_t payload[kLogPayloadSize])
     {
         _radio->stopListening();
         _radio->openWritingPipe(_logAddress);
-        _radio->write(payload, sizeof(payload));
+        /* kLogPayloadSize, not sizeof(payload): the parameter is a pointer
+         * inside this function, and sizeof would be 2 on AVR. The chip would
+         * then transmit two bytes and pad the rest with zeros, which is what
+         * made every log line arrive with its content blank */
+        _radio->write(payload, kLogPayloadSize);
         _radio->openWritingPipe(_restoreAddress);
         _radio->startListening();
     }
