@@ -22,6 +22,7 @@ void printUsbHelp()
     Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
     Serial.println(
         "           green = ACK, amber = empty board, red = refused, RF error = no answer");
+    Serial.println("   stream: e = listen to _box_ for the car telemetry and logs, key quits");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -306,6 +307,9 @@ void handleUsbCommands()
             break;
         case 'p':
             runSendPiecesTest();
+            break;
+        case 'e':
+            runCarStreamTest();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)

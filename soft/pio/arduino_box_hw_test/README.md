@@ -30,6 +30,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
+| `e` | Listen to `_box_`: prints the car's telemetry and log fragments until a key stops it |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
 | `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
@@ -266,6 +267,27 @@ and put back after, like the LED menu):
 | amber blink | empty board, nothing to send |
 | red blink | build refused (invalid slot or overflow), nothing transmitted |
 | RF error | transmitted but no ACK: the car is absent or not listening |
+
+## Car Stream (`e`)
+
+The other half of the link: `setup()` already gives the bench the real box
+layout — pipe 0 for the program bursts to `_car_`, pipe 1 listening on
+`_box_` — and this key opens the listening, where the car answers with
+telemetry and log fragments.
+
+```text
+e                    # any key stops; the radio goes back to transmit only
+   [TLM] yaw=0.0 tgt=7.0 state=0 speed=50
+   [LOG] car-sim [imu] tick=42 ms=8100 yaw=182.0 speed=42
+   [stream] quiet, packets=17
+--- CAR STREAM stopped, packets=17 ---
+```
+
+Log lines are reassembled before printing: the sender splits them in 30
+byte pieces and telemetry can land in between. Outside a session nothing
+drains the FIFO, so the car's writes report FAILED unless a session (or a
+real box) is listening — that difference is the visible proof that the
+receiver is there.
 
 ## Hardware Setup
 
