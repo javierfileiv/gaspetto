@@ -6,7 +6,7 @@ Hardware validation and piece calibration firmware for the Gaspetto GBox program
 
 The GBox programming board reads 20 piece slots through five ADS1115 ADCs and drives three APA106 status LEDs (dedicated FastLED APA106 controller on PB8). This firmware runs two runtime test modes over the same build:
 
-1. **Health mode** — power rails, the APA106 chain, five ADS1115 probes and the NRF24 radio are exercised on demand (`s`), then each probe change is reported as it happens
+1. **Health mode** — power rails, five ADS1115 probes and the NRF24 radio are exercised on demand (`s`), then each probe change is reported as it happens; the APA106 animations run from the LED menu instead
 2. **Calibration mode** — a capture of how the positive hall sensor reads each actual piece, used to derive the per-slot threshold table
 
 The production and test firmware must agree on thresholds, so both read the same header `soft/emu-pc/targets/gbox/include/piece_thresholds.h` (symlinked into this project's `include/`). Both tables live in that header: production `GBox.cpp` still decodes with the legacy global defines, while this firmware decodes with the per-slot rows. Porting production to the per-slot scan and dropping the legacy defines is a planned separate step.
@@ -31,6 +31,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
+| `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
 
 Serial is USB CDC at 115200 baud. `delay` calls are time-sliced so typed keys always get through.
 
@@ -268,8 +269,7 @@ Then on `s` (the LED menu and animations can run in between with `l`):
 -> TURNING ON 5V_SWITCHED (LED Cache)...
 ...
 --- ADS1115 TEST DONE ---
-[led] scan test: cyan bounce, 2 trips
 Cycle complete. 's' reruns the test.
 ```
 
-After the health cycle, the firmware idles silently and only wakes to report probe changes or USB keys — `'s'` re-runs the test at will, `'l'` opens the LED test menu.
+After the health cycle, the firmware idles silently and only wakes to report probe changes or USB keys — `'s'` re-runs the test at will, `'l'` opens the LED test menu, whose `0` runs the power-on/power-off animations the health cycle used to play.
