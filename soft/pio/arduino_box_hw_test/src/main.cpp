@@ -3,12 +3,14 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <config_radio.h>
+#include <string.h>
 
 #ifdef TEST_ADS1115
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "CommandPacket.h"
 #include "PieceProgram.h"
+#include "RadioProtocol.h"
 #include "dfu_bootloader.h"
 #include "hwtest.h"
 #include "i2c3_bitbang.h"
@@ -234,7 +236,11 @@ void setup()
         radio.setAddressWidth(5);
         radio.setPayloadSize(sizeof(CommandPacket));
         radio.openWritingPipe(gcar_pipe_name); /* the GBox writes to the car */
-        radio.printDetails();                  /* Print chip info to Serial */
+        /* The real box layout: pipe 0 carries the program burst to _car_,
+         * pipe 1 listens on _box_ where the car answers with telemetry and
+         * logs ('e' opens that listening, nothing is drained outside it) */
+        radio.openReadingPipe(1, gbox_pipe_name);
+        radio.printDetails(); /* Print chip info to Serial */
         gRadioOk = true;
     }
     else
@@ -648,6 +654,116 @@ void runSendPiecesTest()
     {
         runSendFeedback(runRfErrorAnimationTest);
     }
+}
+
+void runCarStreamTest()
+{
+    uint8_t buffer[sizeof(CommandPacket)];
+    uint8_t logLine[64];
+    uint8_t logLineLen       = 0;
+    uint32_t packets         = 0;
+    uint32_t lastHeartbeatMs = millis();
+
+    Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key to stop ---");
+
+    gMonitorActive = true;
+    gMonitorExit   = false;
+    radio.startListening();
+
+    while (!gMonitorExit)
+    {
+        uint8_t pipe = 0;
+
+        if (radio.available(&pipe))
+        {
+            radio.read(buffer, sizeof(buffer));
+            ++packets;
+
+            switch (static_cast<PacketTag>(buffer[0]))
+            {
+            case PacketTag::Telemetry: {
+                TelemetryPacket telemetry;
+
+                memcpy(&telemetry, buffer, sizeof(telemetry));
+                Serial.print("   [TLM] yaw=");
+                Serial.print(telemetry.yaw, 1);
+                Serial.print(" tgt=");
+                Serial.print(telemetry.targetYaw, 1);
+                Serial.print(" state=");
+                Serial.print(static_cast<int>(telemetry.state));
+                Serial.print(" speed=");
+                Serial.println(static_cast<int>(telemetry.speed));
+                lastHeartbeatMs = millis();
+                break;
+            }
+            case PacketTag::Log: {
+                const uint8_t flags   = buffer[1];
+                const uint8_t dataLen = flags & 0x7FU;
+                const bool hasMore    = (flags & 0x80U) != 0U;
+                const uint8_t room    = static_cast<uint8_t>(sizeof(logLine) - logLineLen);
+                const uint8_t copy    = (dataLen < room) ? dataLen : room;
+
+                memcpy(&logLine[logLineLen], &buffer[2], copy);
+                logLineLen = static_cast<uint8_t>(logLineLen + copy);
+                if (copy < dataLen)
+                {
+                    Serial.println("   [LOG] line too long, truncated");
+                }
+                if (hasMore)
+                {
+                    break;
+                }
+
+                Serial.print("   [LOG] ");
+                Serial.write(logLine, logLineLen);
+                Serial.println();
+                logLineLen      = 0;
+                lastHeartbeatMs = millis();
+                break;
+            }
+            default:
+                /* Byte 0 is the command count on a program and a real tag
+                 * otherwise: reporting both the same way is misleading */
+                if (buffer[0] > 0 && buffer[0] <= BOX_MAX_PAYLOAD_COMMANDS)
+                {
+                    Serial.print("   [PROG] ");
+                    Serial.print(static_cast<int>(buffer[0]));
+                    Serial.print(" command(s):");
+                    for (uint8_t i = 0; i < buffer[0]; ++i)
+                    {
+                        Serial.print(' ');
+                        Serial.print(commandIdToString(static_cast<CommandId>(buffer[1 + i])));
+                    }
+                    Serial.println();
+                }
+                else
+                {
+                    Serial.print("   [rx] unknown tag 0x");
+                    Serial.println(buffer[0], HEX);
+                }
+                lastHeartbeatMs = millis();
+                break;
+            }
+            continue;
+        }
+
+        /* A quiet stream must still look alive */
+        if (millis() - lastHeartbeatMs >= 3000U)
+        {
+            lastHeartbeatMs = millis();
+            Serial.print("   [stream] quiet, packets=");
+            Serial.println(static_cast<int>(packets));
+        }
+
+        delayWithUsb(20);
+    }
+
+    gMonitorActive = false;
+    radio.stopListening();
+
+    Serial.print("--- CAR STREAM stopped, packets=");
+    Serial.print(static_cast<int>(packets));
+    Serial.println(" ---");
 }
 
 void loop()

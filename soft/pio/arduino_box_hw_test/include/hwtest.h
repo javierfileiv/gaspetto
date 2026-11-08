@@ -172,6 +172,9 @@ void runDeepSleepTest();
 /* main.cpp: scan -> build -> transmit test driven by the "p" shell key */
 void runSendPiecesTest();
 
+/* main.cpp: listen to the car stream on _box_, the "e" shell key */
+void runCarStreamTest();
+
 /* ========================================== */
 /* shell.cpp - usb key dispatch, echo and help */
 /* ========================================== */
