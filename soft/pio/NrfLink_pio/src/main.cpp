@@ -35,8 +35,9 @@ void setup()
     radio.openWritingPipe(gcar_pipe_name);
     /* Pipe 1, not pipe 2: RF24 writes a single address byte for pipes 2-5
      * and takes the other four from pipe 1, so every Gaspetto address
-     * (they all start with "_") would collapse back onto pipe 1 */
-    radio.openReadingPipe(1, gcar_telemetry_pipe_name);
+     * (they all start with "_") would collapse back onto pipe 1. _box_ is
+     * where the car sends: telemetry and logs ride it with their tag */
+    radio.openReadingPipe(1, gbox_pipe_name);
     radio.powerUp();
     radio.printDetails();
     radio.printPrettyDetails();
@@ -103,7 +104,7 @@ void clearProgram()
 
 void loop()
 {
-    /* Drain RX FIFO: check for incoming telemetry from GCar (pipe 1 = _tel_). */
+    /* Drain RX FIFO: check for incoming telemetry from GCar (pipe 1 = _box_). */
     uint8_t pipe;
     while (radio.available(&pipe)) {
         TelemetryPacket telemetry;
@@ -193,7 +194,7 @@ void displayTelemetry(const TelemetryPacket &t)
     Serial.print(F(" tgt="));
     Serial.print(t.targetYaw, 1);
     Serial.print(F(" err="));
-    Serial.print(t.err, 2);
+    Serial.print(t.targetYaw - t.yaw, 2); /* err left the packet: the tag took its byte */
     Serial.print(F(" imu state="));
     Serial.print(t.imuOk);
     Serial.print(F(" kp="));

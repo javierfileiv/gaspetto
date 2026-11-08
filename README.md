@@ -180,7 +180,7 @@ Format:
 | `3234` | Timestamp (millis) |
 | `W50` | State (IDL/FWD/BWD/TL/TR) + speed |
 | `Y` | Current yaw (degrees) |
-| `e` | PID error |
+| `e` | Yaw error (`targetYaw - yaw`) |
 | `Kp/Ki/Kd` | PID gains |
 | `O` | Trim offset |
 
