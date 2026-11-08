@@ -35,7 +35,9 @@ CHECKS_CSV="$ALL_CHECKS"
 
 END_SHA=""
 START_SHA=""
-WORKTREE=""
+# Named WORKTREE_DIR, not WORKTREE: an exported WORKTREE would replace the
+# default, and cleanup runs rm -rf on this path
+WORKTREE_DIR=""
 STOP_ON_FAIL=0
 KEEP_WORKTREE=0
 
@@ -53,7 +55,7 @@ Options:
   --fast              shortcut for --checks utest
   --stop-on-fail      stop at the first commit that fails
   --worktree <dir>    where to create the throwaway worktree
-                      (default: a temp directory under /tmp/gaspetto)
+                      (default: a temp directory under /tmp/opencode)
   --keep              keep the worktree and the logs after the run
   -h, --help          this help
 
@@ -68,7 +70,7 @@ while [[ $# -gt 0 ]]; do
         --checks)       CHECKS_CSV="${2:-}"; shift 2 ;;
         --fast)         CHECKS_CSV="utest"; shift ;;
         --stop-on-fail) STOP_ON_FAIL=1; shift ;;
-        --worktree)     WORKTREE="${2:-}"; shift 2 ;;
+        --worktree)     WORKTREE_DIR="${2:-}"; shift 2 ;;
         --keep)         KEEP_WORKTREE=1; shift ;;
         -h|--help)      usage; exit 0 ;;
         -*)             echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -124,7 +126,7 @@ fi
 mapfile -t SHAS < <(git -C "$REPO" rev-list --reverse "${RANGE_START}${END_SHA}")
 COUNT="${#SHAS[@]}"
 
-WORK_DIR="${WORKTREE:-/tmp/gaspetto/gaspetto-history-$$}"
+WORK_DIR="${WORKTREE_DIR:-/tmp/opencode/gaspetto-history-$$}"
 TREE="$WORK_DIR/tree"
 LOG_DIR="$WORK_DIR/logs"
 
