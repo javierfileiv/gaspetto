@@ -27,6 +27,10 @@ RF24 radio(NRF24_CE, NRF24_CSN);
  * report a missing car instead of a missing radio */
 static bool gRadioOk = false;
 
+/* Radio menu (key "t"), same shape as the LED menu: the shell routes
+ * every key here while it is open */
+bool gRadioMenuActive = false;
+
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
 
@@ -656,6 +660,128 @@ void runSendPiecesTest()
     }
 }
 
+/* ========================================== */
+/* Radio menu, key "t"                        */
+/* ========================================== */
+
+/* RF24 v1.6 exposes no address getter, so the addresses printed are the
+ * constants setup() wrote into the chip: that is the question when two
+ * rigs do not hear each other. isChipConnected() does read the chip over
+ * SPI, so entry 1 probes the hardware live instead of trusting the flag
+ * setup() left behind */
+static void printRadioAddress(const char *label, const uint8_t *addr)
+{
+    Serial.print(label);
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        if (addr[i] < 0x10U)
+        {
+            Serial.print('0');
+        }
+        Serial.print(addr[i], HEX);
+        if (i < 4U)
+        {
+            Serial.print(' ');
+        }
+    }
+    Serial.println();
+}
+
+static void printRadioMenu()
+{
+    Serial.println("   [radio] 1 probe | 2 addresses and config | 3 send test program | q quit");
+}
+
+void startRadioMenu()
+{
+    Serial.println("--- RADIO MENU ---");
+    gRadioMenuActive = true;
+    printRadioMenu();
+}
+
+static void stopRadioMenu()
+{
+    gRadioMenuActive = false;
+    Serial.println("   [radio menu closed]");
+}
+
+void runRadioMenuKey(char key)
+{
+    switch (key)
+    {
+    case '1':
+        Serial.print("[radio] chip ");
+        Serial.println(radio.isChipConnected() ? "answering" : "NOT answering over SPI");
+        break;
+
+    case '2': {
+        static const char *const kPaNames[] = {"MIN", "LOW", "HIGH", "MAX"};
+        const uint8_t pa                    = radio.getPALevel();
+        const rf24_datarate_e rate          = radio.getDataRate();
+
+        printRadioAddress("   tx       = ", gcar_pipe_name);
+        printRadioAddress("   rx pipe1 = ", gbox_pipe_name);
+        Serial.print("   pa=");
+        Serial.print((pa < 4U) ? kPaNames[pa] : "?");
+        Serial.print(" rate=");
+        switch (rate)
+        {
+        case RF24_1MBPS:
+            Serial.print("1MBPS");
+            break;
+        case RF24_2MBPS:
+            Serial.print("2MBPS");
+            break;
+        case RF24_250KBPS:
+            Serial.print("250KBPS");
+            break;
+        default:
+            Serial.print("?");
+            break;
+        }
+        Serial.print(" channel=");
+        Serial.print(radio.getChannel());
+        Serial.print(" payload=");
+        Serial.println(radio.getPayloadSize());
+        break;
+    }
+
+    case '3': {
+        /* A one command program proves the transmit path without a scanned
+         * board: MOTOR_STOP is harmless whatever the car is doing */
+        CommandPacket packet = {};
+        bool sent            = false;
+
+        if (!gRadioOk)
+        {
+            Serial.println("[radio] radio is not up: re-probe with 's' in health mode");
+            break;
+        }
+
+        packet.count       = 1;
+        packet.commands[0] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+        radio.stopListening();
+        sent = radio.write(&packet, sizeof(packet));
+        Serial.print("[radio] test program (MOTOR_STOP) -> ");
+        Serial.println(sent ? "ACK (car answered)" : "NO ACK (car absent or not listening)");
+        break;
+    }
+
+    case 'q':
+        stopRadioMenu();
+        return;
+
+    default:
+        Serial.println("   [radio] 1 probe | 2 addresses | 3 test send | q quit");
+        return;
+    }
+
+    if (gRadioMenuActive)
+    {
+        printRadioMenu(); /* the entries are chatty: reprint the prompt after them */
+    }
+}
+
 void runCarStreamTest()
 {
     uint8_t buffer[sizeof(CommandPacket)];
@@ -664,7 +790,19 @@ void runCarStreamTest()
     uint32_t packets         = 0;
     uint32_t lastHeartbeatMs = millis();
 
+    /* Without this guard a dead radio looks exactly like a silent car:
+     * both print "quiet, packets=0" until someone notices the car was
+     * reporting FAILED all along */
+    if (!gRadioOk)
+    {
+        Serial.println("\n[stream] radio is not up: re-probe with 's' in health mode");
+        return;
+    }
+
     Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key to stop ---");
+    /* State the address being listened on, so it can be read against the
+     * sender's without opening either firmware's menu */
+    printRadioAddress("   listening pipe1 = ", gbox_pipe_name);
 
     gMonitorActive = true;
     gMonitorExit   = false;
