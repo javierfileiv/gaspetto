@@ -260,10 +260,11 @@ p                    # scan + build + transmit
 ```
 
 The slot lines are the decode itself, so they are the first place to look
-when a build is refused: a slot reading `INVALID` (failed read or
-uncalibrated row) makes `buildProgramFromPieces` reject the board rather
-than send a wrong program, and a payload over 31 commands is refused the
-same way. The car can never receive more than it can run.
+when a run is refused: a slot reading `INVALID` (failed read, uncalibrated
+row or a value outside every band) **aborts the scan where it stands** and
+raises the build-error LEDs, instead of letting a wrong board travel on. A
+payload over 31 commands is refused by `buildProgramFromPieces` the same
+way. The car can never receive more than it can run.
 
 The verdict also shows on the LEDs (the 5V rail is raised for the animation
 and put back after, like the LED menu):

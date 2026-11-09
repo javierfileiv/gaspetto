@@ -542,10 +542,11 @@ static void runSendFeedback(void (*animation)())
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
 }
 
-/* One slot of the scan: read, decode, report. An INVALID lands in the board
- * and the walk carries on - the build rejects the board afterwards, which
- * is where it has always been caught */
-static void scanOneSlot(uint8_t slot, BoxBoardPieces &board)
+/* One slot of the scan: read, decode, report. Returns false when the slot
+ * decodes INVALID - a failed read, an uncalibrated row or a value outside
+ * every band - which aborts the run: an INVALID is a fault, not the place
+ * where the sequence stops */
+static bool scanOneSlot(uint8_t slot, BoxBoardPieces &board)
 {
     const AdsTestEntry &entry = kAdsTests[slot / 4];
     const uint8_t channel     = slot % 4;
@@ -562,39 +563,50 @@ static void scanOneSlot(uint8_t slot, BoxBoardPieces &board)
     Serial.print(static_cast<int>(slot) + 1);
     if (!readOk)
     {
-        board[slot] = BoxPieceId::INVALID;
         Serial.println(": READ FAIL -> INVALID");
-        return;
+        return false;
     }
 
-    board[slot] = pieceForRaw(slot, rawMean);
+    const BoxPieceId piece = pieceForRaw(slot, rawMean);
     Serial.print(": raw=");
     Serial.print(rawMean);
     Serial.print("  ");
-    Serial.println(labelName(static_cast<int>(board[slot])));
+    Serial.println(labelName(static_cast<int>(piece)));
+    if (piece == BoxPieceId::INVALID)
+    {
+        return false;
+    }
+
+    board[slot] = piece;
+    return true;
 }
 
 /* Scan a zone in slot order and stop at the first EMPTY: the pieces are a
  * contiguous run starting at slot 1, so an empty slot means the sequence is
  * over and whatever lies after it is out of the program - what was already
- * read stays */
-static void scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
+ * read stays. Returns false on the first INVALID so the caller can raise
+ * the build-error LEDs */
+static bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
 {
     for (uint8_t slot = firstSlot; slot < endSlot; ++slot)
     {
-        scanOneSlot(slot, board);
+        if (!scanOneSlot(slot, board))
+        {
+            return false;
+        }
         if (board[slot] == BoxPieceId::EMPTY)
         {
             Serial.print("[send] slot ");
             Serial.print(static_cast<int>(slot) + 1);
             Serial.println(" empty: sequence ends here");
-            return;
+            return true;
         }
         if (board[slot] == BoxPieceId::LOOP_CALL)
         {
             sawLoopCall = true;
         }
     }
+    return true;
 }
 
 /* Scan -> build -> transmit, the chain production GBox runs when it
@@ -626,13 +638,23 @@ void runSendPiecesTest()
 
     /* Main zone first, in slot order: an EMPTY ends the sequence and leaves
      * the slots after it alone - they stay EMPTY from the initialisation */
-    scanZone(0, BOX_MAIN_SLOTS, board, hasLoopCall);
+    if (!scanZone(0, BOX_MAIN_SLOTS, board, hasLoopCall))
+    {
+        Serial.println("[send] INVALID slot: aborting, nothing sent");
+        runSendFeedback(runBuildErrorAnimationTest);
+        return;
+    }
 
     /* The loop zone is read only when the main zone held a LOOP_CALL:
      * without one those slots never reach the program */
     if (hasLoopCall)
     {
-        scanZone(BOX_MAIN_SLOTS, BOX_TOTAL_SLOTS, board, hasLoopCall);
+        if (!scanZone(BOX_MAIN_SLOTS, BOX_TOTAL_SLOTS, board, hasLoopCall))
+        {
+            Serial.println("[send] INVALID slot: aborting, nothing sent");
+            runSendFeedback(runBuildErrorAnimationTest);
+            return;
+        }
     }
     else
     {
