@@ -165,6 +165,7 @@ extern TestMode gMode;
 extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
 extern bool gLedMenuActive;
+extern bool gRadioMenuActive;
 
 /* main.cpp: deep sleep (STOP) test driven by the "b" shell key */
 void runDeepSleepTest();
@@ -174,6 +175,10 @@ void runSendPiecesTest();
 
 /* main.cpp: listen to the car stream on _box_, the "e" shell key */
 void runCarStreamTest();
+
+/* main.cpp: radio menu driven by the "t" shell key */
+void startRadioMenu();
+void runRadioMenuKey(char key);
 
 /* ========================================== */
 /* shell.cpp - usb key dispatch, echo and help */

@@ -31,6 +31,7 @@ The production and test firmware must agree on thresholds, so both read the same
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
 | `e` | Listen to `_box_`: prints the car's telemetry and log fragments until a key stops it |
+| `t` | Radio menu: `1` probes the chip over SPI, `2` prints the addresses and config, `3` sends a one command test program, `q` quits |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
 | `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
@@ -277,17 +278,48 @@ telemetry and log fragments.
 
 ```text
 e                    # any key stops; the radio goes back to transmit only
+   listening pipe1 = 5F 62 6F 78 5F
    [TLM] yaw=0.0 tgt=7.0 state=0 speed=50
    [LOG] car-sim [imu] tick=42 ms=8100 yaw=182.0 speed=42
    [stream] quiet, packets=17
 --- CAR STREAM stopped, packets=17 ---
 ```
 
+The session opens with the address it listens on, so it can be read
+against the sender's without opening either firmware's menu, and it
+refuses to start when `radio.begin()` failed — a dead radio and a silent
+car otherwise both look like `quiet, packets=0`.
+
 Log lines are reassembled before printing: the sender splits them in 30
 byte pieces and telemetry can land in between. Outside a session nothing
 drains the FIFO, so the car's writes report FAILED unless a session (or a
 real box) is listening — that difference is the visible proof that the
 receiver is there.
+
+## Radio Menu (`t`)
+
+The link diagnostics that `printDetails()` used to attempt: RF24 writes
+that dump with `printf_P`, which no core here wires to the port, so it
+reaches nothing. This menu prints the same facts with `Serial.print`.
+
+```text
+t                    # q quits
+--- RADIO MENU ---
+   [radio] 1 probe | 2 addresses and config | 3 send test program | q quit
+2
+   tx       = 5F 63 61 72 5F
+   rx pipe1 = 5F 62 6F 78 5F
+   pa=LOW rate=1MBPS channel=76 payload=32
+3
+[radio] test program (MOTOR_STOP) -> ACK (car answered)
+```
+
+`1` reads the chip over SPI at that moment, so it says whether the radio
+answers *now* rather than repeating the flag `setup()` left. `2` shows
+what the firmware configured: RF24 v1.6 has no address getter, and the
+configured constants are the thing to compare when two rigs do not hear
+each other. `3` sends a single `MOTOR_STOP`, which proves the transmit
+path without a scanned board and is harmless whatever the car is doing.
 
 ## Hardware Setup
 

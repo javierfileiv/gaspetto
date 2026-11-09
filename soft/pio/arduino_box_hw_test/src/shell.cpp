@@ -22,6 +22,7 @@ void printUsbHelp()
     Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
     Serial.println(
         "           green = ACK, amber = empty board, red = refused, RF error = no answer");
+    Serial.println("           t = radio menu: 1 probe, 2 addresses, 3 test send, q quits");
     Serial.println("   stream: e = listen to _box_ for the car telemetry and logs, key quits");
 }
 
@@ -137,6 +138,17 @@ void handleUsbCommands()
             if (incoming != '\n' && incoming != '\r')
             {
                 runLedTestKey(static_cast<char>(incoming));
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
+        if (gRadioMenuActive)
+        {
+            if (incoming != '\n' && incoming != '\r')
+            {
+                runRadioMenuKey(static_cast<char>(incoming));
             }
             pendingSlot   = 0;
             digitsStarted = false;
@@ -300,6 +312,14 @@ void handleUsbCommands()
                 break; /* unreachable: the menu intercepts before the switch */
             }
             startLedTestMenu();
+            break;
+
+        case 't':
+            if (gRadioMenuActive)
+            {
+                break; /* unreachable: the menu intercepts before the switch */
+            }
+            startRadioMenu();
             break;
 
         case 'b':
