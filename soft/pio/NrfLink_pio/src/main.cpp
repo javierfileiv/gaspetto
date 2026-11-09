@@ -73,6 +73,23 @@ void setup()
     printHelp();
 }
 
+/* RF24 v1.6 has no address getter: this prints the constants just written
+ * into the chip, which is what two rigs compare when they do not hear each
+ * other. printDetails() reaches nothing on this board (RF24 writes it with
+ * printf_P, which is not wired to the USB port), hence Serial.print here */
+static void printAddress(const uint8_t *addr)
+{
+    for (uint8_t i = 0; i < 5; ++i) {
+        if (addr[i] < 0x10) {
+            Serial.print('0');
+        }
+        Serial.print(addr[i], HEX);
+        if (i < 4) {
+            Serial.print(' ');
+        }
+    }
+}
+
 /* openWritingPipe() writes TX_ADDR and RX_ADDR_P0 together, which is what
  * the auto-acknowledge needs, so the two modes mirror each other: whoever
  * transmits owns pipe 0 and reads the other address on pipe 1. Both modes
@@ -98,8 +115,15 @@ void setMode(uint8_t mode)
 
     radio.startListening();
 
+    /* Both addresses on one line: this is the half of the link the bench
+     * prints too, and matching the two lines is the whole diagnosis */
     Serial.print("[mode] ");
-    Serial.println(gMode == kModeCar ? "1 = car emulation" : "2 = box/sender");
+    Serial.print(gMode == kModeCar ? "1 = car emulation" : "2 = box/sender");
+    Serial.print(", tx ");
+    printAddress(gMode == kModeCar ? gbox_pipe_name : gcar_pipe_name);
+    Serial.print(", rx(pipe1) ");
+    printAddress(gMode == kModeCar ? gcar_pipe_name : gbox_pipe_name);
+    Serial.println();
 }
 
 /* Telemetry values move every tick so a dead link is visible as a frozen
