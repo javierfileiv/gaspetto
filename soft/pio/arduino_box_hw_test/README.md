@@ -29,6 +29,9 @@ The production and test firmware must agree on thresholds, so both read the same
 | `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
+| `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
+| `e` | Listen to `_box_`: prints the car's telemetry and log fragments until a key stops it |
+| `t` | Radio menu: `1` probes the chip over SPI, `2` prints the addresses and config, `3` sends a one command test program, `q` quits |
 | `dfu` | Type the three letters in a row to jump to the STM32 DFU bootloader |
 | `reset` | Type the five letters in a row to reboot the MCU |
 | `b` | Deep sleep (STOP): the chip sleeps until the wake button (PB9) is pressed; the USB port drops and comes back after the wake |
@@ -220,6 +223,103 @@ static const uint16_t GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_
 ```
 
 Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h` and rebuild. This firmware decodes with those rows right away; production keeps using the legacy global defines until it adopts the same per-slot scan.
+
+## Send Pieces (`p`)
+
+The radio link check: one key runs the whole chain production GBox runs when
+it validates a program, without running GBox itself.
+
+1. **Scan** — one mean reading per slot on all 20 slots, decoded by
+   `pieceForRaw`, the single threshold walk every consumer of this firmware
+   uses (monitors, scan and send cannot disagree)
+2. **Build** — `buildProgramFromPieces` from `shared_types/PieceProgram`
+   (symlinked here), the very function the production GBox links
+3. **Send** — the resulting 32-byte `CommandPacket` on the `_car_` pipe
+
+The chip is set up exactly like production `RadioController::begin()`: PA
+level and data rate from `config_radio.h` (1 MBps), 5-byte address, 32-byte
+payload, writing pipe `_car_`. The bench only transmits, so `write()`
+returning **true** means the car's radio answered the auto-ack — that is the
+delivery proof.
+
+```text
+c                    # calibration mode: the 3V3 sensor rail must be up
+p                    # scan + build + transmit
+--- SEND PIECES: scan -> build -> radio ---
+   slot 1: raw=13472  EMPTY
+   slot 2: raw=14896  FORWARD
+   ...
+[send] program: 3 command(s) [13 1 13]
+[send] radio.write 32 bytes -> ACK (car answered)
+```
+
+The 20 slot lines are the decode itself, so they are the first place to look
+when a build is refused: a slot reading `INVALID` (failed read or
+uncalibrated row) makes `buildProgramFromPieces` reject the board rather
+than send a wrong program, and a payload over 31 commands is refused the
+same way. The car can never receive more than it can run.
+
+The verdict also shows on the LEDs (the 5V rail is raised for the animation
+and put back after, like the LED menu):
+
+| Feedback | Meaning |
+|----------|---------|
+| green cascade | the car acknowledged the payload |
+| amber blink | empty board, nothing to send |
+| red blink | build refused (invalid slot or overflow), nothing transmitted |
+| RF error | transmitted but no ACK: the car is absent or not listening |
+
+## Car Stream (`e`)
+
+The other half of the link: `setup()` already gives the bench the real box
+layout — pipe 0 for the program bursts to `_car_`, pipe 1 listening on
+`_box_` — and this key opens the listening, where the car answers with
+telemetry and log fragments.
+
+```text
+e                    # any key stops; the radio goes back to transmit only
+   listening pipe1 = 5F 62 6F 78 5F
+   [TLM] yaw=0.0 tgt=7.0 state=0 speed=50
+   [LOG] car-sim [imu] tick=42 ms=8100 yaw=182.0 speed=42
+   [stream] quiet, packets=17
+--- CAR STREAM stopped, packets=17 ---
+```
+
+The session opens with the address it listens on, so it can be read
+against the sender's without opening either firmware's menu, and it
+refuses to start when `radio.begin()` failed — a dead radio and a silent
+car otherwise both look like `quiet, packets=0`.
+
+Log lines are reassembled before printing: the sender splits them in 30
+byte pieces and telemetry can land in between. Outside a session nothing
+drains the FIFO, so the car's writes report FAILED unless a session (or a
+real box) is listening — that difference is the visible proof that the
+receiver is there.
+
+## Radio Menu (`t`)
+
+The link diagnostics that `printDetails()` used to attempt: RF24 writes
+that dump with `printf_P`, which no core here wires to the port, so it
+reaches nothing. This menu prints the same facts with `Serial.print`.
+
+```text
+t                    # q quits
+--- RADIO MENU ---
+   [radio] 1 probe | 2 addresses and config | 3 send test program | q quit
+2
+   tx       = 5F 63 61 72 5F
+   rx pipe1 = 5F 62 6F 78 5F
+   pa=LOW rate=1MBPS channel=76 payload=32
+3
+[radio] test program (MOTOR_STOP) -> ACK (car answered)
+```
+
+`1` reads the chip over SPI at that moment, so it says whether the radio
+answers *now* rather than repeating the flag `setup()` left. `2` shows
+what the firmware configured: RF24 v1.6 has no address getter, and the
+configured constants are the thing to compare when two rigs do not hear
+each other. `3` sends a single `MOTOR_STOP`, which proves the transmit
+path without a scanned board and is harmless whatever the car is doing.
 
 ## Hardware Setup
 

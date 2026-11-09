@@ -79,9 +79,6 @@ public:
     void injectRawAdcValues(const std::array<uint16_t, BOX_TOTAL_SLOTS> &rawValues);
 #endif
 
-    static bool buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &packet,
-                                       bool &isEmpty);
-
     void restoreFromStop();
     void setSensorRailEnabled(bool enabled);
     void runScanAnimation();

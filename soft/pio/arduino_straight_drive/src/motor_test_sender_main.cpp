@@ -185,7 +185,7 @@ void setup()
         radio.enableAckPayload();
 
         // Set up for telemetry reception
-        radio.openReadingPipe(1, gcar_telemetry_pipe_name);
+        radio.openReadingPipe(1, gbox_pipe_name);
         radio.startListening();
 
         radioOk = true;
@@ -228,7 +228,7 @@ void displayTelemetry(const TelemetryPacket &t)
     else
         Serial.print(F("?"));
     Serial.print(F(" e="));
-    Serial.print(t.err, 1);
+    Serial.print(t.targetYaw - t.yaw, 1); /* err left the packet: the tag took its byte */
     Serial.print(F(" Kp="));
     Serial.print(t.kp, 3);
     Serial.print(F(" Ki="));

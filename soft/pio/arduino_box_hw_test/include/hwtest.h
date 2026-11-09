@@ -53,6 +53,11 @@ struct AdsTestEntry
 constexpr uint8_t kAdsCount             = 5;
 constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
 
+/* The board the shared CommandPacket describes and the board this firmware
+ * reads are one and the same: the radio send walks the packet slots and
+ * indexes kAdsTests with them, so a divergence would overrun the table */
+static_assert(BOX_TOTAL_SLOTS == kCalibrationSlotCount, "packet slots must match the ADS scan");
+
 void handleUsbCommands();
 
 /* Sliced delay so USB CDC commands are polled while the test cycles wait.
@@ -89,6 +94,8 @@ struct LabelCluster
 
 extern LabelCluster gPieceClusters[kCalibrationSlotCount][6];
 
+/* Names a BoxPieceId value (0..6): the cluster labels 0..5, plus the
+ * INVALID name the decode returns for uncalibrated slots */
 const char *labelName(int index);
 void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw);
 void resetLabeledSlot(uint8_t slotIndex);
@@ -149,14 +156,29 @@ void runSlotMonitor(uint8_t slotIndex);
 void runFrozenSlotMonitor(uint8_t slotIndex);
 void runPieceCalibrationScan();
 
+/* The one piece decode: a raw reading against this slot's compiled row.
+ * Every consumer (monitors, scan, radio send) goes through it */
+BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw);
+
 /* Mode state, defined by main.cpp and read by nearly every module */
 extern TestMode gMode;
 extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
 extern bool gLedMenuActive;
+extern bool gRadioMenuActive;
 
 /* main.cpp: deep sleep (STOP) test driven by the "b" shell key */
 void runDeepSleepTest();
+
+/* main.cpp: scan -> build -> transmit test driven by the "p" shell key */
+void runSendPiecesTest();
+
+/* main.cpp: listen to the car stream on _box_, the "e" shell key */
+void runCarStreamTest();
+
+/* main.cpp: radio menu driven by the "t" shell key */
+void startRadioMenu();
+void runRadioMenuKey(char key);
 
 /* ========================================== */
 /* shell.cpp - usb key dispatch, echo and help */

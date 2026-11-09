@@ -67,7 +67,10 @@ void setup()
 {
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
-    Log::attachNrf24(radio, gcar_log_pipe_name, gcar_pipe_name);
+    /* Logs ride the normal channel, tagged: the destination and the
+     * restore address are both the writing pipe (_box_), so the pipe
+     * never moves and the receiver sorts packets by PacketTag */
+    Log::attachNrf24(radio, gbox_pipe_name, gbox_pipe_name);
 #endif
 #ifdef ARDUINO
     while (!Serial) {

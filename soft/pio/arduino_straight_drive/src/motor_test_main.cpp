@@ -343,9 +343,13 @@ void sendTelemetry()
 {
     TelemetryPacket telemetry = movementController.buildTelemetryPacket();
 
+    /* The tag is what tells a receiver this is telemetry: without it byte 0
+     * reads as the command count of a program */
+    telemetry.tag = static_cast<uint8_t>(PacketTag::Telemetry);
+
     delay(10);
     radio.stopListening();
-    radio.openWritingPipe(gcar_telemetry_pipe_name);
+    radio.openWritingPipe(gbox_pipe_name);
     bool result = radio.write(&telemetry, sizeof(telemetry));
     radio.openWritingPipe(gcar_pipe_name);
     radio.startListening();

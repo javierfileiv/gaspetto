@@ -7,11 +7,15 @@
 #endif
 
 /**
- * @brief Packed event structure for radio transmission (2 bytes).
+ * @brief Packed event structure for radio transmission (3 bytes)
  *
  * Generic packet format - interpretation of fields depends on application.
+ * The tag byte leads so the receiver can tell an event from a program
+ * before looking at anything else; RadioController stamps it on the way
+ * out and checks it on the way in.
  */
 struct __attribute__((packed)) EventPacket {
+    uint8_t tag;
     uint8_t eventId;
     uint8_t payload;
 };
@@ -59,6 +63,7 @@ public:
      */
     void toPacket(EventPacket &packet) const
     {
+        packet.tag = 0; /* RadioController stamps PacketTag::Event before sending */
         packet.eventId = static_cast<uint8_t>(eventId_);
         packet.payload = static_cast<uint8_t>(payload_);
     }

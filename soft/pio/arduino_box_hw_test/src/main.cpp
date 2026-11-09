@@ -3,11 +3,14 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <config_radio.h>
+#include <string.h>
 
 #ifdef TEST_ADS1115
 #include <Adafruit_ADS1X15.h>
 #endif
 #include "CommandPacket.h"
+#include "PieceProgram.h"
+#include "RadioProtocol.h"
 #include "dfu_bootloader.h"
 #include "hwtest.h"
 #include "i2c3_bitbang.h"
@@ -19,6 +22,14 @@
 
 /* Initialize radio object */
 RF24 radio(NRF24_CE, NRF24_CSN);
+
+/* Set by setup() once the chip answered: without it the send test would
+ * report a missing car instead of a missing radio */
+static bool gRadioOk = false;
+
+/* Radio menu (key "t"), same shape as the LED menu: the shell routes
+ * every key here while it is open */
+bool gRadioMenuActive = false;
 
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
@@ -221,14 +232,27 @@ void setup()
     if (radio.begin())
     {
         Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
-        radio.setPALevel(RF24_PA_LOW); /* Set low power for testing */
-        radio.printDetails();          /* Print chip info to Serial */
+        /* Same line as production RadioController::begin(): the bench must
+         * put the chip in the exact state the GBox will, or the link it
+         * validates is not the link production will run */
+        radio.setPALevel(PA_LEVEL);
+        radio.setDataRate(DATA_RATE);
+        radio.setAddressWidth(5);
+        radio.setPayloadSize(sizeof(CommandPacket));
+        radio.openWritingPipe(gcar_pipe_name); /* the GBox writes to the car */
+        /* The real box layout: pipe 0 carries the program burst to _car_,
+         * pipe 1 listens on _box_ where the car answers with telemetry and
+         * logs ('e' opens that listening, nothing is drained outside it) */
+        radio.openReadingPipe(1, gbox_pipe_name);
+        radio.printDetails(); /* Print chip info to Serial */
+        gRadioOk = true;
     }
     else
     {
         Serial.println("   [ERROR] nRF24L01+ not found!");
         Serial.println("   -> Check soldering on PA3, PA4, PA5, PA6, PA7.");
         Serial.println("   -> Check if 3.3V is reaching the nRF board.");
+        Serial.println("   -> 'p' (send pieces) stays disabled until it answers.");
     }
 
     /* --- I2C init --- */
@@ -500,6 +524,384 @@ void runDeepSleepTest()
     digitalWrite(PIN_MOSFET_5V_LEDS, gMode == TestMode::Calibration ? HIGH : LOW);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, gCalibrationRailsOn ? LOW : HIGH);
     Serial.println("[stop] test done, back in the shell ('b' sleeps again)");
+}
+
+/* ========================================== */
+/* Send the scanned board over the radio, key "p" */
+/* ========================================== */
+
+/* The LED verdict only shows if the 5V rail is up; calibration keeps it
+ * down, so raise it for the animation and put it back, the same contract
+ * the LED menu uses */
+static void runSendFeedback(void (*animation)())
+{
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
+    delay(kRailSettleDelayMs);
+    animation();
+    blackoutLeds();
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+}
+
+/* Scan -> build -> transmit, the chain production GBox runs when it
+ * validates a program, without GBox itself: the decode is the compiled
+ * per-slot row (pieceForRaw, the one walk), the build is the shared
+ * buildProgramFromPieces, only the transport is this bench. The verdict
+ * mirrors the production LED semantics: green on ACK, amber on an empty
+ * board, red on a refused build, RF error when the car does not answer */
+void runSendPiecesTest()
+{
+    BoxBoardPieces board = {};
+    CommandPacket packet = {};
+    bool isEmpty         = true;
+    uint8_t readFailures = 0;
+    bool built           = false;
+
+    Serial.println("\n--- SEND PIECES: scan -> build -> radio ---");
+
+    if (!gRadioOk)
+    {
+        Serial.println("[send] radio is not up: re-probe with 's' in health mode");
+        return;
+    }
+    if (!gCalibrationRailsOn)
+    {
+        Serial.println("[send] 3V3 sensor rail is OFF, readings would be garbage ('c' to switch)");
+        return;
+    }
+
+    /* One mean reading per slot, the same read the monitors use; a module
+     * that fails is recovered once, then honestly reported as INVALID
+     * rather than guessed */
+    for (uint8_t slot = 0; slot < BOX_TOTAL_SLOTS; ++slot)
+    {
+        const AdsTestEntry &entry = kAdsTests[slot / 4];
+        const uint8_t channel     = slot % 4;
+        int16_t rawMean           = 0;
+
+        bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        if (!readOk)
+        {
+            recoverAdsModule(&entry);
+            readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        }
+
+        Serial.print("   slot ");
+        Serial.print(static_cast<int>(slot) + 1);
+        if (!readOk)
+        {
+            ++readFailures;
+            board[slot] = BoxPieceId::INVALID;
+            Serial.println(": READ FAIL -> INVALID");
+            continue;
+        }
+
+        board[slot] = pieceForRaw(slot, rawMean);
+        Serial.print(": raw=");
+        Serial.print(rawMean);
+        Serial.print("  ");
+        Serial.println(labelName(static_cast<int>(board[slot])));
+    }
+
+    if (readFailures > 0)
+    {
+        Serial.print("[send] ");
+        Serial.print(readFailures);
+        Serial.println(" slot read(s) failed, they decode INVALID");
+    }
+
+    built = buildProgramFromPieces(board, packet, isEmpty);
+    if (!built)
+    {
+        if (isEmpty)
+        {
+            Serial.println("[send] empty board: no command to send");
+            runSendFeedback(runEmptyBoardAnimationTest);
+        }
+        else
+        {
+            Serial.println("[send] build FAILED: invalid slot or payload overflow");
+            Serial.println("[send] nothing sent");
+            runSendFeedback(runBuildErrorAnimationTest);
+        }
+        return;
+    }
+
+    Serial.print("[send] program: ");
+    Serial.print(static_cast<int>(packet.count));
+    Serial.print(" command(s) [");
+    for (uint8_t i = 0; i < packet.count; ++i)
+    {
+        if (i > 0)
+        {
+            Serial.print(' ');
+        }
+        Serial.print(static_cast<int>(packet.commands[i]));
+    }
+    Serial.println("]");
+
+    /* The bench never listens: nothing puts the radio in RX, so
+     * stopListening() states the intent before the burst. The car's ACK
+     * comes back over the auto-ack channel and write() reports it, which
+     * is the delivery proof the link validation needs */
+    radio.stopListening();
+    const bool sent = radio.write(&packet, sizeof(packet));
+    Serial.print("[send] radio.write ");
+    Serial.print(sizeof(packet));
+    Serial.print(" bytes -> ");
+    Serial.println(sent ? "ACK (car answered)" : "NO ACK (car absent or not listening)");
+
+    if (sent)
+    {
+        runSendFeedback(runSuccessAnimationTest);
+    }
+    else
+    {
+        runSendFeedback(runRfErrorAnimationTest);
+    }
+}
+
+/* ========================================== */
+/* Radio menu, key "t"                        */
+/* ========================================== */
+
+/* RF24 v1.6 exposes no address getter, so the addresses printed are the
+ * constants setup() wrote into the chip: that is the question when two
+ * rigs do not hear each other. isChipConnected() does read the chip over
+ * SPI, so entry 1 probes the hardware live instead of trusting the flag
+ * setup() left behind */
+static void printRadioAddress(const char *label, const uint8_t *addr)
+{
+    Serial.print(label);
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        if (addr[i] < 0x10U)
+        {
+            Serial.print('0');
+        }
+        Serial.print(addr[i], HEX);
+        if (i < 4U)
+        {
+            Serial.print(' ');
+        }
+    }
+    Serial.println();
+}
+
+static void printRadioMenu()
+{
+    Serial.println("   [radio] 1 probe | 2 addresses and config | 3 send test program | q quit");
+}
+
+void startRadioMenu()
+{
+    Serial.println("--- RADIO MENU ---");
+    gRadioMenuActive = true;
+    printRadioMenu();
+}
+
+static void stopRadioMenu()
+{
+    gRadioMenuActive = false;
+    Serial.println("   [radio menu closed]");
+}
+
+void runRadioMenuKey(char key)
+{
+    switch (key)
+    {
+    case '1':
+        Serial.print("[radio] chip ");
+        Serial.println(radio.isChipConnected() ? "answering" : "NOT answering over SPI");
+        break;
+
+    case '2': {
+        static const char *const kPaNames[] = {"MIN", "LOW", "HIGH", "MAX"};
+        const uint8_t pa                    = radio.getPALevel();
+        const rf24_datarate_e rate          = radio.getDataRate();
+
+        printRadioAddress("   tx       = ", gcar_pipe_name);
+        printRadioAddress("   rx pipe1 = ", gbox_pipe_name);
+        Serial.print("   pa=");
+        Serial.print((pa < 4U) ? kPaNames[pa] : "?");
+        Serial.print(" rate=");
+        switch (rate)
+        {
+        case RF24_1MBPS:
+            Serial.print("1MBPS");
+            break;
+        case RF24_2MBPS:
+            Serial.print("2MBPS");
+            break;
+        case RF24_250KBPS:
+            Serial.print("250KBPS");
+            break;
+        default:
+            Serial.print("?");
+            break;
+        }
+        Serial.print(" channel=");
+        Serial.print(radio.getChannel());
+        Serial.print(" payload=");
+        Serial.println(radio.getPayloadSize());
+        break;
+    }
+
+    case '3': {
+        /* A one command program proves the transmit path without a scanned
+         * board: MOTOR_STOP is harmless whatever the car is doing */
+        CommandPacket packet = {};
+        bool sent            = false;
+
+        if (!gRadioOk)
+        {
+            Serial.println("[radio] radio is not up: re-probe with 's' in health mode");
+            break;
+        }
+
+        packet.count       = 1;
+        packet.commands[0] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
+        radio.stopListening();
+        sent = radio.write(&packet, sizeof(packet));
+        Serial.print("[radio] test program (MOTOR_STOP) -> ");
+        Serial.println(sent ? "ACK (car answered)" : "NO ACK (car absent or not listening)");
+        break;
+    }
+
+    case 'q':
+        stopRadioMenu();
+        return;
+
+    default:
+        Serial.println("   [radio] 1 probe | 2 addresses | 3 test send | q quit");
+        return;
+    }
+
+    if (gRadioMenuActive)
+    {
+        printRadioMenu(); /* the entries are chatty: reprint the prompt after them */
+    }
+}
+
+void runCarStreamTest()
+{
+    uint8_t buffer[sizeof(CommandPacket)];
+    uint8_t logLine[64];
+    uint8_t logLineLen       = 0;
+    uint32_t packets         = 0;
+    uint32_t lastHeartbeatMs = millis();
+
+    /* Without this guard a dead radio looks exactly like a silent car:
+     * both print "quiet, packets=0" until someone notices the car was
+     * reporting FAILED all along */
+    if (!gRadioOk)
+    {
+        Serial.println("\n[stream] radio is not up: re-probe with 's' in health mode");
+        return;
+    }
+
+    Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key to stop ---");
+    /* State the address being listened on, so it can be read against the
+     * sender's without opening either firmware's menu */
+    printRadioAddress("   listening pipe1 = ", gbox_pipe_name);
+
+    gMonitorActive = true;
+    gMonitorExit   = false;
+    radio.startListening();
+
+    while (!gMonitorExit)
+    {
+        uint8_t pipe = 0;
+
+        if (radio.available(&pipe))
+        {
+            radio.read(buffer, sizeof(buffer));
+            ++packets;
+
+            switch (static_cast<PacketTag>(buffer[0]))
+            {
+            case PacketTag::Telemetry: {
+                TelemetryPacket telemetry;
+
+                memcpy(&telemetry, buffer, sizeof(telemetry));
+                Serial.print("   [TLM] yaw=");
+                Serial.print(telemetry.yaw, 1);
+                Serial.print(" tgt=");
+                Serial.print(telemetry.targetYaw, 1);
+                Serial.print(" state=");
+                Serial.print(static_cast<int>(telemetry.state));
+                Serial.print(" speed=");
+                Serial.println(static_cast<int>(telemetry.speed));
+                lastHeartbeatMs = millis();
+                break;
+            }
+            case PacketTag::Log: {
+                const uint8_t flags   = buffer[1];
+                const uint8_t dataLen = flags & 0x7FU;
+                const bool hasMore    = (flags & 0x80U) != 0U;
+                const uint8_t room    = static_cast<uint8_t>(sizeof(logLine) - logLineLen);
+                const uint8_t copy    = (dataLen < room) ? dataLen : room;
+
+                memcpy(&logLine[logLineLen], &buffer[2], copy);
+                logLineLen = static_cast<uint8_t>(logLineLen + copy);
+                if (copy < dataLen)
+                {
+                    Serial.println("   [LOG] line too long, truncated");
+                }
+                if (hasMore)
+                {
+                    break;
+                }
+
+                Serial.print("   [LOG] ");
+                Serial.write(logLine, logLineLen);
+                Serial.println();
+                logLineLen      = 0;
+                lastHeartbeatMs = millis();
+                break;
+            }
+            default:
+                /* Byte 0 is the command count on a program and a real tag
+                 * otherwise: reporting both the same way is misleading */
+                if (buffer[0] > 0 && buffer[0] <= BOX_MAX_PAYLOAD_COMMANDS)
+                {
+                    Serial.print("   [PROG] ");
+                    Serial.print(static_cast<int>(buffer[0]));
+                    Serial.print(" command(s):");
+                    for (uint8_t i = 0; i < buffer[0]; ++i)
+                    {
+                        Serial.print(' ');
+                        Serial.print(commandIdToString(static_cast<CommandId>(buffer[1 + i])));
+                    }
+                    Serial.println();
+                }
+                else
+                {
+                    Serial.print("   [rx] unknown tag 0x");
+                    Serial.println(buffer[0], HEX);
+                }
+                lastHeartbeatMs = millis();
+                break;
+            }
+            continue;
+        }
+
+        /* A quiet stream must still look alive */
+        if (millis() - lastHeartbeatMs >= 3000U)
+        {
+            lastHeartbeatMs = millis();
+            Serial.print("   [stream] quiet, packets=");
+            Serial.println(static_cast<int>(packets));
+        }
+
+        delayWithUsb(20);
+    }
+
+    gMonitorActive = false;
+    radio.stopListening();
+
+    Serial.print("--- CAR STREAM stopped, packets=");
+    Serial.print(static_cast<int>(packets));
+    Serial.println(" ---");
 }
 
 void loop()

@@ -19,7 +19,6 @@ public:
     MockRadioController(const MockRadioController &) = delete;
     MockRadioController &operator=(const MockRadioController &) = delete;
 
-    void expect_radio_initialization();
     void expect_receive_event(Event *evt = nullptr);
 
 private:

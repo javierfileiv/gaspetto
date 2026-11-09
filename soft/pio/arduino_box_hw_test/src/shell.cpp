@@ -19,6 +19,11 @@ void printUsbHelp()
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
     Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
+    Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
+    Serial.println(
+        "           green = ACK, amber = empty board, red = refused, RF error = no answer");
+    Serial.println("           t = radio menu: 1 probe, 2 addresses, 3 test send, q quits");
+    Serial.println("   stream: e = listen to _box_ for the car telemetry and logs, key quits");
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -133,6 +138,17 @@ void handleUsbCommands()
             if (incoming != '\n' && incoming != '\r')
             {
                 runLedTestKey(static_cast<char>(incoming));
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
+        if (gRadioMenuActive)
+        {
+            if (incoming != '\n' && incoming != '\r')
+            {
+                runRadioMenuKey(static_cast<char>(incoming));
             }
             pendingSlot   = 0;
             digitsStarted = false;
@@ -298,8 +314,22 @@ void handleUsbCommands()
             startLedTestMenu();
             break;
 
+        case 't':
+            if (gRadioMenuActive)
+            {
+                break; /* unreachable: the menu intercepts before the switch */
+            }
+            startRadioMenu();
+            break;
+
         case 'b':
             runDeepSleepTest();
+            break;
+        case 'p':
+            runSendPiecesTest();
+            break;
+        case 'e':
+            runCarStreamTest();
             break;
         case 'g':
             if (gMode != TestMode::Calibration)
