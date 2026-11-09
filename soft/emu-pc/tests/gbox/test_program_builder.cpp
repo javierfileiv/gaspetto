@@ -51,6 +51,63 @@ TEST(GBoxProgramBuilderTest, RejectsEmptyBoard)
     EXPECT_EQ(packet.count, 0);
 }
 
+TEST(GBoxProgramBuilderTest, StopsAtEmptyBeforeAnyPiece)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = true;
+
+    board[0] = BoxPieceId::EMPTY;
+    board[1] = BoxPieceId::FORWARD; /* past the empty: never reached */
+
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
+
+    EXPECT_FALSE(ok);
+    EXPECT_TRUE(isEmpty);
+    EXPECT_EQ(packet.count, 0);
+}
+
+TEST(GBoxProgramBuilderTest, StopsAtFirstEmptyInMainZone)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = false;
+
+    board[0] = BoxPieceId::FORWARD;
+    board[1] = BoxPieceId::EMPTY;
+    board[2] = BoxPieceId::TURN_RIGHT; /* past the empty: out of the program */
+
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
+
+    ASSERT_TRUE(ok);
+    ASSERT_FALSE(isEmpty);
+    ASSERT_EQ(packet.count, 1);
+    EXPECT_EQ(packet.commands[0], static_cast<uint8_t>(CommandId::MOTOR_FORWARD));
+}
+
+TEST(GBoxProgramBuilderTest, StopsAtFirstEmptyInLoopZone)
+{
+    BoxPieceId board[BOX_TOTAL_SLOTS];
+    gbox_test::fillEmptyBoard(board);
+    CommandPacket packet{};
+    bool isEmpty = false;
+
+    board[0] = BoxPieceId::LOOP_CALL;
+
+    board[12] = BoxPieceId::TURN_LEFT;
+    board[13] = BoxPieceId::EMPTY;
+    board[14] = BoxPieceId::FORWARD; /* past the empty: out of the program */
+
+    const bool ok = buildProgramFromPieces(board, packet, isEmpty);
+
+    ASSERT_TRUE(ok);
+    ASSERT_FALSE(isEmpty);
+    ASSERT_EQ(packet.count, 1);
+    EXPECT_EQ(packet.commands[0], static_cast<uint8_t>(CommandId::MOTOR_TURN_LEFT));
+}
+
 TEST(GBoxProgramBuilderTest, RejectsOverflowingLoopExpansion)
 {
     BoxPieceId board[BOX_TOTAL_SLOTS];
@@ -73,7 +130,7 @@ TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopAreaWhenNoOtherPieces)
     bool isEmpty = false;
 
     board[0] = BoxPieceId::LOOP_CALL;
-    board[14] = BoxPieceId::LOOP_CALL;
+    board[12] = BoxPieceId::LOOP_CALL;
 
     const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
@@ -90,8 +147,8 @@ TEST(GBoxProgramBuilderTest, IgnoresLoopCallInLoopArea)
     bool isEmpty = false;
 
     board[0] = BoxPieceId::LOOP_CALL;
-    board[14] = BoxPieceId::LOOP_CALL;
-    board[15] = BoxPieceId::FORWARD;
+    board[12] = BoxPieceId::LOOP_CALL;
+    board[13] = BoxPieceId::FORWARD;
 
     const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 
@@ -208,12 +265,12 @@ TEST(GBoxProgramBuilderTest, RejectsOverflowWhenAppendingRegularMainPiece)
     board[5] = BoxPieceId::FORWARD;
     board[6] = BoxPieceId::BACKWARD;
 
-    board[14] = BoxPieceId::FORWARD;
-    board[15] = BoxPieceId::BACKWARD;
-    board[16] = BoxPieceId::TURN_LEFT;
-    board[17] = BoxPieceId::TURN_RIGHT;
-    board[18] = BoxPieceId::BACKWARD;
-    board[19] = BoxPieceId::FORWARD;
+    board[12] = BoxPieceId::FORWARD;
+    board[13] = BoxPieceId::BACKWARD;
+    board[14] = BoxPieceId::TURN_LEFT;
+    board[15] = BoxPieceId::TURN_RIGHT;
+    board[16] = BoxPieceId::BACKWARD;
+    board[17] = BoxPieceId::FORWARD;
 
     const bool ok = buildProgramFromPieces(board, packet, isEmpty);
 

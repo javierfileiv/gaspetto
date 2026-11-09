@@ -542,6 +542,61 @@ static void runSendFeedback(void (*animation)())
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
 }
 
+/* One slot of the scan: read, decode, report. An INVALID lands in the board
+ * and the walk carries on - the build rejects the board afterwards, which
+ * is where it has always been caught */
+static void scanOneSlot(uint8_t slot, BoxBoardPieces &board)
+{
+    const AdsTestEntry &entry = kAdsTests[slot / 4];
+    const uint8_t channel     = slot % 4;
+    int16_t rawMean           = 0;
+
+    bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    if (!readOk)
+    {
+        recoverAdsModule(&entry);
+        readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    }
+
+    Serial.print("   slot ");
+    Serial.print(static_cast<int>(slot) + 1);
+    if (!readOk)
+    {
+        board[slot] = BoxPieceId::INVALID;
+        Serial.println(": READ FAIL -> INVALID");
+        return;
+    }
+
+    board[slot] = pieceForRaw(slot, rawMean);
+    Serial.print(": raw=");
+    Serial.print(rawMean);
+    Serial.print("  ");
+    Serial.println(labelName(static_cast<int>(board[slot])));
+}
+
+/* Scan a zone in slot order and stop at the first EMPTY: the pieces are a
+ * contiguous run starting at slot 1, so an empty slot means the sequence is
+ * over and whatever lies after it is out of the program - what was already
+ * read stays */
+static void scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
+{
+    for (uint8_t slot = firstSlot; slot < endSlot; ++slot)
+    {
+        scanOneSlot(slot, board);
+        if (board[slot] == BoxPieceId::EMPTY)
+        {
+            Serial.print("[send] slot ");
+            Serial.print(static_cast<int>(slot) + 1);
+            Serial.println(" empty: sequence ends here");
+            return;
+        }
+        if (board[slot] == BoxPieceId::LOOP_CALL)
+        {
+            sawLoopCall = true;
+        }
+    }
+}
+
 /* Scan -> build -> transmit, the chain production GBox runs when it
  * validates a program, without GBox itself: the decode is the compiled
  * per-slot row (pieceForRaw, the one walk), the build is the shared
@@ -553,7 +608,7 @@ void runSendPiecesTest()
     BoxBoardPieces board = {};
     CommandPacket packet = {};
     bool isEmpty         = true;
-    uint8_t readFailures = 0;
+    bool hasLoopCall     = false;
     bool built           = false;
 
     Serial.println("\n--- SEND PIECES: scan -> build -> radio ---");
@@ -569,44 +624,19 @@ void runSendPiecesTest()
         return;
     }
 
-    /* One mean reading per slot, the same read the monitors use; a module
-     * that fails is recovered once, then honestly reported as INVALID
-     * rather than guessed */
-    for (uint8_t slot = 0; slot < BOX_TOTAL_SLOTS; ++slot)
+    /* Main zone first, in slot order: an EMPTY ends the sequence and leaves
+     * the slots after it alone - they stay EMPTY from the initialisation */
+    scanZone(0, BOX_MAIN_SLOTS, board, hasLoopCall);
+
+    /* The loop zone is read only when the main zone held a LOOP_CALL:
+     * without one those slots never reach the program */
+    if (hasLoopCall)
     {
-        const AdsTestEntry &entry = kAdsTests[slot / 4];
-        const uint8_t channel     = slot % 4;
-        int16_t rawMean           = 0;
-
-        bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
-        if (!readOk)
-        {
-            recoverAdsModule(&entry);
-            readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
-        }
-
-        Serial.print("   slot ");
-        Serial.print(static_cast<int>(slot) + 1);
-        if (!readOk)
-        {
-            ++readFailures;
-            board[slot] = BoxPieceId::INVALID;
-            Serial.println(": READ FAIL -> INVALID");
-            continue;
-        }
-
-        board[slot] = pieceForRaw(slot, rawMean);
-        Serial.print(": raw=");
-        Serial.print(rawMean);
-        Serial.print("  ");
-        Serial.println(labelName(static_cast<int>(board[slot])));
+        scanZone(BOX_MAIN_SLOTS, BOX_TOTAL_SLOTS, board, hasLoopCall);
     }
-
-    if (readFailures > 0)
+    else
     {
-        Serial.print("[send] ");
-        Serial.print(readFailures);
-        Serial.println(" slot read(s) failed, they decode INVALID");
+        Serial.println("[send] no LOOP_CALL in the main zone: loop zone not scanned");
     }
 
     built = buildProgramFromPieces(board, packet, isEmpty);

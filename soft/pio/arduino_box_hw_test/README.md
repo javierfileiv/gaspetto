@@ -229,9 +229,14 @@ Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/inclu
 The radio link check: one key runs the whole chain production GBox runs when
 it validates a program, without running GBox itself.
 
-1. **Scan** — one mean reading per slot on all 20 slots, decoded by
-   `pieceForRaw`, the single threshold walk every consumer of this firmware
-   uses (monitors, scan and send cannot disagree)
+1. **Scan** — one mean reading per slot, decoded by `pieceForRaw`, the
+   single threshold walk every consumer of this firmware uses (monitors,
+   scan and send cannot disagree). The walk **stops at the first `EMPTY`**:
+   the pieces are a contiguous run, so an empty slot ends the sequence and
+   whatever lies after it stays out of the program — what was already read
+   is kept. The loop zone (slots 13-20) is read **only when the main zone
+   held a `LOOP_CALL`**, since without one those slots never reach the
+   program.
 2. **Build** — `buildProgramFromPieces` from `shared_types/PieceProgram`
    (symlinked here), the very function the production GBox links
 3. **Send** — the resulting 32-byte `CommandPacket` on the `_car_` pipe
@@ -246,14 +251,15 @@ delivery proof.
 c                    # calibration mode: the 3V3 sensor rail must be up
 p                    # scan + build + transmit
 --- SEND PIECES: scan -> build -> radio ---
-   slot 1: raw=13472  EMPTY
-   slot 2: raw=14896  FORWARD
-   ...
-[send] program: 3 command(s) [13 1 13]
+   slot 1: raw=14896  FORWARD
+   slot 2: raw=13472  EMPTY
+[send] slot 2 empty: sequence ends here
+[send] no LOOP_CALL in the main zone: loop zone not scanned
+[send] program: 1 command(s) [13]
 [send] radio.write 32 bytes -> ACK (car answered)
 ```
 
-The 20 slot lines are the decode itself, so they are the first place to look
+The slot lines are the decode itself, so they are the first place to look
 when a build is refused: a slot reading `INVALID` (failed read or
 uncalibrated row) makes `buildProgramFromPieces` reject the board rather
 than send a wrong program, and a payload over 31 commands is refused the

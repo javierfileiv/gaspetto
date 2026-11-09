@@ -72,7 +72,7 @@ bool buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &pa
         const BoxPieceId piece = boardPieces[slot];
 
         if (piece == BoxPieceId::EMPTY) {
-            continue;
+            break;
         }
 
         if (piece == BoxPieceId::INVALID) {
@@ -82,6 +82,13 @@ bool buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &pa
 
         if (piece == BoxPieceId::LOOP_CALL) {
             for (size_t loopSlot = 0; loopSlot < BOX_LOOP_SLOTS; ++loopSlot) {
+                /* The zone is walked on the raw board: a LOOP_CALL inside it
+                 * normalises to EMPTY below but is still a piece, so only a
+                 * genuinely empty slot ends the zone */
+                if (boardPieces[BOX_MAIN_SLOTS + loopSlot] == BoxPieceId::EMPTY) {
+                    break;
+                }
+
                 if (loopPieces[loopSlot] == BoxPieceId::EMPTY) {
                     continue;
                 }
