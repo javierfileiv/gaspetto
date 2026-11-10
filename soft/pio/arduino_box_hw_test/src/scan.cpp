@@ -40,11 +40,6 @@ void runSlotMonitor(uint8_t slotIndex)
     Serial.print(" (");
     Serial.print(entry.busName);
     Serial.println("), any key to stop ---");
-    if (!gCalibrationRailsOn)
-    {
-        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
-    }
-
     uint16_t minRaw = 0xFFFF;
     uint16_t maxRaw = 0;
     uint32_t count  = 0;
@@ -163,11 +158,6 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
     Serial.print(" (");
     Serial.print(entry.busName);
     Serial.println("), SPACE = measure, any other key to quit ---");
-    if (!gCalibrationRailsOn)
-    {
-        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
-    }
-
     gFreezeActive    = true;
     gFreezeMeasure   = false;
     gFreezeMeasuring = false;
@@ -300,11 +290,20 @@ void runPieceCalibrationScan()
      * production legacy table and the scan never used them */
     Serial.println("decode: per-slot rows, see row=[...] on each slot line");
 
+    /* No rail held around the scan: the readings below pulse it themselves,
+     * exactly like the game and 'p' do. Holding it here would warm the board
+     * through the whole scan, so this path would calibrate against a
+     * temperature those two never read - which is what the offsets were.
+     * Only the probe needs it, and that one takes it inside the loop */
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
     {
         const AdsTestEntry &entry = kAdsTests[deviceIndex];
 
-        /* Check if device is accessible */
+        /* Check if device is accessible. The chip hangs on the sensor rail,
+         * so take it for the probe and give it straight back: the readings
+         * that follow must pulse it the way the game and 'p' do */
+        const bool probeRail = sensorRailAcquire();
+
         bool deviceFound;
         if (entry.useBitBang)
         {
@@ -315,6 +314,8 @@ void runPieceCalibrationScan()
             Adafruit_ADS1115 ads;
             deviceFound = ads.begin(entry.address, entry.wire);
         }
+
+        sensorRailRelease(probeRail);
 
         if (!deviceFound)
         {

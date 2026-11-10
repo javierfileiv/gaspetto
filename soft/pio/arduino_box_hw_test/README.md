@@ -14,7 +14,7 @@ The production and test firmware must agree on thresholds, so both read the same
 ## Runtime Modes
 
 - **Health** (default at boot) — idles until a key asks for a test (`s` runs the cycle); the board LED heartbeat runs while quiet, and each cycle reports probe/radio changes against the previous one
-- **Calibration** — keeps the 5V LED rail off, powers the 3V3 sensor rail, and allows piece labeling
+- **Calibration** — keeps the 5V LED rail off, raises the 3V3 sensor rail for each reading rather than holding it on, and allows piece labeling
 
 ## USB Commands
 
@@ -106,7 +106,7 @@ swallowed (one key, one measure).
 
 Full campaign recipe, in order:
 
-1. Flash the firmware, open the serial monitor, press `c` — calibration mode powers the 3V3 sensor rail and enables capture
+1. Flash the firmware, open the serial monitor, press `c` — calibration mode enables capture, and every reading raises the 3V3 sensor rail for its own duration
 2. Run the guided game (next section): `g`, then follow every prompt until the firmware prints the per-slot analysis and the generated rows
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
@@ -248,7 +248,7 @@ returning **true** means the car's radio answered the auto-ack — that is the
 delivery proof.
 
 ```text
-c                    # calibration mode: the 3V3 sensor rail must be up
+c                    # calibration mode (each read raises the 3V3 sensor rail)
 p                    # scan + build + transmit
 --- SEND PIECES: scan -> build -> radio ---
    slot 1: raw=14896  FORWARD

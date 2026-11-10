@@ -185,19 +185,28 @@ void recoverI2c3Bus()
  * a fresh module begin before the next try can succeed */
 void recoverAdsModule(const AdsTestEntry *entry)
 {
+    /* The recovery re-inits the module over I2C and the ADS chips hang on
+     * the sensor rail. Every caller reaches this right after a failed read,
+     * which is exactly the moment the lease drops the rail, so take it back
+     * for the duration - unless an enclosing scan is already holding it */
+    const bool acquired = sensorRailAcquire();
+
     if (entry->useBitBang)
     {
         recoverI2c3Bus();
-        return;
+    }
+    else
+    {
+        entry->wire->end();
+        entry->wire->begin();
+        entry->wire->setClock(kI2c1ClockHz);
+        Adafruit_ADS1115 ads;
+        ads.begin(entry->address, entry->wire);
+        ads.setGain(GAIN_ONE);
+        Serial.println("   [RECOVERED] I2C1 module re-inited");
     }
 
-    entry->wire->end();
-    entry->wire->begin();
-    entry->wire->setClock(kI2c1ClockHz);
-    Adafruit_ADS1115 ads;
-    ads.begin(entry->address, entry->wire);
-    ads.setGain(GAIN_ONE);
-    Serial.println("   [RECOVERED] I2C1 module re-inited");
+    sensorRailRelease(acquired);
 }
 
 bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
@@ -309,16 +318,41 @@ static bool readAdsSingleEnded(const AdsTestEntry *entry, uint8_t channel, int16
 
 bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw)
 {
+    /* Raise the sensor rail for the reading and drop it again: the decode
+     * depends on how long the rail has been up - a warm board reads about
+     * 370 counts higher than a cold one, more than half the narrowest EMPTY
+     * band, which flips ten of the twenty slots to another piece with the
+     * pieces untouched. A short pulse from cold is the only state that
+     * repeats between a calibration and a later scan. The lease keeps a
+     * rail someone else holds: the health cycle raises it for its I2C
+     * probes, and a reading must not take it away from under it */
+    const bool acquired = sensorRailAcquire();
+    if (acquired && !entry->useBitBang && entry->wire != nullptr)
+    {
+        /* Power-cycling an ADS on the hardware bus leaves the peripheral
+         * waiting on a slave that was unpowered mid-transaction, with SDA
+         * held low by the chip's protection diodes. The bit-banged I2C3 has
+         * no state to go stale - hence only I2C1 failing - and the recovery
+         * path re-arms the peripheral the same way, which is why every
+         * reading failed once while the rail pulses */
+        entry->wire->end();
+        entry->wire->begin();
+        entry->wire->setClock(kI2c1ClockHz);
+    }
+
     int32_t sum = 0;
     for (uint8_t sample = 0; sample < kAdsMeanSamples; ++sample)
     {
         int16_t raw = 0;
         if (!readAdsSingleEnded(entry, channel, raw))
         {
+            sensorRailRelease(acquired);
             return false;
         }
         sum += raw;
     }
+
+    sensorRailRelease(acquired);
 
     meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(kAdsMeanSamples));
     return true;

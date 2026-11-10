@@ -23,6 +23,20 @@ static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be 
 
 constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
 
+/* Settle time after the sensor rail changes state: a hall sensor answers in
+ * microseconds, so 250 ms covers the rail's own RC plus margin. Every read
+ * raises the rail for its duration and drops it again (see
+ * readAdsSingleEndedMean), so this is also the pause between two readings */
+constexpr uint16_t kRailSettleDelayMs = 250;
+
+/* Raise the sensor rail when it is down and report whether this call did it,
+ * so the caller drops it again only in that case: a rail someone else holds
+ * (the health cycle, an enclosing scan) is never taken away. Every I2C access
+ * to the ADS chips needs the rail, and it must be held for the whole
+ * operation - probe, reads and recovery - not only around one reading */
+bool sensorRailAcquire();
+void sensorRailRelease(bool acquired);
+
 struct CalibrationStats
 {
     bool initialized;
@@ -31,8 +45,8 @@ struct CalibrationStats
 };
 
 /* Runtime test modes, switched over the USB CDC port. Health runs the
- * connectivity cycle each pass; Calibration keeps the 3V3 sensor rail
- * powered and watches piece ADC values continuously */
+ * connectivity cycle each pass; Calibration watches piece ADC values, with
+ * the sensor rail raised per reading rather than held on for the session */
 enum class TestMode : uint8_t
 {
     Health,
