@@ -180,6 +180,27 @@ void recoverI2c3Bus()
     delay(20);
 }
 
+/* Bring the bus and the module back, silently. The same work the recovery
+ * does, minus its report: a caller that re-arms on every rail-up must not be
+ * drowned in [RECOVERED] lines. Only the hardware bus needs it - the
+ * bit-banged I2C3 re-samples its pins on every operation and reads with a
+ * span of 0 or 1 straight through a power cycle, so there is nothing to
+ * restore there */
+void rearmAdsModule(const AdsTestEntry *entry)
+{
+    if (entry->useBitBang || entry->wire == nullptr)
+    {
+        return;
+    }
+
+    entry->wire->end();
+    entry->wire->begin();
+    entry->wire->setClock(kI2c1ClockHz);
+    Adafruit_ADS1115 ads;
+    ads.begin(entry->address, entry->wire);
+    ads.setGain(GAIN_ONE);
+}
+
 /* Bring one ADS module back after a failed transaction: bit-banged
  * I2C3 re-inits the bus itself; hardware I2C1 needs a bus restart and
  * a fresh module begin before the next try can succeed */
@@ -193,16 +214,13 @@ void recoverAdsModule(const AdsTestEntry *entry)
 
     if (entry->useBitBang)
     {
+        /* The bit-banged bus needs nothing at rail-up, but it does after a
+         * failed transaction: its lines can be left mid-byte by a timeout */
         recoverI2c3Bus();
     }
     else
     {
-        entry->wire->end();
-        entry->wire->begin();
-        entry->wire->setClock(kI2c1ClockHz);
-        Adafruit_ADS1115 ads;
-        ads.begin(entry->address, entry->wire);
-        ads.setGain(GAIN_ONE);
+        rearmAdsModule(entry);
         Serial.println("   [RECOVERED] I2C1 module re-inited");
     }
 
@@ -327,17 +345,17 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
      * rail someone else holds: the health cycle raises it for its I2C
      * probes, and a reading must not take it away from under it */
     const bool acquired = sensorRailAcquire();
-    if (acquired && !entry->useBitBang && entry->wire != nullptr)
+    if (acquired)
     {
-        /* Power-cycling an ADS on the hardware bus leaves the peripheral
-         * waiting on a slave that was unpowered mid-transaction, with SDA
-         * held low by the chip's protection diodes. The bit-banged I2C3 has
-         * no state to go stale - hence only I2C1 failing - and the recovery
-         * path re-arms the peripheral the same way, which is why every
-         * reading failed once while the rail pulses */
-        entry->wire->end();
-        entry->wire->begin();
-        entry->wire->setClock(kI2c1ClockHz);
+        /* Power-cycling an ADS leaves both stale: the master waits on a
+         * slave that was unpowered mid-transaction, and the module itself
+         * comes back in a state where it answers but returns wrong
+         * conversions - worse than failing, since nothing reports it. The
+         * recovery does both steps and is proven to give clean values, so
+         * this is that same re-arm on every rail-up rather than only after
+         * every failure. rearmAdsModule is a no-op on the bit-banged bus,
+         * which reads straight through a power cycle */
+        rearmAdsModule(entry);
     }
 
     int32_t sum = 0;

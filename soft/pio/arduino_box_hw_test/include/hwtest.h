@@ -217,6 +217,7 @@ void updateCalibrationStats(uint8_t slotIndex, int16_t raw);
 bool isI2c3Entry(const AdsTestEntry *entry);
 void recoverI2c3Bus();
 void recoverAdsModule(const AdsTestEntry *entry);
+void rearmAdsModule(const AdsTestEntry *entry);
 bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config);
 bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw);
 
