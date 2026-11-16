@@ -251,7 +251,13 @@ The targets use the **median gain**, not the slot's own. With its own gain the s
 
 `printJigHelp()` is the single source of that list: the shell's `?` and the jig's own `?` both call it, so a new key cannot appear in one and not the other.
 
-Captures live in RAM only: a reset loses the session. A full walk is 60 to 120 placements, so it is meant to be done in one sitting.
+### Surviving a Reset
+
+Captures are journalled to flash, so a reset no longer costs a campaign. The part has no EEPROM, so the core emulates one in its last flash page: `jigStoreLoad()` reads it at the first `j`, the plan skips whatever is already there, and the walk resumes on the pose it stopped at.
+
+The emulated page is erased and rewritten on every save, and on this part that erases a 128 kB sector — about a second. So saves are throttled: one every four captures, which bounds what a reset can cost to the last few placements, and an immediate save whenever a session ends (`q`, `X`, `<slot>k`, `n`, `b`).
+
+The journal holds 272 records of 12 bytes, well under the 8 kB page, and a fresh save blanks the tail of the previous one so a shorter run cannot be read as a longer one. `X` clears both the RAM and the flash. Wear is a non-issue: a campaign costs about thirty erases, and the page takes thousands.
 
 ## Send Pieces (`p`)
 

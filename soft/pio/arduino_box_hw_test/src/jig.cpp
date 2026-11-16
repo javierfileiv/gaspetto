@@ -20,6 +20,8 @@
  * gain pass re-measures it in every slot including the reference one */
 #include "hwtest.h"
 
+#include <EEPROM.h>
+
 /* Played pieces in campaign order: the 4 mm magnets first, because their
  * larger field gives the best signal to noise and a wrong magnet in that
  * batch shows up within the first minutes */
@@ -227,6 +229,13 @@ static int16_t sWindow[kJigStableCount] = {};
 static uint8_t sWindowCount             = 0;
 static uint8_t sWindowNext              = 0;
 
+/* Defined further down: the flash journal needs the store, and the store
+ * reports to the journal after every change, so the two refer to each other */
+static void jigRebuildRefs();
+static void jigStoreMaybeSave();
+static void jigStoreLoad();
+static void jigStoreSave();
+
 /* Target on screen, so the prompt is printed only when it changes */
 static bool sTargetPrinted    = false;
 static JigTarget sShownTarget = {};
@@ -301,6 +310,8 @@ static void jigRecord(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient,
         sRefKnown[slot] = true;
         sRefValue[slot] = static_cast<uint16_t>(mean);
     }
+
+    jigStoreMaybeSave();
 }
 
 struct JigSkip
@@ -343,6 +354,8 @@ static void jigSkipAdd(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient
     skip.piece    = piece;
     skip.orient   = orient;
     skip.slot     = slot;
+
+    jigStoreMaybeSave();
 }
 
 /* A capture counts as present when it was recorded or explicitly skipped */
@@ -365,6 +378,196 @@ static int32_t jigDeviation(const JigCapture *capture)
 static int32_t jigGap(int32_t left, int32_t right)
 {
     return left > right ? left - right : right - left;
+}
+
+/* ========================================== */
+/* Flash journal */
+/* ========================================== */
+/* A campaign outlives a reset only if it is on flash, and losing twenty
+ * minutes of placement to a stray reset is the whole reason this exists. The
+ * part has no EEPROM, so the core emulates one in its last flash page and
+ * exposes a RAM buffer: fill() reads the page, buffered writes go to RAM and
+ * flush() erases the page and writes the buffer back.
+ *
+ * That flush erases a 128 kB sector here, about a second, so it does not
+ * happen on every capture: a save every few poses bounds what a reset can
+ * cost to the last handful of placements, and everything that ends a session
+ * (stop, clear, forget a slot, restart a piece) saves straight away */
+constexpr uint8_t kJigStoreMagicA     = 0x4A; /* 'J' */
+constexpr uint8_t kJigStoreMagicB     = 0x47; /* 'G' */
+constexpr uint8_t kJigStoreVersion    = 1;
+constexpr uint16_t kJigStoreHeader    = 8;
+constexpr uint8_t kJigStoreRecordSize = 12;
+constexpr uint16_t kJigStoreCapacity  = kJigMaxCaptures + kJigMaxSkips;
+constexpr uint16_t kJigStoreTotal     = kJigStoreHeader + kJigStoreCapacity * kJigStoreRecordSize;
+constexpr uint8_t kJigStoreKindSkip   = 3;
+constexpr uint8_t kJigSaveEvery       = 4;
+
+static_assert(kJigStoreTotal <= E2END + 1, "the journal must fit the emulated EEPROM");
+
+static uint8_t sUnsaved   = 0;
+static bool sStoreReady   = false;
+static bool sStoreLoading = false;
+
+static void jigStoreWriteU8(uint16_t position, uint8_t value)
+{
+    eeprom_buffered_write_byte(position, value);
+}
+
+static void jigStoreWriteU16(uint16_t position, uint16_t value)
+{
+    jigStoreWriteU8(position, static_cast<uint8_t>(value & 0xFFU));
+    jigStoreWriteU8(static_cast<uint16_t>(position + 1), static_cast<uint8_t>(value >> 8));
+}
+
+static uint8_t jigStoreReadU8(uint16_t position)
+{
+    return eeprom_buffered_read_byte(position);
+}
+
+static uint16_t jigStoreReadU16(uint16_t position)
+{
+    return static_cast<uint16_t>(
+        jigStoreReadU8(position) |
+        (static_cast<uint16_t>(jigStoreReadU8(static_cast<uint16_t>(position + 1))) << 8));
+}
+
+/* One record covers both a capture and a write-off: the kind byte says which,
+ * and byte 5 carries the target kind a write-off applies to */
+static void jigStoreWriteRecord(uint16_t index, uint8_t kind, uint8_t type, uint8_t piece,
+                                uint8_t orient, uint8_t slot, uint8_t extra, int16_t mean,
+                                uint16_t ref)
+{
+    const uint16_t base = static_cast<uint16_t>(kJigStoreHeader + index * kJigStoreRecordSize);
+
+    jigStoreWriteU8(base, kind);
+    jigStoreWriteU8(static_cast<uint16_t>(base + 1), type);
+    jigStoreWriteU8(static_cast<uint16_t>(base + 2), piece);
+    jigStoreWriteU8(static_cast<uint16_t>(base + 3), orient);
+    jigStoreWriteU8(static_cast<uint16_t>(base + 4), slot);
+    jigStoreWriteU8(static_cast<uint16_t>(base + 5), extra);
+    jigStoreWriteU16(static_cast<uint16_t>(base + 6), static_cast<uint16_t>(mean));
+    jigStoreWriteU16(static_cast<uint16_t>(base + 8), ref);
+    jigStoreWriteU16(static_cast<uint16_t>(base + 10), 0);
+}
+
+static void jigStoreSave()
+{
+    if (sStoreLoading)
+    {
+        return;
+    }
+
+    uint16_t index = 0;
+
+    jigStoreWriteU8(0, kJigStoreMagicA);
+    jigStoreWriteU8(1, kJigStoreMagicB);
+    jigStoreWriteU8(2, kJigStoreVersion);
+    jigStoreWriteU16(3, static_cast<uint16_t>(sCaptureCount + sSkipCount));
+
+    for (uint16_t captureIndex = 0; captureIndex < sCaptureCount && index < kJigStoreCapacity;
+         ++captureIndex)
+    {
+        const JigCapture &capture = sCaptures[captureIndex];
+        jigStoreWriteRecord(index++, static_cast<uint8_t>(capture.kind), capture.type,
+                            capture.piece, capture.orient, capture.slot, 0, capture.mean,
+                            capture.ref);
+    }
+    for (uint8_t skipIndex = 0; skipIndex < sSkipCount && index < kJigStoreCapacity; ++skipIndex)
+    {
+        const JigSkip &skip = sSkips[skipIndex];
+        jigStoreWriteRecord(index++, kJigStoreKindSkip, skip.type, skip.piece, skip.orient,
+                            skip.slot, static_cast<uint8_t>(skip.kind), 0, 0);
+    }
+
+    /* Blank the rest of the journal: a shorter save must not leave the tail
+     * of a longer one behind, since the count alone would not catch it */
+    for (; index < kJigStoreCapacity; ++index)
+    {
+        jigStoreWriteRecord(index, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0);
+    }
+
+    eeprom_buffer_flush();
+
+    sUnsaved    = 0;
+    sStoreReady = true;
+
+    Serial.print("   [flash ");
+    Serial.print(sCaptureCount);
+    Serial.println(" captures]");
+}
+
+static void jigStoreMaybeSave()
+{
+    if (sStoreLoading)
+    {
+        return;
+    }
+    if (sUnsaved < 0xFF)
+    {
+        ++sUnsaved;
+    }
+    if (sUnsaved >= kJigSaveEvery)
+    {
+        jigStoreSave();
+    }
+}
+
+static void jigStoreLoad()
+{
+    if (sStoreReady)
+    {
+        return;
+    }
+    sStoreReady = true;
+
+    eeprom_buffer_fill();
+
+    if (jigStoreReadU8(0) != kJigStoreMagicA || jigStoreReadU8(1) != kJigStoreMagicB ||
+        jigStoreReadU8(2) != kJigStoreVersion)
+    {
+        return; /* blank page, or content from another firmware */
+    }
+
+    const uint16_t stored = jigStoreReadU16(3);
+    if (stored == 0 || stored > kJigStoreCapacity)
+    {
+        return;
+    }
+
+    sStoreLoading = true;
+    for (uint16_t index = 0; index < stored; ++index)
+    {
+        const uint16_t base = static_cast<uint16_t>(kJigStoreHeader + index * kJigStoreRecordSize);
+        const uint8_t kind  = jigStoreReadU8(base);
+
+        if (kind == kJigStoreKindSkip)
+        {
+            jigSkipAdd(static_cast<JigKind>(jigStoreReadU8(static_cast<uint16_t>(base + 5))),
+                       jigStoreReadU8(static_cast<uint16_t>(base + 1)),
+                       jigStoreReadU8(static_cast<uint16_t>(base + 2)),
+                       jigStoreReadU8(static_cast<uint16_t>(base + 3)),
+                       jigStoreReadU8(static_cast<uint16_t>(base + 4)));
+        }
+        else if (kind <= 2)
+        {
+            jigRecord(static_cast<JigKind>(kind), jigStoreReadU8(static_cast<uint16_t>(base + 1)),
+                      jigStoreReadU8(static_cast<uint16_t>(base + 2)),
+                      jigStoreReadU8(static_cast<uint16_t>(base + 3)),
+                      jigStoreReadU8(static_cast<uint16_t>(base + 4)),
+                      static_cast<int16_t>(jigStoreReadU16(static_cast<uint16_t>(base + 6))),
+                      jigStoreReadU16(static_cast<uint16_t>(base + 8)));
+        }
+    }
+    sStoreLoading = false;
+
+    jigRebuildRefs();
+
+    Serial.print("   resumed ");
+    Serial.print(sCaptureCount);
+    Serial.print(" captures and ");
+    Serial.print(sSkipCount);
+    Serial.println(" write-offs from flash");
 }
 
 /* ========================================== */
@@ -1552,6 +1755,10 @@ void startJigMode()
         return;
     }
 
+    /* Whatever a reset left behind comes back before the plan is computed,
+     * so the walk resumes on the pose it stopped at */
+    jigStoreLoad();
+
     if (sAnalysisDone)
     {
         jigAnalyse();
@@ -1588,9 +1795,10 @@ void stopJigMode()
         return;
     }
     gJigActive = false;
+    jigStoreSave();
     Serial.print("\n--- JIG MODE stopped, ");
     Serial.print(sCaptureCount);
-    Serial.println(" captures kept in RAM ---");
+    Serial.println(" captures kept ---");
     jigPrintProgress();
 }
 
@@ -1605,6 +1813,7 @@ void clearJigCaptures()
         sRefKnown[slot] = false;
         sRefValue[slot] = 0;
     }
+    jigStoreSave();
     Serial.println("   jig captures cleared");
 }
 
@@ -1634,6 +1843,7 @@ void forgetJigSlot(uint8_t slot)
     sRefValue[slot] = 0;
     sAnalysisDone   = false;
     sHasCaptured    = false;
+    jigStoreSave();
 }
 
 /* Writing off the pose on screen: a piece that is broken or lost takes all
@@ -1738,6 +1948,7 @@ static void jigRestartPiece(uint8_t type, uint8_t piece)
     sHasCaptured     = false;
     sTargetPrinted   = false;
     sLastCensusValid = false;
+    jigStoreSave();
     jigPlateauReset();
 }
 
@@ -1785,6 +1996,7 @@ static void jigUndoLast()
     sAnalysisDone  = false;
     sHasCaptured   = false;
     sTargetPrinted = false;
+    jigStoreSave();
     jigPlateauReset();
 }
 
