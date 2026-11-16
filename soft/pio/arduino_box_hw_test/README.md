@@ -111,6 +111,16 @@ Full campaign recipe, in order:
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
 
+Each scan now ends with a `--- PASS COMPARISON ---` block: for every slot it
+prints the previous pass's mean, this pass's mean and their delta, so a piece
+that was placed, removed or nudged between two passes is obvious instead of
+hiding inside the session-wide `min`/`max`. Deltas past 150 counts are flagged
+`<<`. The first scan of a session only stores the baseline; a failed read keeps
+the slot's last valid reading as the reference. The running `min`/`max` on the
+slot lines still span the whole session, so a piece that moves between passes
+inflates their `span` — use the comparison block, not that span, to judge
+stability.
+
 A slot that needs rework later: `5R` clears its clusters and a fresh game run
 rebuilds them.
 

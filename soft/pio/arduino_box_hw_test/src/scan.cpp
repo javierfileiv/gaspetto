@@ -7,6 +7,22 @@
 
 uint32_t gCalibrationScanCounter = 0;
 
+/* Previous scan pass, kept for the pass-to-pass comparison: every scan
+ * stores the mean it read per slot and the next scan prints the signed
+ * delta against it. The running min/max on the slot lines span the whole
+ * session, so a pass with a piece and one without look like thousands of
+ * counts of noise; pairing only the last two passes is what a re-seat or a
+ * cover move actually shifts. resetCalibrationStats() zeroes the counter on
+ * a mode entry, which also drops this baseline */
+static uint16_t gScanPrevMean[kCalibrationSlotCount];
+static bool gScanPrevValid[kCalibrationSlotCount];
+static bool gScanHasPrev = false;
+
+/* Delta past which the comparison flags a slot: the readings gigue is 0-16
+ * counts on I2C3 and around 100 on I2C1, so this catches real movement (a
+ * re-seated piece, a cover shift) without flagging the bus noise */
+static constexpr uint32_t kScanDeltaAlert = 150;
+
 /* Continuous slot monitor ('m'): while active, usb keys only stop it */
 bool gMonitorActive = false;
 bool gMonitorExit   = false;
@@ -280,6 +296,24 @@ static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
 
 void runPieceCalibrationScan()
 {
+    /* This pass's mean per slot, filled as the loop goes, and whether the
+     * slot produced a reading: the comparison block below pairs them with
+     * the previous pass, and a failed read keeps the old entry so a
+     * transient timeout is not reported as a movement */
+    uint16_t passMean[kCalibrationSlotCount] = {};
+    bool passValid[kCalibrationSlotCount]    = {};
+
+    /* resetCalibrationStats() zeroes the counter on a mode entry, so a zero
+     * here means a fresh session and the stored pass belongs to before it */
+    if (gCalibrationScanCounter == 0)
+    {
+        for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+        {
+            gScanPrevValid[slotIndex] = false;
+        }
+        gScanHasPrev = false;
+    }
+
     Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
     Serial.print("scan=");
     Serial.println(++gCalibrationScanCounter);
@@ -378,6 +412,8 @@ void runPieceCalibrationScan()
             }
 
             updateCalibrationStats(slotIndex, rawMean);
+            passMean[slotIndex]           = static_cast<uint16_t>(rawMean);
+            passValid[slotIndex]          = true;
             const CalibrationStats &stats = gCalibrationStats[slotIndex];
 
             Serial.print("mean=");
@@ -392,6 +428,76 @@ void runPieceCalibrationScan()
             Serial.println(pieceLabelForRaw(slotIndex, rawMean));
         }
     }
+
+    /* Pass-to-pass comparison: the running min/max on the lines above span
+     * the whole session, so a pass with a piece and one without read as
+     * thousands of counts of noise. Pairing only the last two passes shows
+     * what actually moved - a re-seated piece, a shifted cover - and a delta
+     * past kScanDeltaAlert is flagged */
+    Serial.print("--- PASS COMPARISON");
+    if (gScanHasPrev)
+    {
+        Serial.print(" vs scan ");
+        Serial.print(gCalibrationScanCounter - 1);
+    }
+    Serial.println(" ---");
+
+    if (!gScanHasPrev)
+    {
+        Serial.println("   first pass of this session, baseline stored: rerun to compare");
+    }
+    else
+    {
+        for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+        {
+            Serial.print("   slot ");
+            Serial.print(static_cast<int>(slotIndex) + 1);
+            Serial.print(": ");
+
+            if (!passValid[slotIndex])
+            {
+                Serial.println("read FAIL, no comparison");
+                continue;
+            }
+            if (!gScanPrevValid[slotIndex])
+            {
+                Serial.print(passMean[slotIndex]);
+                Serial.println(" (no previous pass)");
+                continue;
+            }
+
+            const int32_t delta = static_cast<int32_t>(passMean[slotIndex]) -
+                                  static_cast<int32_t>(gScanPrevMean[slotIndex]);
+            Serial.print(gScanPrevMean[slotIndex]);
+            Serial.print(" -> ");
+            Serial.print(passMean[slotIndex]);
+            Serial.print("  delta=");
+            if (delta >= 0)
+            {
+                Serial.print('+');
+            }
+            Serial.print(delta);
+            if ((delta > static_cast<int32_t>(kScanDeltaAlert)) ||
+                (delta < -static_cast<int32_t>(kScanDeltaAlert)))
+            {
+                Serial.print("  <<");
+            }
+            Serial.println();
+        }
+    }
+
+    /* Hand this pass to the next comparison. Mean and validity are copied
+     * per slot: a slot that failed keeps its last valid reading as the
+     * reference instead of losing the baseline */
+    for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+    {
+        if (passValid[slotIndex])
+        {
+            gScanPrevMean[slotIndex]  = passMean[slotIndex];
+            gScanPrevValid[slotIndex] = true;
+        }
+    }
+    gScanHasPrev = true;
 
     Serial.println("--- LABELED PIECE SAMPLES ---");
     for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
