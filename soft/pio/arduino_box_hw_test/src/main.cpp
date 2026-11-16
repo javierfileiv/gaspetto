@@ -80,21 +80,19 @@ void enterMode(TestMode mode)
     }
 
     gMode = mode;
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     if (gMode == TestMode::Calibration)
     {
         resetCalibrationStats();
         /* The sensor rail goes up per reading now, so entering the mode only
          * takes it down: holding it up for the whole session is what warmed
          * the board and shifted every reading by ~370 counts */
-        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
         gCalibrationRailsOn = false;
         Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
     }
     else
     {
-        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
         gCalibrationRailsOn = false;
         Serial.println("\n-> mode: health ('?' for status)");
     }
@@ -304,6 +302,16 @@ void setup()
     printUsbHelp();
     Serial.print("   mode: ");
     Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
+
+    /* Give both rails back before waiting for a key: the boot raised them
+     * for the APA106 first frames and for an ADS probe that no longer runs
+     * here, and nothing measures at this point. Every measurement takes its
+     * own rail now, so leaving them up would only warm the board before the
+     * first reading - the offset the pulse exists to avoid */
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    gCalibrationRailsOn = false;
+
     Serial.println("   waiting for a key ('?' for help)");
 }
 
@@ -551,11 +559,11 @@ void runDeepSleepTest()
         delay(150);
     }
 
-    /* Hand the board back with the rest state of the active mode: health
-     * keeps the LED rail up, calibration keeps it down; the sensor rail
-     * follows the calibration latch */
-    digitalWrite(PIN_MOSFET_5V_LEDS, gMode == TestMode::Calibration ? HIGH : LOW);
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, gCalibrationRailsOn ? LOW : HIGH);
+    /* Hand the board back with both rails down. Every reading takes its own
+     * rail now, so the mode has no rest state to restore: leaving one up
+     * would only warm the board before the next measurement */
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     Serial.println("[stop] test done, back in the shell ('b' sleeps again)");
 }
 
