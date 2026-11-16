@@ -155,6 +155,23 @@ void advanceGameState();
 void emitGameThresholds();
 
 /* ========================================== */
+/* jig.cpp - piece census and slot gain campaign */
+/* ========================================== */
+/* Measures every piece once in one slot, then one piece across the board to
+ * get each slot's gain, and derives the per-slot rows from the two. No
+ * keypress during the campaign: the reading says when a piece is in */
+extern bool gJigActive;
+
+void startJigMode();
+void stopJigMode();
+void clearJigCaptures();
+void forgetJigSlot(uint8_t slot);
+void printJigHelp();
+void runJigKey(char key);
+void pollJig();
+void dumpJigCaptures();
+
+/* ========================================== */
 /* scan.cpp - calibration scan and slot monitor */
 /* ========================================== */
 extern bool gMonitorActive;

@@ -663,12 +663,13 @@ void emitGameThresholds()
     static_assert(kCalibrationSlotCount == GASPETTO_ADC_SLOTS,
                   "per-slot table size must match the calibration slot count");
 
-    /* Canonical ascending piece order: the first table columns follow it,
-     * so a slot whose measured order differs would silently swap two
-     * pieces. The band above FORWARD carries no piece */
+    /* Canonical ascending band order, matching kBandPieces in scan.cpp and
+     * kJigClassType in jig.cpp: this batch reads the greens lowest, so the
+     * first column carries FORWARD. A slot whose measured order differs would
+     * silently swap two pieces. The band above TURN_LEFT carries no piece */
     static const BoxPieceId kCanonicalOrder[] = {
-        BoxPieceId::TURN_LEFT,  BoxPieceId::LOOP_CALL, BoxPieceId::EMPTY,
-        BoxPieceId::TURN_RIGHT, BoxPieceId::FORWARD,
+        BoxPieceId::FORWARD,   BoxPieceId::TURN_RIGHT, BoxPieceId::EMPTY,
+        BoxPieceId::LOOP_CALL, BoxPieceId::TURN_LEFT,
     };
 
     uint16_t slotRows[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {};

@@ -13,6 +13,7 @@ void printUsbHelp()
     Serial.println("          measure, any other key quits | 5R = clear slot 5 samples");
     Serial.println("   game:  g = full campaign | 7g = slot 7 only | 7gf = slot 7 FORWARD only");
     Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
+    printJigHelp();
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
     Serial.println("   rows:  w = reprint analysis and pasteable table");
     Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
@@ -181,6 +182,19 @@ void handleUsbCommands()
                 {
                     Serial.println("   [scope cancelled]");
                 }
+            }
+            pendingSlot   = 0;
+            digitsStarted = false;
+            continue;
+        }
+
+        /* Jig mode intercepts its own keys, like the game does: the walk is
+         * driven by the polling loop and only the escape hatches are here */
+        if (gJigActive)
+        {
+            if (incoming != '\n' && incoming != '\r')
+            {
+                runJigKey(static_cast<char>(incoming));
             }
             pendingSlot   = 0;
             digitsStarted = false;
@@ -361,6 +375,27 @@ void handleUsbCommands()
             {
                 startGameMode();
             }
+            break;
+        case 'j':
+            if (gJigActive)
+            {
+                stopJigMode();
+                break;
+            }
+            startJigMode();
+            break;
+        case 'k':
+            if (gMode != TestMode::Calibration)
+            {
+                Serial.println("forgetting a slot works in calibration mode ('c' to switch)");
+                break;
+            }
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kGameSlotCount)
+            {
+                Serial.println("prefix the slot number: 19k forgets slot 19");
+                break;
+            }
+            forgetJigSlot(static_cast<uint8_t>(pendingSlot - 1));
             break;
         case 'R':
             if (gMode != TestMode::Calibration)

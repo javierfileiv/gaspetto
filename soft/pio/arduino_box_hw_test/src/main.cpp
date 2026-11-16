@@ -1007,6 +1007,16 @@ void loop()
          * for each reading and drops it again, so re-latching it would bring
          * back the warm board this change exists to avoid */
 
+        if (gJigActive)
+        {
+            /* One reading per pass, and a reading raises and drops the rail
+             * itself, so a pass costs the settle time: the detector sees the
+             * operator within half a second, which is faster than a hand
+             * placing a piece */
+            pollJig();
+            return;
+        }
+
         /* Game mode: auto-capture polls the current slot and records as
          * soon as the reading settles; otherwise just USB polling between
          * steps. EMPTY is excluded from auto (it needs one deliberate

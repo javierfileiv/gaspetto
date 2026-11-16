@@ -252,6 +252,21 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
  * decode in the firmware: the monitors, the scan and the radio send all go
  * through it, so a label printed here and a piece sent over the air can
  * never come from two different walks */
+/* Which piece each band carries. The bands ascend with the raw reading, so
+ * this array is the single place where a name is bound to a physical family.
+ * This batch was mounted with the opposite pole throughout, which puts the
+ * greens at the bottom and the blues at the top; the operator asked for the
+ * greens to be FORWARD and the reds LOOP_CALL, so the mapping follows the
+ * measurement instead of asking twenty magnets to be flipped. Rebuilding the
+ * pieces the other way round flips this array, nothing else */
+static const BoxPieceId kBandPieces[5] = {
+    BoxPieceId::FORWARD,    /* band 0: green 4 mm, the most negative */
+    BoxPieceId::TURN_RIGHT, /* band 1: yellow 2 mm */
+    BoxPieceId::EMPTY,      /* band 2: the slot's own idle level */
+    BoxPieceId::LOOP_CALL,  /* band 3: red 2 mm */
+    BoxPieceId::TURN_LEFT,  /* band 4: blue 4 mm, the most positive */
+};
+
 BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
 {
     if (raw < 0)
@@ -265,25 +280,23 @@ BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
-        return BoxPieceId::TURN_LEFT;
+        return kBandPieces[0];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
     {
-        /* Band 1 is the loop piece now; the shared enum column name still
-         * says BACKWARD until the production migration renames it */
-        return BoxPieceId::LOOP_CALL;
+        return kBandPieces[1];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
     {
-        return BoxPieceId::EMPTY;
+        return kBandPieces[2];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_FORWARD])
     {
-        return BoxPieceId::TURN_RIGHT;
+        return kBandPieces[3];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TO_REMOVE])
     {
-        return BoxPieceId::FORWARD;
+        return kBandPieces[4];
     }
     return BoxPieceId::INVALID;
 }
