@@ -7,6 +7,29 @@
 
 uint32_t gCalibrationScanCounter = 0;
 
+const char *labelName(int index)
+{
+    switch (index)
+    {
+    case 0:
+        return "EMPTY";
+    case 1:
+        return "FORWARD";
+    case 2:
+        return "BACKWARD";
+    case 3:
+        return "TURN_RIGHT";
+    case 4:
+        return "TURN_LEFT";
+    case 5:
+        return "LOOP_CALL";
+    case 6: /* INVALID: the decode name, never a cluster label */
+        return "INVALID";
+    default:
+        return "?";
+    }
+}
+
 /* Previous scan pass, kept for the pass-to-pass comparison: every scan
  * stores the mean it read per slot and the next scan prints the signed
  * delta against it. The running min/max on the slot lines span the whole
@@ -511,29 +534,4 @@ void runPieceCalibrationScan()
         }
     }
     gScanHasPrev = true;
-
-    Serial.println("--- LABELED PIECE SAMPLES ---");
-    for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
-    {
-        for (int label = 0; label < 6; ++label)
-        {
-            const LabelCluster &cluster = gPieceClusters[slotIndex][label];
-            if (cluster.count == 0)
-            {
-                continue;
-            }
-            Serial.print("   slot ");
-            Serial.print(static_cast<int>(slotIndex) + 1);
-            Serial.print(" ");
-            Serial.print(labelName(label));
-            Serial.print(": n=");
-            Serial.print(cluster.count);
-            Serial.print(" raw ");
-            Serial.print(cluster.min);
-            Serial.print("-");
-            Serial.print(cluster.max);
-            Serial.print(" mean=");
-            Serial.println(static_cast<int>(cluster.sum / cluster.count));
-        }
-    }
 }

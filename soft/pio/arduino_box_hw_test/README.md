@@ -26,10 +26,8 @@ The production and test firmware must agree on thresholds, so both read the same
 | `?` | Print the active mode and rail states |
 | `m` | Continuous readout of a slot with a live decoded piece (`<slot>m`, the number is required) |
 | `x` | Frozen monitor: waits without sampling, SPACE opens one clean 3 s measurement (`<slot>x`, the number is required) |
-| `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
 | `j` | Start or resume jig mode: piece census then slot gains, no keypress during the walk (calibration only) |
 | `k` | Forget one slot's jig captures so the plan asks for it again: `<slot>k` (calibration only) |
-| `w` | Reprint the per-slot analysis and the paste-ready generated rows |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
 | `e` | Listen to `_box_`: prints the car's telemetry and log fragments until a key stops it |
@@ -53,8 +51,9 @@ All printed values are raw ADS1115 counts (GAIN_ONE, single-ended, 3V3
 rail) — the same scale the production decode compares against, so pasted
 thresholds need no conversion.
 
-Capture runs through the guided game mode below; manual per-key labeling
-retired with the global-table workflow (gap analysis `t` and header `x` are gone too; `w` reprints the rows any time).
+Capture runs through the jig mode below; the guided game walk and the manual
+per-key labeling it replaced are gone, and `j` reprints the analysis and the
+rows at any time.
 
 ## Slot Monitor (`m`)
 
@@ -109,7 +108,7 @@ swallowed (one key, one measure).
 Full campaign recipe, in order:
 
 1. Flash the firmware, open the serial monitor, press `c` — calibration mode enables capture, and every reading raises the 3V3 sensor rail for its own duration
-2. Run the guided game (next section): `g`, then follow every prompt until the firmware prints the per-slot analysis and the generated rows
+2. Run the jig walk (next section): `j`, then follow the prompts until the firmware prints the analysis, the verification sheet and the generated rows
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
 
@@ -123,8 +122,8 @@ slot lines still span the whole session, so a piece that moves between passes
 inflates their `span` — use the comparison block, not that span, to judge
 stability.
 
-A slot that needs rework later: `5R` clears its clusters and a fresh game run
-rebuilds them.
+A slot that needs rework later: `19k` forgets its captures, and the next `j`
+asks for it again — ten seconds instead of a campaign.
 
 ## Jig Mode (Piece Census and Slot Gains)
 
@@ -253,116 +252,6 @@ The targets use the **median gain**, not the slot's own. With its own gain the s
 `printJigHelp()` is the single source of that list: the shell's `?` and the jig's own `?` both call it, so a new key cannot appear in one and not the other.
 
 Captures live in RAM only: a reset loses the session. A full walk is 60 to 120 placements, so it is meant to be done in one sitting.
-
-## Game Mode (Guided Calibration)
-
-Game mode replaces manual `<slot><label>` typing with a guided sequence that prevents mislabeling and enforces reading stability. Activate it in calibration mode with `g`.
-
-### How It Works
-
-The firmware walks through all (piece, slot) combinations in a fixed order:
-
-1. **By piece**: EMPTY → FORWARD → LOOP_CALL → TURN_RIGHT → TURN_LEFT
-2. **By slot**: for each piece, all 20 slots (`kGameSlotCount = 20`, the fully populated board)
-3. **By sample**: 8 readings per combination (configurable via `kGameSamplesPerCombo`)
-
-Total: 5 pieces × 20 slots × 8 samples = **800 steps**. EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
-
-### Sequence
-
-At each step, the firmware:
-
-1. Displays the instruction: `[step/total] slot N, PIECE_HINT [sample/8]`
-2. In auto-capture (default, toggle with `a`), polls the current slot and records a sample as soon as the reading settles — the operator only places and removes pieces
-3. With auto-capture off, SPACE triggers the capture attempt
-4. Either way: 5 rapid readings, stability check (span < 100 counts), then the mean is recorded with the outlier guard (±20%) and the sequence advances
-5. If unstable: prints the span and stays on the same step — adjust the piece (or SPACE again with auto off)
-
-### Keys During Game Mode
-
-| Key | Action |
-|-----|--------|
-| `SPACE` | Record one sample (auto-capture off) or confirm the EMPTY sweep (whole board, or the scoped slot) |
-| `a` | Toggle auto-capture (on by default: readings record themselves when they settle) |
-| `r` | Reset the current (slot, piece) cluster and retry the step from scratch |
-| `q` | Quit game mode and generate thresholds from collected data |
-| `?` | Show game mode commands and current instruction |
-
-### Scoped Retakes
-
-Re-record one sensor without walking the whole campaign. A slot number
-prefixes `g`, then one optional piece letter narrows it further:
-
-```text
-7R      # clear all slot 7 clusters first
-7g      # scope slot 7: waits for a piece letter, or a second g for all five
-7gg     # whole slot campaign (40 steps, EMPTY confirmed for slot 7 only)
-7gf     # only slot 7 FORWARD: 8 captures, then the campaign ends and emits
-```
-
-Piece letters: `e` empty, `f` forward, `L` loop, `r` turn right, `l` turn
-left. Any other key cancels the armed scope. On every end — natural or
-`q` — the firmware re-emits all twenty rows from the RAM clusters, so the
-untouched slots keep the data they already had from an earlier run; a scoped
-run on a cold board will honestly print `[NO DATA]` for the others. `w`
-reprints analysis and rows at any time without entering the game.
-
-### Threshold Generation
-
-When the game completes all steps (or you press `q`), the firmware analyzes **each slot's own clusters** — sensors idle up to 940 counts apart across the board, so one slot's clean gap can be the next slot's overlap — and prints one verdict per slot under `--- PER-SLOT THRESHOLD ANALYSIS ---`:
-
-- `[OK] piece[min..max] ... gaps a,b,c,d` — the five classes separated on that sensor; thresholds sit at the midpoints and the printed gaps are the margins
-- `[OVERLAP A/B gap=N, row zeroed]` — two classes overlap on this slot; its row decodes INVALID
-- `[NO DATA]` / `[INCOMPLETE, row zeroed]` — this slot was not fully recorded
-- `[BAD ORDER, row zeroed]` — this slot's means sort the classes differently than the canonical ascending order: a mislabeled piece or a wildly foreign idle level
-
-A zeroed row decodes INVALID on purpose — an untrusted slot must never inject a false piece. Then `--- GENERATED PER-SLOT ROWS ---` prints the full paste-ready `GASPETTO_ADC_SLOT_THRESHOLDS` table between the `BEGIN/END GENERATED PER-SLOT ROWS` markers. Columns are ascending piece starts; the loop piece occupies the band below the EMPTY idle, and the last column (`LOOP_START`) is pinned to 65535: no piece plays above FORWARD, so no reading can ever reach that band and FORWARD's range simply extends to the top of the scale.
-
-### Configuration
-
-Game mode parameters are defined in `src/game.cpp`:
-
-- `kGameSlotCount` — number of slots covered (20, the fully populated board)
-- `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
-- `kGameStabilitySpanMax` — max span for stability check (default 100 counts)
-- `kGamePieceCount` — entries the walk visits (5: the empty board plus the four played pieces)
-
-### Example Session
-
-```text
-c                    # calibration mode
-g                    # start game mode
---- GAME MODE STARTED ---
-   800 steps (5 pieces x 20 slots x 8 samples)
-   [1/800] slot 1, EMPTY (remove piece) [1/8]
-   -> place/adjust, wait for stability, then SPACE
-SPACE                # one SPACE for the EMPTY sweep records every slot
-...
-   [169/800] slot 2, FORWARD (green, 4mm N) [1/8]   # auto-capture mode:
-   recorded raw=15276 (span=3)                     # no SPACE, the settle does it
-...
-   [800/800] slot 20, TURN_LEFT (blue, 4mm S) [8/8]
-   recorded raw=8763 (span=2)
-
---- GAME MODE ENDED ---
-
---- PER-SLOT THRESHOLD ANALYSIS ---
-   slot 1  [OK] TURN_LEFT[10848..10848] LOOP_CALL[13104..13106] EMPTY[13472..13472]
-              TURN_RIGHT[14224..14224] FORWARD[14896..14896] gaps 2256,366,752,672
-   slot 10 [OVERLAP TURN_RIGHT/FORWARD gap=-48, row zeroed]
-   ...
-   calibrated slots: 19/20
-
---- GENERATED PER-SLOT ROWS ---
-/* --- BEGIN GENERATED PER-SLOT ROWS --- */
-static const uint16_t GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {
-    /* slot 1 */ { 10848, 11976, 13289, 13848, 14560, 16396 },
-    ...
-};
-/* --- END GENERATED PER-SLOT ROWS --- */
-```
-
-Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h` and rebuild. This firmware decodes with those rows right away; production keeps using the legacy global defines until it adopts the same per-slot scan.
 
 ## Send Pieces (`p`)
 

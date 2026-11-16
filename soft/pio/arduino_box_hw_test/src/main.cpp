@@ -1017,20 +1017,6 @@ void loop()
             return;
         }
 
-        /* Game mode: auto-capture polls the current slot and records as
-         * soon as the reading settles; otherwise just USB polling between
-         * steps. EMPTY is excluded from auto (it needs one deliberate
-         * SPACE so a board that still holds pieces is not recorded) */
-        if (gGameActive)
-        {
-            if (gGameAuto && kGamePieces[gGamePieceIndex] != BoxPieceId::EMPTY)
-            {
-                pollGameAutoCapture();
-            }
-            delayWithUsb(50);
-            return;
-        }
-
         /* Quick double blink visual check on builtin LED. */
         for (int i = 0; i < 2; i++)
         {

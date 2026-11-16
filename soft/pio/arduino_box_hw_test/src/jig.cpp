@@ -69,7 +69,7 @@ constexpr uint8_t kJigMinPieces = 3;
  * instead of asking for them forever */
 constexpr uint8_t kJigMaxSkips    = 32;
 constexpr uint8_t kJigOrientCount = 4;
-constexpr uint8_t kJigSlotCount   = kGameSlotCount;
+constexpr uint8_t kJigSlotCount   = kCalibrationSlotCount;
 
 /* The census happens in one slot; the gain pass walks them all, the
  * reference one included so both ends of the ratio are measured at the same

@@ -93,66 +93,11 @@ inline void delayWithUsb(uint32_t totalMs)
 }
 
 /* ========================================== */
-/* clusters.cpp - label storage */
+/* scan.cpp - label names */
 /* ========================================== */
-/* Accumulated samples per (slot, piece): the operator places a piece in a
- * slot, the game records the current mean reading and, across visits,
- * min/max/count map each piece type per sensor. Label indexes match the
- * BoxPieceId enum order EMPTY..LOOP_CALL; INVALID is never labeled */
-struct LabelCluster
-{
-    uint32_t sum;
-    uint16_t min;
-    uint16_t max;
-    uint16_t count;
-};
-
-extern LabelCluster gPieceClusters[kCalibrationSlotCount][6];
-
-/* Names a BoxPieceId value (0..6): the cluster labels 0..5, plus the
- * INVALID name the decode returns for uncalibrated slots */
+/* Names a BoxPieceId value (0..6): the five pieces, plus the INVALID name
+ * the decode returns for uncalibrated slots */
 const char *labelName(int index);
-void addLabelPoint(uint8_t slotIndex, BoxPieceId piece, uint16_t raw);
-void resetLabeledSlot(uint8_t slotIndex);
-void resetLabelPiece(uint8_t slotIndex, BoxPieceId piece);
-
-/* ========================================== */
-/* game.cpp - guided campaign walk and row generation */
-/* ========================================== */
-/* Slots covered by the guided walk (the soldered main zone, up to 20) */
-constexpr uint8_t kGameSlotCount = 20;
-
-extern const BoxPieceId kGamePieces[];
-extern bool gGameActive;
-extern bool gGameAuto;
-extern bool gGameOutlierWarned;
-extern uint8_t gGamePieceIndex;
-extern uint8_t gGameSlotIndex;
-extern uint8_t gGameSampleIndex;
-
-/* Outcome of one sample attempt in game mode, so the manual SPACE handler
- * and the auto-capture poll can share the same read/guard logic but react
- * differently (print vs stay silent, advance vs keep waiting) */
-enum class GameSampleResult : uint8_t
-{
-    Recorded,       /* sample added to the cluster */
-    Unstable,       /* span too wide, nothing recorded */
-    Outlier,        /* stable but outside the cluster guard, nothing recorded */
-    ReadFail,       /* ADS read failed after recovery, nothing recorded */
-    PieceNotPlaced, /* stable but the slot still reads empty: piece not placed yet */
-};
-
-void startGameMode();
-void startGameScoped(uint8_t slotIndex, int pieceIndex);
-void stopGameMode();
-void displayGameInstruction();
-bool recordCurrentEmptyStep();
-void retryGameStep();
-int gamePieceForChar(char ch);
-GameSampleResult recordGameSample(uint8_t slotIndex, BoxPieceId piece, bool verbose);
-void pollGameAutoCapture();
-void advanceGameState();
-void emitGameThresholds();
 
 /* ========================================== */
 /* jig.cpp - piece census and slot gain campaign */
