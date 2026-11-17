@@ -92,10 +92,56 @@ inline bool flashProgramWord(uint32_t address, uint32_t value)
     return ok;
 }
 
+/* A flash address is a pointer on the chip */
+inline const uint8_t *flashPointer(uint32_t address)
+{
+    return reinterpret_cast<const uint8_t *>(address);
+}
+
 #else /* ARDUINO */
 
-/* The emulator and the unit tests have no flash to write: the calls exist so
- * the receiver compiles, and they fail so the OTA path is never faked */
+#include <string.h>
+
+/* The emulator has no flash: the record and staging sectors declared in
+ * FlashLayout.h stand in for it. The address constants keep their hardware
+ * values, and every access is translated to the matching buffer, so the code
+ * under test runs the same 32-bit addresses it would on the chip */
+inline uint8_t *flashSectorBuffer(uint32_t address, uint32_t &base, uint32_t &size)
+{
+    if (address >= kStagingAddress && address < kStagingEnd) {
+        base = kStagingAddress;
+        size = kStagingCapacity;
+        return gStagingSector;
+    }
+    if (address >= kRecordAddress && address < kRecordAddress + kRecordSectorSize) {
+        base = kRecordAddress;
+        size = kRecordSectorSize;
+        return gRecordSector;
+    }
+
+    base = 0;
+    size = 0;
+    return nullptr;
+}
+
+inline const uint8_t *flashPointer(uint32_t address)
+{
+    uint32_t base = 0;
+    uint32_t size = 0;
+    const uint8_t *buffer = flashSectorBuffer(address, base, size);
+
+    return buffer != nullptr ? buffer + (address - base) : nullptr;
+}
+
+/* One flag for the tests: while it is set, the next erase or program fails,
+ * so the error paths of the updater are walked without a broken chip. It
+ * lives in the emulation only, never in the target build */
+inline bool &flashFailureForTest()
+{
+    static bool failed = false;
+    return failed;
+}
+
 inline void flashUnlock()
 {
 }
@@ -104,14 +150,32 @@ inline void flashLock()
 {
 }
 
-inline bool flashEraseSector(uint32_t)
+inline bool flashEraseSector(uint32_t address)
 {
-    return false;
+    uint32_t base = 0;
+    uint32_t size = 0;
+    uint8_t *buffer = flashSectorBuffer(address, base, size);
+
+    if (buffer == nullptr || flashFailureForTest()) {
+        return false;
+    }
+
+    memset(buffer, 0xFF, size);
+    return true;
 }
 
-inline bool flashProgramWord(uint32_t, uint32_t)
+inline bool flashProgramWord(uint32_t address, uint32_t value)
 {
-    return false;
+    uint32_t base = 0;
+    uint32_t size = 0;
+    uint8_t *buffer = flashSectorBuffer(address, base, size);
+
+    if (buffer == nullptr || flashFailureForTest() || (address - base) + 4U > size) {
+        return false;
+    }
+
+    memcpy(buffer + (address - base), &value, sizeof(value));
+    return true;
 }
 
 #endif /* ARDUINO */

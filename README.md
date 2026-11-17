@@ -63,6 +63,7 @@ goes quiet to save power until the next button press.
 - `soft/emu-pc`: host-side CMake project with GoogleTest-based tests and coverage
 - `soft/pio`: PlatformIO firmware projects
 	- `GCar_pio`, `GBox_pio`: robot and box firmware
+	- `GCar_boot`: the robot bootloader, flashed by hand
 	- `NrfLink_pio`: radio link test tool for Arduino Uno + NRF24L01 — sends motor
 	commands to the car over the radio, and can put the car in its DFU
 	bootloader
@@ -128,27 +129,34 @@ bootloader.
 - `GCAR_NRF_PORT=/dev/ttyUSBx` overrides the default NrfLink port when the
   board is not the usual CH340
 
-A failed request costs nothing: the bootloader ROM is not installed, so a
-RESET returns to the application, and BOOT0 plus RESET is always available as
-a last resort.
+A failed request costs nothing: the application was never touched, so a RESET
+boots it again through the bootloader. BOOT0 plus RESET remains available as a
+last resort.
 
 ### Memory layout
 
-The board carries a small bootloader in the first 32 kB (sectors 0-1) and the
-application in the next 96 kB (sectors 2-4), so an application upload can never
-erase the bootloader:
+The board carries the bootloader alone in sector 0, the validation record
+alone in sector 1, and the application in the next 96 kB (sectors 2 to 4), so an
+application upload can never erase the bootloader or the record that proves the
+image is intact:
 
 | Address      | Size   | Content                                      |
 |--------------|--------|----------------------------------------------|
-| `0x08000000` | 32 kB  | bootloader (`soft/pio/GCar_boot`)            |
+| `0x08000000` | 16 kB  | bootloader (`soft/pio/GCar_boot`)            |
+| `0x08004000` | 16 kB  | validation record, alone in its sector       |
 | `0x08008000` | 96 kB  | application (`soft/pio/GCar_pio`)            |
-| `0x08020000` | 128 kB | free, reserved for a future radio update     |
+| `0x08020000` | 128 kB | staging area for a radio update              |
 
 The bootloader checks that an image is present, that the validation record
 matches it, and jumps to it. It is flashed by hand, and again only when it
 changes: put the board in DFU, then `pio run -d soft/pio/GCar_boot -t upload`.
 Application uploads go to `0x08008000`, which `tools/gcar_dfu_upload.py` already
 uses. Each upload writes the record too: the image length and its CRC32.
+
+When the record carries the copy-pending flag, the bootloader copies the
+staging area into the application slot first, verifies the CRC on the copied
+bytes, and clears the flag before jumping. A failed copy leaves the flag set,
+so the next boot retries it.
 
 ### When the bootloader refuses to start
 
@@ -159,6 +167,11 @@ It has no serial port and no radio, so it says why with the LED on PC13:
 | 1      | no image at all: the slot is erased or its vectors are nonsense |
 | 2      | the validation record is missing or unreadable                |
 | 3      | the record is there but the CRC does not match                |
+| 4      | the copy from the staging area failed, the next boot retries   |
+
+A refusal code repeats forever. After a successful copy the bootloader blinks
+three times instead, then starts the application: the pattern stops, which is
+how you tell the end of an update from a failure.
 
 The third code is the one worth provoking on a bench, because it proves the
 check actually runs: `./tools/gcar_dfu_upload.py --bad-crc` flashes the

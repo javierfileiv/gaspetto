@@ -46,13 +46,14 @@ NRF_BOOT_WAIT = 2.0  # Optiboot holds the Uno ~1s before the app runs
 NRF_PORT_ENV = "GCAR_NRF_PORT"
 NRF_PORT_DEFAULT = "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"
 GCAR_ENV = "gcar"
-# The application starts after the bootloader's 32 kB; the bootloader itself is
-# flashed once at 0x08000000 and is never touched by an application upload
+# The application starts after the bootloader's sector and the record's sector;
+# the bootloader itself is flashed once at 0x08000000 and is never touched by an
+# application upload
 GCAR_APP_ADDRESS = "0x08008000"
 # Validation record the bootloader reads before jumping: magic, format,
-# image length and CRC32. It lives at the start of the free sector 5, which
-# writing it erases without touching the application
-GCAR_META_ADDRESS = "0x08020000"
+# image length and CRC32. It owns sector 1 entirely, so rewriting it erases
+# nothing else
+GCAR_META_ADDRESS = "0x08004000"
 
 
 def _root():

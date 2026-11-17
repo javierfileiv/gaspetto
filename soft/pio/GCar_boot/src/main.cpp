@@ -1,42 +1,40 @@
 /*
  * GCar bootloader.
  *
- * The application lives at 0x08008000, after these first 32 kB. This program
- * does nothing but check that an image is there, intact, and jump to it, so
- * that the image that cannot be reprogrammed over the air stays as small and as
- * simple as possible.
+ * It owns sector 0 only. The application lives at 0x08008000 and the
+ * validation record in sector 1, so an update can erase the staging area and
+ * the application without ever touching this code.
  *
- * When it refuses to boot it says why with the LED, because there is no serial
- * port and no radio here:
+ * On boot it reads the record. If the record says the staging area holds a
+ * complete image, it copies that image into place and clears the flag; then,
+ * record and application agreed, it jumps. When it refuses to boot it says why
+ * with the LED, because there is no serial port and no radio here:
  *
  *   1 blink  no image at all: the application slot is erased or its vectors
  *            are nonsense
- *   2 blinks the validation record is missing or unreadable: the image may be
- *            fine, but nothing says which bytes it covers
+ *   2 blinks the validation record is missing or unreadable
  *   3 blinks the record is there but the CRC does not match: the image is
  *            corrupted or was written halfway
+ *   4 blinks the copy from the staging area failed: the flag stays set and
+ *            the next boot tries again
  *
- * That last code is the one worth provoking on a bench: flash the application
- * with a deliberately wrong CRC and the bootloader must refuse to jump.
+ * After a successful copy it blinks three times and starts the application, so
+ * the end of an update is not silent. The three blinks stop; a refusal code
+ * repeats forever
  *
  * The ROM DFU of the chip is untouched by any of this, so BOOT0 plus RESET
  * always brings the board back.
  */
+#include "AppRecord.h"
+#include "Crc32.h"
+#include "FlashLayout.h"
+#include "FlashWriter.h"
+#include "RecordStore.h"
+
 #include <Arduino.h>
 
 namespace
 {
-/* Application slot: sectors 2 to 4, 96 kB after the bootloader */
-constexpr uint32_t kAppBase = 0x08008000UL;
-constexpr uint32_t kAppEnd = 0x08020000UL;
-
-/* Validation record, first bytes of the free sector 5. It sits outside the
- * application slot on purpose: writing it must not erase a sector the image
- * lives in */
-constexpr uint32_t kMetaAddress = 0x08020000UL;
-constexpr uint32_t kMetaMagic = 0x52414347UL; /* 'GCAR', little-endian */
-constexpr uint16_t kMetaFormat = 1;
-
 /* SRAM of the F411CE, 128 kB */
 constexpr uint32_t kRamBase = 0x20000000UL;
 constexpr uint32_t kRamEnd = 0x20020000UL;
@@ -51,31 +49,44 @@ constexpr int kCodeOffMs = 180;
 constexpr int kCodeGapMs = 900;
 constexpr int kAliveFlashMs = 60;
 
-struct __attribute__((packed)) AppMetadata {
-    uint32_t magic;
-    uint16_t format;
-    uint16_t reserved;
-    uint32_t length;
-    uint32_t crc;
-};
-
-static_assert(sizeof(AppMetadata) == 16, "the uploader writes exactly 16 bytes");
-
-/* CRC-32/ISO-HDLC, the same one zlib computes on the sending side. Bitwise on
- * purpose: 55 kB costs a few tens of milliseconds once at boot, and a table
- * would be a kilobyte of flash in the one image that must stay small */
-uint32_t crc32(const uint8_t *data, uint32_t length)
+/* The application slot is erased whole: the record gives the length but the
+ * sectors are the erase unit, so anything shorter still costs all of them */
+bool copyStagingToApplication(const AppRecord *record)
 {
-    uint32_t crc = 0xFFFFFFFFUL;
+    if (!flashEraseSector(kAppBase) || !flashEraseSector(0x0800C000UL) ||
+        !flashEraseSector(0x08010000UL)) {
+        return false;
+    }
 
-    for (uint32_t index = 0; index < length; ++index) {
-        crc ^= data[index];
-        for (int bit = 0; bit < 8; ++bit) {
-            crc = (crc & 1UL) != 0UL ? (crc >> 1) ^ 0xEDB88320UL : crc >> 1;
+    const uint32_t words = (record->length + 3) / 4;
+    for (uint32_t index = 0; index < words; ++index) {
+        const uint32_t offset = index * 4;
+        uint32_t word = 0xFFFFFFFFUL;
+
+        for (uint32_t byte = 0; byte < 4; ++byte) {
+            const uint32_t at = offset + byte;
+            if (at < record->length) {
+                const uint8_t value = *reinterpret_cast<const uint8_t *>(kStagingAddress + at);
+                word &= ~(0xFFUL << (byte * 8));
+                word |= static_cast<uint32_t>(value) << (byte * 8);
+            }
+        }
+
+        if (!flashProgramWord(kAppBase + offset, word)) {
+            return false;
         }
     }
 
-    return crc ^ 0xFFFFFFFFUL;
+    return true;
+}
+
+bool recordLooksValid(const AppRecord *record)
+{
+    if (record->magic != kRecordMagic || record->format != kRecordFormat) {
+        return false;
+    }
+
+    return record->length != 0 && record->length <= kAppEnd - kAppBase;
 }
 
 bool vectorsLookValid(const uint32_t *app)
@@ -92,18 +103,9 @@ bool vectorsLookValid(const uint32_t *app)
     return app[1] >= kAppBase && app[1] < kAppEnd;
 }
 
-bool recordLooksValid(const AppMetadata *meta)
+bool imageMatchesRecord(const AppRecord *record)
 {
-    if (meta->magic != kMetaMagic || meta->format != kMetaFormat) {
-        return false;
-    }
-
-    return meta->length != 0 && meta->length <= kAppEnd - kAppBase;
-}
-
-bool imageMatchesRecord(const AppMetadata *meta)
-{
-    return crc32(reinterpret_cast<const uint8_t *>(kAppBase), meta->length) == meta->crc;
+    return crc32(reinterpret_cast<const uint8_t *>(kAppBase), record->length) == record->crc;
 }
 
 void startApplication(const uint32_t *app)
@@ -148,6 +150,22 @@ void startApplication(const uint32_t *app)
     }
 }
 
+/* Three blinks then silence: the update is written and the application starts
+ * right after, so the pattern must not repeat like a refusal code */
+void blinkSequence(int blinks)
+{
+    pinMode(kLedPin, OUTPUT);
+
+    for (int blink = 0; blink < blinks; ++blink) {
+        digitalWrite(kLedPin, kLedOn);
+        delay(kCodeOnMs);
+        digitalWrite(kLedPin, kLedOff);
+        delay(kCodeOffMs);
+    }
+
+    delay(kCodeGapMs);
+}
+
 [[noreturn]] void blinkCode(int blinks)
 {
     pinMode(kLedPin, OUTPUT);
@@ -167,9 +185,6 @@ void startApplication(const uint32_t *app)
 
 void setup()
 {
-    const uint32_t *app = reinterpret_cast<const uint32_t *>(kAppBase);
-    const AppMetadata *meta = reinterpret_cast<const AppMetadata *>(kMetaAddress);
-
     /* A short pulse on every boot proves the bootloader ran, before either the
      * application takes over or a refusal code starts blinking */
     pinMode(kLedPin, OUTPUT);
@@ -177,14 +192,45 @@ void setup()
     delay(kAliveFlashMs);
     digitalWrite(kLedPin, kLedOff);
 
+    const AppRecord *record = reinterpret_cast<const AppRecord *>(kRecordAddress);
+    if (!recordLooksValid(record)) {
+        blinkCode(2);
+    }
+
+    bool updated = false;
+
+    if ((record->flags & kRecordFlagCopyPending) != 0U) {
+        const AppRecord pending = *record;
+        AppRecord cleared = pending;
+        bool done = false;
+
+        cleared.flags = 0;
+
+        flashUnlock();
+        if (copyStagingToApplication(&pending)) {
+            done = recordWrite(&cleared);
+        }
+        flashLock();
+
+        if (!done) {
+            /* The flag is still set, so the next boot retries the copy */
+            blinkCode(4);
+        }
+
+        updated = done;
+        record = reinterpret_cast<const AppRecord *>(kRecordAddress);
+    }
+
+    const uint32_t *app = reinterpret_cast<const uint32_t *>(kAppBase);
     if (!vectorsLookValid(app)) {
         blinkCode(1);
     }
-    if (!recordLooksValid(meta)) {
-        blinkCode(2);
-    }
-    if (!imageMatchesRecord(meta)) {
+    if (!imageMatchesRecord(record)) {
         blinkCode(3);
+    }
+
+    if (updated) {
+        blinkSequence(3);
     }
 
     startApplication(app);

@@ -35,5 +35,5 @@ inline bool recordWrite(const AppRecord *record)
 
 inline void recordRead(AppRecord *record)
 {
-    memcpy(record, reinterpret_cast<const void *>(kRecordAddress), sizeof(AppRecord));
+    memcpy(record, flashPointer(kRecordAddress), sizeof(AppRecord));
 }

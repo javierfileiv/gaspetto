@@ -7,7 +7,9 @@ add_library(gcar_itf INTERFACE)
 target_include_directories(gcar_itf INTERFACE include)
 target_link_libraries(gcar_itf INTERFACE state_machine_framework_itf shared_types)
 
-add_library(gcar_impl STATIC src/GCar.cpp src/IdleState.cpp src/ProcessingState.cpp)
+add_library(
+  gcar_impl STATIC src/GCar.cpp src/IdleState.cpp src/ProcessingState.cpp src/OtaReceiver.cpp
+)
 target_include_directories(gcar_impl PUBLIC include)
 target_link_libraries(
   gcar_impl PRIVATE radio_controller_itf movement_controller_itf state_machine_framework_itf

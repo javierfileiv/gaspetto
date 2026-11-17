@@ -5,6 +5,7 @@
 #include "EventQueue.h"
 #include "Events.h"
 #include "Log.h"
+#include "OtaProtocol.h"
 #include "RadioProtocol.h"
 
 #include <stdint.h>
@@ -19,6 +20,8 @@ class RF24;
 
 class RadioController : public Log {
 public:
+    using OtaHandler = void (*)(const OtaPacket &packet);
+
     RadioController(RF24 &radio, EventQueue *gaspettoQueue, const uint8_t writing_addr[5],
                     const uint8_t reading_addr[5]);
     void init();
@@ -27,6 +30,11 @@ public:
     EventQueue *getRadioQueue();
     bool sendBuffer(const void *data, uint8_t len);
     bool isChipConnected();
+
+    /** setOtaHandler(): Install the receiver of an image transfer
+     * @handler: called for every OTA packet; null drops them
+     */
+    void setOtaHandler(OtaHandler handler);
 
     /**
      * sendTelemetry(): Send telemetry packet via radio
@@ -51,6 +59,8 @@ private:
     uint8_t reading_addr[5];
     EventQueue radioQueue;
     EventQueue *gaspettoQueue;
+    OtaHandler otaHandler = nullptr;
+    bool otaWarningShown = false;
     uint8_t logLine[64];
     uint8_t logLineLen;
 };

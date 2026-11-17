@@ -9,6 +9,7 @@
 #include "Log.h"
 #include "MotorControl.h"
 #include "MovementController.h"
+#include "OtaReceiver.h"
 #include "ProcessingState.h"
 #include "RF24.h"
 #include "RadioController.h"
@@ -35,6 +36,7 @@ IMUOrientation imu;
 MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_FWD, MOTOR_RIGHT_BWD);
 MovementController carMovementController(motorControl, imu);
 RadioController radioControllerCar(radio, &eventQueue, gbox_pipe_name, gcar_pipe_name);
+OtaReceiver otaReceiver(radioControllerCar);
 
 TimeredEventQueue timeredEventQueue;
 
@@ -43,6 +45,13 @@ Context context = {
     &idleState,  &processingState,       MOTOR_FREQ,
 };
 GCar gcar(context);
+
+/* The radio hands every OTA packet to the receiver; a plain function keeps the
+ * radio controller free of any knowledge of flash or of the car */
+void onOtaPacket(const OtaPacket &packet)
+{
+    otaReceiver.handle(packet);
+}
 
 void ISR(void)
 {
@@ -88,6 +97,7 @@ void setup()
     /* The radio delivers a DFU request as an event: the jump itself is a
      * target concern, so main wires it and the state machine stays generic */
     gcar.setDfuCallback(enterDfuBootloader);
+    radioControllerCar.setOtaHandler(onOtaPacket);
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
 

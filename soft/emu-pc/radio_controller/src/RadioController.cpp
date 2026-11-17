@@ -72,10 +72,16 @@ void RadioController::processRadio()
 
     /* RX processing. */
     if (_radio.available(&pipe)) {
-        LOG(F("Radio RX: pipe "));
-        LOG(static_cast<int>(pipe));
-        LOGLN();
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
+
+        /* An image transfer is thousands of packets: a log line per packet
+         * would make the receiver deaf while it transmits the line, on the
+         * very channel the transfer is using */
+        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+            LOG(F("Radio RX: pipe "));
+            LOG(static_cast<int>(pipe));
+            LOGLN();
+        }
 
         /* Byte 0 names the packet: a program keeps its command count
          * there (never above 31) and every other kind carries a
@@ -123,6 +129,19 @@ void RadioController::processRadio()
         case PacketTag::Log:
             handleLogFragment(buffer);
             break;
+        case PacketTag::Ota: {
+            OtaPacket packet;
+            std::memcpy(&packet, buffer, sizeof(packet));
+            if (otaHandler != nullptr) {
+                otaHandler(packet);
+            } else if (!otaWarningShown) {
+                /* One line is enough: a full transfer is thousands of packets
+                 * and a log per packet would flood the radio it is using */
+                otaWarningShown = true;
+                LOGLN(F("Radio RX: OTA packet with no receiver, dropped."));
+            }
+            break;
+        }
         default:
             /* Not a tag: byte 0 is the command count of a program, and a
              * count above the maximum means an unknown tag after all */
@@ -191,6 +210,12 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
 bool RadioController::isChipConnected()
 {
     return _radio.isChipConnected();
+}
+
+void RadioController::setOtaHandler(OtaHandler handler)
+{
+    otaHandler = handler;
+    otaWarningShown = false;
 }
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
