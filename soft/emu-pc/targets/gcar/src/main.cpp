@@ -2,6 +2,7 @@
 #include "Context.h"
 #include "EventQueue.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "GCar.h"
 #include "IMUOrientation.h"
 #include "IdleState.h"
@@ -14,6 +15,7 @@
 #include "RadioProtocol.h"
 #include "States.h"
 #include "TimeredEventQueue.h"
+#include "WireVersion.h"
 #include "config_radio.h"
 #include "dfu_bootloader.h"
 
@@ -88,6 +90,13 @@ void setup()
     gcar.setDfuCallback(enterDfuBootloader);
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
+
+    LOG(F("GCar firmware v"));
+    LOG(FW_VERSION);
+    LOG(F(" ("));
+    LOG(FW_BUILD);
+    LOG(F("), wire protocol v"));
+    LOGLN(kWireProtocolVersion);
     LOGLN(F("GCar init done"));
 
 #ifdef USE_RADIO_CONTROLLER
