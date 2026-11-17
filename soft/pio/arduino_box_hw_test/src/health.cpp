@@ -1,14 +1,14 @@
 /* Health side of the bench: the ADS1115 bus test and the periodic cycle the
  * 's' key reruns */
+#include "hwtest.h"
+#include "i2c3_bitbang.h"
+#include "pin_definitions.h"
+
 #include <Arduino.h>
 
 #ifdef TEST_ADS1115
 #include <Adafruit_ADS1X15.h>
 #endif
-
-#include "hwtest.h"
-#include "i2c3_bitbang.h"
-#include "pin_definitions.h"
 
 #ifdef TEST_ADS1115
 /* ========================================== */
