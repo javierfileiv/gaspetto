@@ -81,6 +81,9 @@ void MovementController::stopBothMotors()
 void MovementController::startStraightDriving(float speed, uint32_t duration_ms)
 {
     if (!imuOk) {
+        /* Silent refusal was indistinguishable from a lost command: the board
+         * answered the radio and then did nothing at all */
+        LOGLN(F("MovementController: IMU unavailable, straight drive refused"));
         return;
     }
 
@@ -110,6 +113,7 @@ void MovementController::startTurningInPlace(float final_yaw_angle, float speed,
                                              uint32_t duration_ms)
 {
     if (!imuOk) {
+        LOGLN(F("MovementController: IMU unavailable, turn refused"));
         return;
     }
 
