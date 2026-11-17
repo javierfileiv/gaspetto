@@ -14,7 +14,13 @@
 #endif
 #include <stdint.h>
 
-const uint32_t MOTOR_FREQ = 20000; /* Set PWM frequency to 20KHz. */
+/* 15 Hz, and deliberately so: at 20 kHz the same duty cycle smooths into an
+ * average voltage below the motor stiction threshold and the car does not move
+ * at all. At this frequency each period delivers a full-voltage pulse that
+ * actually starts the motor, and the duty then sets the speed. Raising the
+ * frequency to slow the car down does the opposite, because it also raises the
+ * smallest duty that can move it */
+const uint32_t MOTOR_FREQ = 15;
 
 /** @brief Number of states for GCar. */
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);

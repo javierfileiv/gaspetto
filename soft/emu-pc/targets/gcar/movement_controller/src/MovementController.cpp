@@ -62,6 +62,7 @@ void MovementController::init(uint32_t pwm_freq)
     _imu.zeroYaw();
     _imu.calibrate();
     _motorControl.init(pwm_freq);
+    telemPwmFreq = static_cast<float>(pwm_freq);
 
     /* Configure PID (20 Hz like test implementation). */
     g_yawPID.SetTunings(g_Kp, g_Ki, g_Kd);
