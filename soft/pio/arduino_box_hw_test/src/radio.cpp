@@ -20,7 +20,7 @@
 static void radio_run_send_feedback(void (*animation)())
 {
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
-    delay(kRailSettleDelayMs);
+    delay(RAIL_SETTLE_DELAY_MS);
     animation();
     leds_blackout();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
@@ -184,14 +184,14 @@ void radio_run_menu_key(char key)
         break;
 
     case '2': {
-        static const char *const kPaNames[] = {"MIN", "LOW", "HIGH", "MAX"};
+        static const char *const PA_NAMES[] = {"MIN", "LOW", "HIGH", "MAX"};
         const uint8_t pa                    = radio.getPALevel();
         const rf24_datarate_e rate          = radio.getDataRate();
 
         radio_print_address("   tx       = ", gcar_pipe_name);
         radio_print_address("   rx pipe1 = ", gbox_pipe_name);
         Serial.print("   pa=");
-        Serial.print((pa < 4U) ? kPaNames[pa] : "?");
+        Serial.print((pa < 4U) ? PA_NAMES[pa] : "?");
         Serial.print(" rate=");
         switch (rate)
         {

@@ -25,9 +25,9 @@
 /* Played pieces in campaign order: the 4 mm magnets first, because their
  * larger field gives the best signal to noise and a wrong magnet in that
  * batch shows up within the first minutes */
-constexpr uint8_t kJigTypeCount = 4;
+constexpr uint8_t JIG_TYPE_COUNT = 4;
 
-static const BoxPieceId kJigTypes[kJigTypeCount] = {
+static const BoxPieceId JIG_TYPES[JIG_TYPE_COUNT] = {
     BoxPieceId::FORWARD,
     BoxPieceId::TURN_LEFT,
     BoxPieceId::TURN_RIGHT,
@@ -39,8 +39,8 @@ static const BoxPieceId kJigTypes[kJigTypeCount] = {
  * bench firmware owns the mapping from a colour to the band the shared table
  * describes. The bands ascend with the raw reading, and this batch reads the
  * greens lowest and the blues highest, which is why the band order below is
- * not the historical one: kBandPieces in scan.cpp carries the same mapping */
-static const char *const kJigTypeHints[kJigTypeCount] = {
+ * not the historical one: BAND_PIECES in scan.cpp carries the same mapping */
+static const char *const JIG_TYPE_HINTS[JIG_TYPE_COUNT] = {
     "green 4mm",  /* FORWARD: band 0, the most negative */
     "blue 4mm",   /* TURN_LEFT: band 4, the most positive */
     "yellow 1mm", /* TURN_RIGHT: band 1, the weak negative */
@@ -50,61 +50,61 @@ static const char *const kJigTypeHints[kJigTypeCount] = {
 /* Ascending class order the threshold table is built on: the row lists the
  * start of each band in this order, so a slot whose measured centres sort
  * differently would silently swap two pieces */
-constexpr uint8_t kJigClassCount = 5;
+constexpr uint8_t JIG_CLASS_COUNT = 5;
 
 /* Type index of each band in ascending order; 0xFF is the EMPTY band, which
  * has no piece and sits at the slot's own idle level. The bands ascend with
  * the raw reading, and this batch puts the greens at the bottom and the blues
  * at the top, so the order below is the reverse of the historical one and
- * matches kBandPieces in scan.cpp */
-static const uint8_t kJigClassType[kJigClassCount] = {0, 2, 0xFF, 3, 1};
+ * matches BAND_PIECES in scan.cpp */
+static const uint8_t JIG_CLASS_TYPE[JIG_CLASS_COUNT] = {0, 2, 0xFF, 3, 1};
 
 /* Pieces per type, orientations per piece, slots to walk */
-constexpr uint8_t kJigPiecesPerType = 5;
+constexpr uint8_t JIG_PIECES_PER_TYPE = 5;
 
 /* A type is still usable with fewer than five pieces: a broken one is
  * declared with 'n' and the plan stops asking for it. Three is the floor
  * where a median and a spread still mean something */
-constexpr uint8_t kJigMinPieces = 3;
+constexpr uint8_t JIG_MIN_PIECES = 3;
 
 /* Poses the operator declared unavailable, remembered so the walk finishes
  * instead of asking for them forever */
-constexpr uint8_t kJigMaxSkips    = 32;
-constexpr uint8_t kJigOrientCount = 4;
-constexpr uint8_t kJigSlotCount   = kCalibrationSlotCount;
+constexpr uint8_t JIG_MAX_SKIPS    = 32;
+constexpr uint8_t JIG_ORIENT_COUNT = 4;
+constexpr uint8_t JIG_SLOT_COUNT   = CALIBRATION_SLOT_COUNT;
 
 /* The census happens in one slot; the gain pass walks them all, the
  * reference one included so both ends of the ratio are measured at the same
  * moment */
-constexpr uint8_t kJigReferenceSlot = 0;
+constexpr uint8_t JIG_REFERENCE_SLOT = 0;
 
-static_assert(kJigSlotCount == GASPETTO_ADC_SLOTS, "jig slots must match the shared table");
+static_assert(JIG_SLOT_COUNT == GASPETTO_ADC_SLOTS, "jig slots must match the shared table");
 
 /* Store keys that are not a type index */
-constexpr uint8_t kJigKeySlotIdle = 0xFE; /* idle taken for the gain pass in a slot */
+constexpr uint8_t JIG_KEY_SLOT_IDLE = 0xFE; /* idle taken for the gain pass in a slot */
 
 /* Detector thresholds, in counts. The weakest piece reads about 600 counts
  * away from idle, so 200 separates it from an empty slot with margin while
  * still catching a piece landing slightly off centre */
-constexpr uint16_t kJigPresentDelta = 200;
+constexpr uint16_t JIG_PRESENT_DELTA = 200;
 
 /* A plateau is six readings whose span stays inside 40 counts: one reading
  * is a fifteen sample mean already, and 40 counts is under 2 % of the
  * weakest piece, so the window can lock on a reading that drifts by a few
  * counts while the piece settles. A wild reading leaves the window after six
  * polls instead of poisoning it */
-constexpr uint8_t kJigStableCount = 6;
-constexpr uint16_t kJigStableSpan = 40;
+constexpr uint8_t JIG_STABLE_COUNT = 6;
+constexpr uint16_t JIG_STABLE_SPAN = 40;
 
 /* How far a reading may sit from the expected idle and still be accepted as
  * an idle level. A piece left in the slot reads hundreds of counts away, so
  * this refuses it instead of turning a piece into the slot's reference. The
  * slots idle up to 550 counts apart on this board, hence the margin */
-constexpr uint16_t kJigIdlePlausible = 900;
+constexpr uint16_t JIG_IDLE_PLAUSIBLE = 900;
 
 /* Rejections of the idle before the firmware says what it is waiting for: a
  * silent loop would look like a frozen board */
-constexpr uint8_t kJigIdleRejectHint = 10;
+constexpr uint8_t JIG_IDLE_REJECT_HINT = 10;
 
 /* A new capture in the same slot needs the reading to have moved from the
  * one just recorded. Arming on a return to idle was the first design and it
@@ -120,18 +120,18 @@ constexpr uint8_t kJigIdleRejectHint = 10;
  * A truly centred magnet reads the same in every orientation and would block
  * forever, so after this many refused polls the capture is taken anyway and
  * the log says only what was observed */
-constexpr uint16_t kJigRearmDelta = 30;
-constexpr uint8_t kJigStuckPolls  = 8;
+constexpr uint16_t JIG_REARM_DELTA = 30;
+constexpr uint8_t JIG_STUCK_POLLS  = 8;
 
 /* A pair of bands closer than this cannot survive the rail's wander and a
  * piece landing a little off: the slot is reported as tight and the sensor's
  * position becomes the lever */
-constexpr int32_t kJigTightGap = 300;
+constexpr int32_t JIG_TIGHT_GAP = 300;
 
 /* A slot whose gain sits this far (per mille) from the median is reported:
  * too low and its bands squeeze against the empty one, too high and the
  * strongest piece approaches the sensor's ceiling */
-constexpr int32_t kJigGainSpreadPermille = 300;
+constexpr int32_t JIG_GAIN_SPREAD_PERMILLE = 300;
 
 /* Half-width added for the play in the slot, in per mille of the deviation.
  * The piece can land anywhere within that play, and the field falls with the
@@ -140,30 +140,30 @@ constexpr int32_t kJigGainSpreadPermille = 300;
  * orientations on a piece reading about 2700: that spread is the full width,
  * so half of it is about 11 %. Replace it with the 8-placement measurement
  * once it is done: four orientations at a fixed position, two positions */
-constexpr int32_t kJigPlayPermille = 120;
+constexpr int32_t JIG_PLAY_PERMILLE = 120;
 
 /* Empty class half width: twice the rail wander measured on the bench, which
  * is the whole reason the empty band needs to be wider than a few counts */
-constexpr uint16_t kJigEmptyHalf = 100;
+constexpr uint16_t JIG_EMPTY_HALF = 100;
 
 /* Rotation counts for a type when the four orientations move the reading by
  * more than this: below it the magnet is centred enough that the choice of
  * edge buys nothing, and asking four placements per piece would only waste
  * the operator's time */
-constexpr uint16_t kJigRotationSignificant = 50;
+constexpr uint16_t JIG_ROTATION_SIGNIFICANT = 50;
 
 /* Pieces used to decide whether rotations matter for the rest of the type */
-constexpr uint8_t kJigRotationProbePieces = 3;
+constexpr uint8_t JIG_ROTATION_PROBE_PIECES = 3;
 
 /* A piece this far from its type's median is worth a look: at the magnet
  * sizes used here it is about the difference between two magnet lengths */
-constexpr int32_t kJigSuspectPermille = 200;
+constexpr int32_t JIG_SUSPECT_PERMILLE = 200;
 
-constexpr uint16_t kJigRoundStep = 5;
+constexpr uint16_t JIG_ROUND_STEP = 5;
 
 /* Room for the whole campaign plus redoes: repeating a placement replaces
  * the capture it supersedes */
-constexpr uint16_t kJigMaxCaptures = 240;
+constexpr uint16_t JIG_MAX_CAPTURES = 240;
 
 enum class JigKind : uint8_t
 {
@@ -203,10 +203,10 @@ struct JigTypeStats
 
 bool jig_active = false;
 
-static JigCapture captures[kJigMaxCaptures] = {};
-static uint16_t capture_count               = 0;
-static bool ref_known[kJigSlotCount]        = {};
-static uint16_t ref_value[kJigSlotCount]    = {};
+static JigCapture captures[JIG_MAX_CAPTURES] = {};
+static uint16_t capture_count                = 0;
+static bool ref_known[JIG_SLOT_COUNT]        = {};
+static uint16_t ref_value[JIG_SLOT_COUNT]    = {};
 
 /* Arm state of the detector: a capture drops the arm, and the reading has to
  * move away from the value just recorded before another one is accepted,
@@ -225,9 +225,9 @@ static bool capture_now = false;
  * extreme stayed in it forever and the capture could not happen again. A
  * window keeps only recent readings, so a piece that drifts while settling
  * locks as soon as it holds still */
-static int16_t window[kJigStableCount] = {};
-static uint8_t window_count            = 0;
-static uint8_t window_next             = 0;
+static int16_t window[JIG_STABLE_COUNT] = {};
+static uint8_t window_count             = 0;
+static uint8_t window_next              = 0;
 
 /* Defined further down: the flash journal needs the store, and the store
  * reports to the journal after every change, so the two refer to each other */
@@ -249,8 +249,8 @@ static uint8_t idle_rejects = 0;
  * a few tens of counts: the rail wanders by that much, not by hundreds. A
  * larger spread means one of them caught a piece next to the slot or a hand
  * over it, and the deviations of that family are shifted by as much */
-constexpr int32_t kJigIdleSuspect    = 200;
-constexpr uint8_t kJigMaxIdlePerSlot = 12;
+constexpr int32_t JIG_IDLE_SUSPECT      = 200;
+constexpr uint8_t JIG_MAX_IDLE_PER_SLOT = 12;
 
 /* Consecutive polls where the reading had not moved away from the previous
  * capture: a centred magnet never does, so the guard gives way after a few */
@@ -290,7 +290,7 @@ static const JigCapture *jig_find(JigKind kind, uint8_t type, uint8_t piece, uin
 static void jig_record(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot,
                        int16_t mean, uint16_t ref)
 {
-    if (capture_count >= kJigMaxCaptures)
+    if (capture_count >= JIG_MAX_CAPTURES)
     {
         Serial.println("   [store full, clear with 'X']");
         return;
@@ -323,8 +323,8 @@ struct JigSkip
     uint8_t slot;
 };
 
-static JigSkip skips[kJigMaxSkips] = {};
-static uint8_t skip_count          = 0;
+static JigSkip skips[JIG_MAX_SKIPS] = {};
+static uint8_t skip_count           = 0;
 
 static bool jig_is_skipped(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot)
 {
@@ -342,7 +342,7 @@ static bool jig_is_skipped(JigKind kind, uint8_t type, uint8_t piece, uint8_t or
 
 static void jig_skip_add(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot)
 {
-    if (skip_count >= kJigMaxSkips)
+    if (skip_count >= JIG_MAX_SKIPS)
     {
         Serial.println("   [skip list full]");
         return;
@@ -393,17 +393,17 @@ static int32_t jig_gap(int32_t left, int32_t right)
  * happen on every capture: a save every few poses bounds what a reset can
  * cost to the last handful of placements, and everything that ends a session
  * (stop, clear, forget a slot, restart a piece) saves straight away */
-constexpr uint8_t kJigStoreMagicA     = 0x4A; /* 'J' */
-constexpr uint8_t kJigStoreMagicB     = 0x47; /* 'G' */
-constexpr uint8_t kJigStoreVersion    = 1;
-constexpr uint16_t kJigStoreHeader    = 8;
-constexpr uint8_t kJigStoreRecordSize = 12;
-constexpr uint16_t kJigStoreCapacity  = kJigMaxCaptures + kJigMaxSkips;
-constexpr uint16_t kJigStoreTotal     = kJigStoreHeader + kJigStoreCapacity * kJigStoreRecordSize;
-constexpr uint8_t kJigStoreKindSkip   = 3;
-constexpr uint8_t kJigSaveEvery       = 4;
+constexpr uint8_t JIG_STORE_MAGIC_A     = 0x4A; /* 'J' */
+constexpr uint8_t JIG_STORE_MAGIC_B     = 0x47; /* 'G' */
+constexpr uint8_t JIG_STORE_VERSION     = 1;
+constexpr uint16_t JIG_STORE_HEADER     = 8;
+constexpr uint8_t JIG_STORE_RECORD_SIZE = 12;
+constexpr uint16_t JIG_STORE_CAPACITY   = JIG_MAX_CAPTURES + JIG_MAX_SKIPS;
+constexpr uint16_t JIG_STORE_TOTAL = JIG_STORE_HEADER + JIG_STORE_CAPACITY * JIG_STORE_RECORD_SIZE;
+constexpr uint8_t JIG_STORE_KIND_SKIP = 3;
+constexpr uint8_t JIG_SAVE_EVERY      = 4;
 
-static_assert(kJigStoreTotal <= E2END + 1, "the journal must fit the emulated EEPROM");
+static_assert(JIG_STORE_TOTAL <= E2END + 1, "the journal must fit the emulated EEPROM");
 
 static uint8_t unsaved    = 0;
 static bool store_ready   = false;
@@ -438,7 +438,7 @@ static void jig_store_write_record(uint16_t index, uint8_t kind, uint8_t type, u
                                    uint8_t orient, uint8_t slot, uint8_t extra, int16_t mean,
                                    uint16_t ref)
 {
-    const uint16_t base = static_cast<uint16_t>(kJigStoreHeader + index * kJigStoreRecordSize);
+    const uint16_t base = static_cast<uint16_t>(JIG_STORE_HEADER + index * JIG_STORE_RECORD_SIZE);
 
     jig_store_write_u8(base, kind);
     jig_store_write_u8(static_cast<uint16_t>(base + 1), type);
@@ -460,12 +460,12 @@ static void jig_store_save()
 
     uint16_t index = 0;
 
-    jig_store_write_u8(0, kJigStoreMagicA);
-    jig_store_write_u8(1, kJigStoreMagicB);
-    jig_store_write_u8(2, kJigStoreVersion);
+    jig_store_write_u8(0, JIG_STORE_MAGIC_A);
+    jig_store_write_u8(1, JIG_STORE_MAGIC_B);
+    jig_store_write_u8(2, JIG_STORE_VERSION);
     jig_store_write_u16(3, static_cast<uint16_t>(capture_count + skip_count));
 
-    for (uint16_t captureIndex = 0; captureIndex < capture_count && index < kJigStoreCapacity;
+    for (uint16_t captureIndex = 0; captureIndex < capture_count && index < JIG_STORE_CAPACITY;
          ++captureIndex)
     {
         const JigCapture &capture = captures[captureIndex];
@@ -473,16 +473,16 @@ static void jig_store_save()
                                capture.piece, capture.orient, capture.slot, 0, capture.mean,
                                capture.ref);
     }
-    for (uint8_t skipIndex = 0; skipIndex < skip_count && index < kJigStoreCapacity; ++skipIndex)
+    for (uint8_t skipIndex = 0; skipIndex < skip_count && index < JIG_STORE_CAPACITY; ++skipIndex)
     {
         const JigSkip &skip = skips[skipIndex];
-        jig_store_write_record(index++, kJigStoreKindSkip, skip.type, skip.piece, skip.orient,
+        jig_store_write_record(index++, JIG_STORE_KIND_SKIP, skip.type, skip.piece, skip.orient,
                                skip.slot, static_cast<uint8_t>(skip.kind), 0, 0);
     }
 
     /* Blank the rest of the journal: a shorter save must not leave the tail
      * of a longer one behind, since the count alone would not catch it */
-    for (; index < kJigStoreCapacity; ++index)
+    for (; index < JIG_STORE_CAPACITY; ++index)
     {
         jig_store_write_record(index, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0);
     }
@@ -507,7 +507,7 @@ static void jig_store_maybe_save()
     {
         ++unsaved;
     }
-    if (unsaved >= kJigSaveEvery)
+    if (unsaved >= JIG_SAVE_EVERY)
     {
         jig_store_save();
     }
@@ -523,14 +523,14 @@ static void jig_store_load()
 
     eeprom_buffer_fill();
 
-    if (jig_store_read_u8(0) != kJigStoreMagicA || jig_store_read_u8(1) != kJigStoreMagicB ||
-        jig_store_read_u8(2) != kJigStoreVersion)
+    if (jig_store_read_u8(0) != JIG_STORE_MAGIC_A || jig_store_read_u8(1) != JIG_STORE_MAGIC_B ||
+        jig_store_read_u8(2) != JIG_STORE_VERSION)
     {
         return; /* blank page, or content from another firmware */
     }
 
     const uint16_t stored = jig_store_read_u16(3);
-    if (stored == 0 || stored > kJigStoreCapacity)
+    if (stored == 0 || stored > JIG_STORE_CAPACITY)
     {
         return;
     }
@@ -538,10 +538,11 @@ static void jig_store_load()
     store_loading = true;
     for (uint16_t index = 0; index < stored; ++index)
     {
-        const uint16_t base = static_cast<uint16_t>(kJigStoreHeader + index * kJigStoreRecordSize);
-        const uint8_t kind  = jig_store_read_u8(base);
+        const uint16_t base =
+            static_cast<uint16_t>(JIG_STORE_HEADER + index * JIG_STORE_RECORD_SIZE);
+        const uint8_t kind = jig_store_read_u8(base);
 
-        if (kind == kJigStoreKindSkip)
+        if (kind == JIG_STORE_KIND_SKIP)
         {
             jig_skip_add(static_cast<JigKind>(jig_store_read_u8(static_cast<uint16_t>(base + 5))),
                          jig_store_read_u8(static_cast<uint16_t>(base + 1)),
@@ -585,16 +586,17 @@ static bool jig_rotation_matters(uint8_t type)
     int32_t highest = 0;
     uint8_t pieces  = 0;
 
-    for (uint8_t piece = 0; piece < kJigPiecesPerType && pieces < kJigRotationProbePieces; ++piece)
+    for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE && pieces < JIG_ROTATION_PROBE_PIECES;
+         ++piece)
     {
         int32_t pieceLow  = 0;
         int32_t pieceHigh = 0;
         bool any          = false;
 
-        for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+        for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
         {
             const JigCapture *capture =
-                jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot);
+                jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT);
             if (capture == nullptr)
             {
                 continue;
@@ -635,12 +637,12 @@ static bool jig_rotation_matters(uint8_t type)
         return true; /* one piece is not a sample: keep asking for four */
     }
 
-    return (highest - lowest) > static_cast<int32_t>(kJigRotationSignificant);
+    return (highest - lowest) > static_cast<int32_t>(JIG_ROTATION_SIGNIFICANT);
 }
 
 static uint8_t jig_orientations_for(uint8_t type)
 {
-    return jig_rotation_matters(type) ? kJigOrientCount : 1;
+    return jig_rotation_matters(type) ? JIG_ORIENT_COUNT : 1;
 }
 
 /* The gain pass uses one piece per type, and always in orientation one: the
@@ -650,13 +652,13 @@ static uint8_t jig_orientations_for(uint8_t type)
  * edge and skew the scaling */
 static uint8_t jig_ref_piece(uint8_t type)
 {
-    int32_t devs[kJigPiecesPerType]    = {};
-    uint8_t used                       = 0;
-    uint8_t pieceOf[kJigPiecesPerType] = {};
+    int32_t devs[JIG_PIECES_PER_TYPE]    = {};
+    uint8_t used                         = 0;
+    uint8_t pieceOf[JIG_PIECES_PER_TYPE] = {};
 
-    for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+    for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
     {
-        const JigCapture *capture = jig_find(JigKind::Census, type, piece, 0, kJigReferenceSlot);
+        const JigCapture *capture = jig_find(JigKind::Census, type, piece, 0, JIG_REFERENCE_SLOT);
         if (capture == nullptr)
         {
             continue;
@@ -695,22 +697,22 @@ static bool jig_next_target(JigTarget &target)
      * every orientation still worth asking for. The idle is re-measured per
      * type so a census spread over several minutes never compares a reading
      * against an idle taken ten minutes earlier */
-    for (uint8_t type = 0; type < kJigTypeCount; ++type)
+    for (uint8_t type = 0; type < JIG_TYPE_COUNT; ++type)
     {
-        if (jig_missing(JigKind::Idle, type, 0, 0, kJigReferenceSlot))
+        if (jig_missing(JigKind::Idle, type, 0, 0, JIG_REFERENCE_SLOT))
         {
-            target = {JigKind::Idle, type, 0, 0, kJigReferenceSlot};
+            target = {JigKind::Idle, type, 0, 0, JIG_REFERENCE_SLOT};
             return true;
         }
 
         const uint8_t orientations = jig_orientations_for(type);
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
             for (uint8_t orient = 0; orient < orientations; ++orient)
             {
-                if (jig_missing(JigKind::Census, type, piece, orient, kJigReferenceSlot))
+                if (jig_missing(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT))
                 {
-                    target = {JigKind::Census, type, piece, orient, kJigReferenceSlot};
+                    target = {JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT};
                     return true;
                 }
             }
@@ -723,11 +725,11 @@ static bool jig_next_target(JigTarget &target)
      * a fresh idle first, the reference one included, so both ends of the
      * ratio are measured in the same pass */
     const uint8_t refPiece = jig_ref_piece(0);
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
-        if (jig_missing(JigKind::Idle, kJigKeySlotIdle, 0, 0, slot))
+        if (jig_missing(JigKind::Idle, JIG_KEY_SLOT_IDLE, 0, 0, slot))
         {
-            target = {JigKind::Idle, kJigKeySlotIdle, 0, 0, slot};
+            target = {JigKind::Idle, JIG_KEY_SLOT_IDLE, 0, 0, slot};
             return true;
         }
         if (jig_missing(JigKind::Gain, 0, refPiece, 0, slot))
@@ -746,7 +748,7 @@ static bool jig_next_target(JigTarget &target)
 
 static bool jig_read_slot(uint8_t slot, int16_t &mean)
 {
-    const AdsTestEntry &entry = kAdsTests[slot / 4];
+    const AdsTestEntry &entry = ADS_TESTS[slot / 4];
     const uint8_t channel     = static_cast<uint8_t>(slot % 4);
 
     if (ads_read_single_ended_mean(&entry, channel, mean))
@@ -766,8 +768,8 @@ static void jig_plateau_reset()
 static void jig_plateau_add(int16_t mean)
 {
     window[window_next] = mean;
-    window_next         = static_cast<uint8_t>((window_next + 1) % kJigStableCount);
-    if (window_count < kJigStableCount)
+    window_next         = static_cast<uint8_t>((window_next + 1) % JIG_STABLE_COUNT);
+    if (window_count < JIG_STABLE_COUNT)
     {
         ++window_count;
     }
@@ -775,19 +777,19 @@ static void jig_plateau_add(int16_t mean)
 
 static bool jig_plateau_stable()
 {
-    if (window_count < kJigStableCount)
+    if (window_count < JIG_STABLE_COUNT)
     {
         return false;
     }
 
     int16_t lowest  = window[0];
     int16_t highest = window[0];
-    for (uint8_t index = 1; index < kJigStableCount; ++index)
+    for (uint8_t index = 1; index < JIG_STABLE_COUNT; ++index)
     {
         lowest  = window[index] < lowest ? window[index] : lowest;
         highest = window[index] > highest ? window[index] : highest;
     }
-    return static_cast<uint16_t>(highest - lowest) <= kJigStableSpan;
+    return static_cast<uint16_t>(highest - lowest) <= JIG_STABLE_SPAN;
 }
 
 static int16_t jig_plateau_mean()
@@ -825,22 +827,22 @@ static void jig_print_progress()
     uint16_t censusPlan = 0;
     uint16_t gainDone   = 0;
 
-    for (uint8_t type = 0; type < kJigTypeCount; ++type)
+    for (uint8_t type = 0; type < JIG_TYPE_COUNT; ++type)
     {
         const uint8_t orientations = jig_orientations_for(type);
-        censusPlan += static_cast<uint16_t>(kJigPiecesPerType) * orientations;
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        censusPlan += static_cast<uint16_t>(JIG_PIECES_PER_TYPE) * orientations;
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
             for (uint8_t orient = 0; orient < orientations; ++orient)
             {
-                if (jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot) != nullptr)
+                if (jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT) != nullptr)
                 {
                     ++censusDone;
                 }
             }
         }
     }
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
         if (jig_find(JigKind::Gain, 0, jig_ref_piece(0), 0, slot) != nullptr)
         {
@@ -855,7 +857,7 @@ static void jig_print_progress()
     Serial.print(", gains ");
     Serial.print(gainDone);
     Serial.print('/');
-    Serial.print(kJigSlotCount);
+    Serial.print(JIG_SLOT_COUNT);
     Serial.println("   [q stop, d dump]");
 }
 
@@ -868,21 +870,21 @@ static void jig_print_target(const JigTarget &target)
     case JigKind::Idle:
         Serial.print("   [idle] slot ");
         Serial.print(static_cast<int>(target.slot) + 1);
-        if (target.type != kJigKeySlotIdle)
+        if (target.type != JIG_KEY_SLOT_IDLE)
         {
             Serial.print(" before ");
-            Serial.print(kJigTypeHints[target.type]);
+            Serial.print(JIG_TYPE_HINTS[target.type]);
         }
         Serial.println(": leave it empty, holding still");
         break;
 
     case JigKind::Census: {
         Serial.print("   [census] ");
-        Serial.print(kJigTypeHints[target.type]);
+        Serial.print(JIG_TYPE_HINTS[target.type]);
         Serial.print(", piece ");
         Serial.print(static_cast<int>(target.piece) + 1);
         Serial.print('/');
-        Serial.print(kJigPiecesPerType);
+        Serial.print(JIG_PIECES_PER_TYPE);
         Serial.print(", orientation ");
         Serial.print(static_cast<int>(target.orient) + 1);
         Serial.print('/');
@@ -890,7 +892,7 @@ static void jig_print_target(const JigTarget &target)
         Serial.print(" (");
         Serial.print(jig_orientation_hint(target.orient));
         Serial.print(") in slot ");
-        Serial.print(kJigReferenceSlot + 1);
+        Serial.print(JIG_REFERENCE_SLOT + 1);
         Serial.println(": place it");
         break;
     }
@@ -899,9 +901,9 @@ static void jig_print_target(const JigTarget &target)
         Serial.print("   [gain] slot ");
         Serial.print(static_cast<int>(target.slot) + 1);
         Serial.print('/');
-        Serial.print(kJigSlotCount);
+        Serial.print(JIG_SLOT_COUNT);
         Serial.print(": empty first, then ");
-        Serial.print(kJigTypeHints[0]);
+        Serial.print(JIG_TYPE_HINTS[0]);
         Serial.print(", piece ");
         Serial.print(static_cast<int>(target.piece) + 1);
         Serial.println(" (text readable)");
@@ -945,7 +947,8 @@ static uint16_t jig_round5(int32_t value)
     {
         return 65530;
     }
-    return static_cast<uint16_t>(((value + (kJigRoundStep / 2)) / kJigRoundStep) * kJigRoundStep);
+    return static_cast<uint16_t>(((value + (JIG_ROUND_STEP / 2)) / JIG_ROUND_STEP) *
+                                 JIG_ROUND_STEP);
 }
 
 static void jig_sort(int32_t *values, uint8_t count)
@@ -977,10 +980,10 @@ static bool jig_piece_deviation(uint8_t type, uint8_t piece, int32_t centre, int
     int32_t best    = 0;
     int32_t bestGap = 0;
 
-    for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+    for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
     {
         const JigCapture *capture =
-            jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot);
+            jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT);
         if (capture == nullptr)
         {
             continue;
@@ -1003,17 +1006,17 @@ static void jig_analyse_pieces(JigTypeStats *stats)
 {
     Serial.println("\n--- PIECE ANALYSIS (reference slot 1) ---");
 
-    for (uint8_t type = 0; type < kJigTypeCount; ++type)
+    for (uint8_t type = 0; type < JIG_TYPE_COUNT; ++type)
     {
-        int32_t all[kJigPiecesPerType * kJigOrientCount] = {};
-        uint8_t allCount                                 = 0;
+        int32_t all[JIG_PIECES_PER_TYPE * JIG_ORIENT_COUNT] = {};
+        uint8_t allCount                                    = 0;
 
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
-            for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+            for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
             {
                 const JigCapture *capture =
-                    jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot);
+                    jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT);
                 if (capture == nullptr)
                 {
                     continue;
@@ -1025,11 +1028,11 @@ static void jig_analyse_pieces(JigTypeStats *stats)
         /* Pieces actually measured: a broken one is declared with 'n', so a
          * type can be complete with fewer than five and still give a median */
         uint8_t piecesSeen = 0;
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
-            for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+            for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
             {
-                if (jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot) != nullptr)
+                if (jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT) != nullptr)
                 {
                     ++piecesSeen;
                     break;
@@ -1037,17 +1040,17 @@ static void jig_analyse_pieces(JigTypeStats *stats)
             }
         }
 
-        stats[type].complete        = piecesSeen >= kJigMinPieces;
+        stats[type].complete        = piecesSeen >= JIG_MIN_PIECES;
         stats[type].rotationMatters = jig_rotation_matters(type);
 
         Serial.print("  ");
-        Serial.print(kJigTypeHints[type]);
+        Serial.print(JIG_TYPE_HINTS[type]);
         Serial.print("  ");
         Serial.print(piecesSeen);
         Serial.print('/');
-        Serial.print(kJigPiecesPerType);
+        Serial.print(JIG_PIECES_PER_TYPE);
         Serial.print(" pieces  as ");
-        Serial.print(scan_label_name(static_cast<int>(kJigTypes[type])));
+        Serial.print(scan_label_name(static_cast<int>(JIG_TYPES[type])));
 
         if (!stats[type].complete)
         {
@@ -1058,9 +1061,9 @@ static void jig_analyse_pieces(JigTypeStats *stats)
         jig_sort(all, allCount);
         const int32_t centre = jig_median(all, allCount);
 
-        int32_t pieceDev[kJigPiecesPerType] = {};
-        uint8_t used                        = 0;
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        int32_t pieceDev[JIG_PIECES_PER_TYPE] = {};
+        uint8_t used                          = 0;
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
             int32_t dev = 0;
             if (jig_piece_deviation(type, piece, centre, dev))
@@ -1095,9 +1098,9 @@ static void jig_analyse_pieces(JigTypeStats *stats)
         Serial.println(stats[type].rotationMatters ? "matters" : "irrelevant");
 
         const int32_t magnitude = jig_gap(median, 0);
-        const int32_t suspect   = (magnitude * kJigSuspectPermille) / 1000;
+        const int32_t suspect   = (magnitude * JIG_SUSPECT_PERMILLE) / 1000;
 
-        for (uint8_t piece = 0; piece < kJigPiecesPerType; ++piece)
+        for (uint8_t piece = 0; piece < JIG_PIECES_PER_TYPE; ++piece)
         {
             int32_t dev = 0;
             if (!jig_piece_deviation(type, piece, centre, dev))
@@ -1111,10 +1114,10 @@ static void jig_analyse_pieces(JigTypeStats *stats)
             int32_t orientLow  = 0;
             int32_t orientHigh = 0;
 
-            for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+            for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
             {
                 const JigCapture *capture =
-                    jig_find(JigKind::Census, type, piece, orient, kJigReferenceSlot);
+                    jig_find(JigKind::Census, type, piece, orient, JIG_REFERENCE_SLOT);
                 if (capture == nullptr)
                 {
                     continue;
@@ -1177,7 +1180,7 @@ static void jig_analyse_pieces(JigTypeStats *stats)
  * then be reported as an overlap without ever saying why */
 static bool jig_order_ok(const JigTypeStats *stats)
 {
-    for (uint8_t type = 0; type < kJigTypeCount; ++type)
+    for (uint8_t type = 0; type < JIG_TYPE_COUNT; ++type)
     {
         if (!stats[type].complete)
         {
@@ -1191,16 +1194,16 @@ static bool jig_order_ok(const JigTypeStats *stats)
 
 static void jig_print_order(const JigTypeStats *stats)
 {
-    int32_t sorted[kJigTypeCount] = {};
-    uint8_t order[kJigTypeCount]  = {};
+    int32_t sorted[JIG_TYPE_COUNT] = {};
+    uint8_t order[JIG_TYPE_COUNT]  = {};
 
-    for (uint8_t type = 0; type < kJigTypeCount; ++type)
+    for (uint8_t type = 0; type < JIG_TYPE_COUNT; ++type)
     {
         sorted[type] = stats[type].median;
         order[type]  = type;
     }
 
-    for (uint8_t i = 1; i < kJigTypeCount; ++i)
+    for (uint8_t i = 1; i < JIG_TYPE_COUNT; ++i)
     {
         const int32_t held    = sorted[i];
         const uint8_t heldKey = order[i];
@@ -1217,11 +1220,11 @@ static void jig_print_order(const JigTypeStats *stats)
 
     Serial.println("\n--- CANONICAL ORDER CHECK ---");
     Serial.print("  measured, ascending: ");
-    for (uint8_t i = 0; i < kJigTypeCount; ++i)
+    for (uint8_t i = 0; i < JIG_TYPE_COUNT; ++i)
     {
-        Serial.print(kJigTypeHints[order[i]]);
+        Serial.print(JIG_TYPE_HINTS[order[i]]);
         Serial.print(" as ");
-        Serial.print(scan_label_name(static_cast<int>(kJigTypes[order[i]])));
+        Serial.print(scan_label_name(static_cast<int>(JIG_TYPES[order[i]])));
         Serial.print('(');
         if (sorted[i] >= 0)
         {
@@ -1229,7 +1232,7 @@ static void jig_print_order(const JigTypeStats *stats)
         }
         Serial.print(sorted[i]);
         Serial.print(')');
-        Serial.print(i + 1 < kJigTypeCount ? "  " : "");
+        Serial.print(i + 1 < JIG_TYPE_COUNT ? "  " : "");
     }
     Serial.println();
     Serial.println("  expected           : TURN_LEFT < LOOP_CALL < EMPTY < TURN_RIGHT < FORWARD");
@@ -1261,7 +1264,7 @@ static bool jig_gain_piece(uint8_t &piece)
  * their own idle. Returns 0 when either end is missing */
 static int32_t jig_gain_milli(uint8_t slot, uint8_t refPiece)
 {
-    const JigCapture *base = jig_find(JigKind::Gain, 0, refPiece, 0, kJigReferenceSlot);
+    const JigCapture *base = jig_find(JigKind::Gain, 0, refPiece, 0, JIG_REFERENCE_SLOT);
     if (base == nullptr)
     {
         return 0;
@@ -1292,7 +1295,7 @@ static void jig_emit_rows(const JigTypeStats *stats)
     if (jig_gain_piece(refPiece))
     {
         Serial.print("\n   gain pass measured with ");
-        Serial.print(kJigTypeHints[0]);
+        Serial.print(JIG_TYPE_HINTS[0]);
         Serial.print(" piece ");
         Serial.println(static_cast<int>(refPiece) + 1);
     }
@@ -1309,10 +1312,10 @@ static void jig_emit_rows(const JigTypeStats *stats)
 
     /* Gains first: the verification sheet targets the median gain, so the
      * rows cannot all be built before it is known */
-    int32_t gains[kJigSlotCount]       = {};
-    int32_t sortedGains[kJigSlotCount] = {};
-    uint8_t gainCount                  = 0;
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    int32_t gains[JIG_SLOT_COUNT]       = {};
+    int32_t sortedGains[JIG_SLOT_COUNT] = {};
+    uint8_t gainCount                   = 0;
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
         gains[slot] = jig_gain_milli(slot, refPiece);
         if (gains[slot] != 0)
@@ -1323,11 +1326,11 @@ static void jig_emit_rows(const JigTypeStats *stats)
     jig_sort(sortedGains, gainCount);
     const int32_t medianGain = jig_median(sortedGains, gainCount);
 
-    bool flagged[kJigSlotCount] = {};
+    bool flagged[JIG_SLOT_COUNT] = {};
 
     Serial.println("\n--- SLOT GAINS ---");
 
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
         const uint16_t ref = jig_ref_for(slot);
         const int32_t gain = gains[slot];
@@ -1352,16 +1355,16 @@ static void jig_emit_rows(const JigTypeStats *stats)
             continue;
         }
 
-        int32_t centre[kJigClassCount] = {};
-        int32_t half[kJigClassCount]   = {};
+        int32_t centre[JIG_CLASS_COUNT] = {};
+        int32_t half[JIG_CLASS_COUNT]   = {};
 
-        for (uint8_t cls = 0; cls < kJigClassCount; ++cls)
+        for (uint8_t cls = 0; cls < JIG_CLASS_COUNT; ++cls)
         {
-            const uint8_t type = kJigClassType[cls];
+            const uint8_t type = JIG_CLASS_TYPE[cls];
             if (type == 0xFF)
             {
                 centre[cls] = ref;
-                half[cls]   = kJigEmptyHalf;
+                half[cls]   = JIG_EMPTY_HALF;
                 continue;
             }
             if (!stats[type].complete)
@@ -1375,7 +1378,7 @@ static void jig_emit_rows(const JigTypeStats *stats)
              * follows is proportional to the deviation, so the allowance
              * scales with it instead of being a fixed count */
             const int32_t play = static_cast<int32_t>(
-                (static_cast<int64_t>(jig_gap(stats[type].median, 0)) * kJigPlayPermille) / 1000);
+                (static_cast<int64_t>(jig_gap(stats[type].median, 0)) * JIG_PLAY_PERMILLE) / 1000);
 
             centre[cls] =
                 static_cast<int32_t>(ref) +
@@ -1389,7 +1392,7 @@ static void jig_emit_rows(const JigTypeStats *stats)
          * row guessed there would invent a piece that is not in the box */
         bool usable      = true;
         int32_t smallest = 0;
-        for (uint8_t cls = 1; cls < kJigClassCount; ++cls)
+        for (uint8_t cls = 1; cls < JIG_CLASS_COUNT; ++cls)
         {
             const int32_t gap = (centre[cls] - half[cls]) - (centre[cls - 1] + half[cls - 1]);
             if (gap <= 0)
@@ -1414,15 +1417,15 @@ static void jig_emit_rows(const JigTypeStats *stats)
          * different field than the others: both are fixed on the bench, not
          * by a threshold */
         const bool gainOff = (medianGain != 0) && (jig_gap(gain, medianGain) * 1000 >
-                                                   medianGain * kJigGainSpreadPermille);
-        if (smallest < kJigTightGap || gainOff)
+                                                   medianGain * JIG_GAIN_SPREAD_PERMILLE);
+        if (smallest < JIG_TIGHT_GAP || gainOff)
         {
             flagged[slot] = true;
         }
 
         uint16_t row[GASPETTO_ADC_COLS] = {};
         row[0]                          = jig_round5(centre[0] - half[0]);
-        for (uint8_t cls = 1; cls < kJigClassCount; ++cls)
+        for (uint8_t cls = 1; cls < JIG_CLASS_COUNT; ++cls)
         {
             row[cls] =
                 jig_round5(((centre[cls - 1] + half[cls - 1]) + (centre[cls] - half[cls])) / 2);
@@ -1468,7 +1471,7 @@ static void jig_emit_rows(const JigTypeStats *stats)
     Serial.print("\n   computed slots: ");
     Serial.print(calibrated);
     Serial.print('/');
-    Serial.println(kJigSlotCount);
+    Serial.println(JIG_SLOT_COUNT);
 
     /* Verification sheet: only the slots that need bench work, and only the
      * target value. The target uses the median gain, not the slot's own, so
@@ -1489,7 +1492,7 @@ static void jig_emit_rows(const JigTypeStats *stats)
         Serial.print('.');
         Serial.println((medianGain % 1000) / 10);
 
-        for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+        for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
         {
             if (!flagged[slot])
             {
@@ -1530,16 +1533,16 @@ static void jig_emit_rows(const JigTypeStats *stats)
 
             Serial.print("            idle ");
             Serial.print(ref);
-            for (uint8_t cls = 0; cls < kJigClassCount; ++cls)
+            for (uint8_t cls = 0; cls < JIG_CLASS_COUNT; ++cls)
             {
-                const uint8_t type = kJigClassType[cls];
+                const uint8_t type = JIG_CLASS_TYPE[cls];
                 int32_t centre     = static_cast<int32_t>(ref);
-                int32_t half       = kJigEmptyHalf;
+                int32_t half       = JIG_EMPTY_HALF;
 
                 if (type != 0xFF && stats[type].complete)
                 {
                     const int32_t play = static_cast<int32_t>(
-                        (static_cast<int64_t>(jig_gap(stats[type].median, 0)) * kJigPlayPermille) /
+                        (static_cast<int64_t>(jig_gap(stats[type].median, 0)) * JIG_PLAY_PERMILLE) /
                         1000);
                     centre = static_cast<int32_t>(ref) +
                              static_cast<int32_t>(
@@ -1555,9 +1558,9 @@ static void jig_emit_rows(const JigTypeStats *stats)
                 }
                 else
                 {
-                    Serial.print(scan_label_name(static_cast<int>(kJigTypes[type])));
+                    Serial.print(scan_label_name(static_cast<int>(JIG_TYPES[type])));
                     Serial.print('/');
-                    Serial.print(kJigTypeHints[type]);
+                    Serial.print(JIG_TYPE_HINTS[type]);
                 }
                 Serial.print(' ');
                 Serial.print(centre);
@@ -1603,13 +1606,13 @@ static void jig_print_idle_history()
 
     Serial.println("\n--- IDLE HISTORY (counts, deltas to the slot median) ---");
 
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
-        int32_t values[kJigMaxIdlePerSlot] = {};
-        int32_t sorted[kJigMaxIdlePerSlot] = {};
-        uint8_t count                      = 0;
+        int32_t values[JIG_MAX_IDLE_PER_SLOT] = {};
+        int32_t sorted[JIG_MAX_IDLE_PER_SLOT] = {};
+        uint8_t count                         = 0;
 
-        for (uint16_t index = 0; index < capture_count && count < kJigMaxIdlePerSlot; ++index)
+        for (uint16_t index = 0; index < capture_count && count < JIG_MAX_IDLE_PER_SLOT; ++index)
         {
             const JigCapture &capture = captures[index];
             if (capture.kind == JigKind::Idle && capture.slot == slot)
@@ -1646,7 +1649,7 @@ static void jig_print_idle_history()
                 Serial.print('+');
             }
             Serial.print(delta);
-            if (jig_gap(values[index], median) > kJigIdleSuspect)
+            if (jig_gap(values[index], median) > JIG_IDLE_SUSPECT)
             {
                 Serial.print(" <<");
             }
@@ -1663,7 +1666,7 @@ static void jig_print_idle_history()
 
 static void jig_analyse()
 {
-    JigTypeStats stats[kJigTypeCount] = {};
+    JigTypeStats stats[JIG_TYPE_COUNT] = {};
 
     jig_print_idle_history();
     jig_analyse_pieces(stats);
@@ -1724,7 +1727,7 @@ void jig_dump_captures()
             break;
         case JigKind::Census:
             Serial.print("  census ");
-            Serial.print(kJigTypeHints[capture.type]);
+            Serial.print(JIG_TYPE_HINTS[capture.type]);
             Serial.print(" piece ");
             Serial.print(static_cast<int>(capture.piece) + 1);
             Serial.print(" orient ");
@@ -1809,7 +1812,7 @@ void jig_clear_captures()
     skip_count    = 0;
     analysis_done = false;
     has_captured  = false;
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
         ref_known[slot] = false;
         ref_value[slot] = 0;
@@ -1859,7 +1862,7 @@ static void jig_skip_shown()
 
     if (shown_target.kind == JigKind::Census)
     {
-        for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
+        for (uint8_t orient = 0; orient < JIG_ORIENT_COUNT; ++orient)
         {
             jig_skip_add(JigKind::Census, shown_target.type, shown_target.piece, orient,
                          shown_target.slot);
@@ -1867,7 +1870,7 @@ static void jig_skip_shown()
         Serial.print("   piece ");
         Serial.print(static_cast<int>(shown_target.piece) + 1);
         Serial.print(" written off: ");
-        Serial.println(kJigTypeHints[shown_target.type]);
+        Serial.println(JIG_TYPE_HINTS[shown_target.type]);
     }
     else
     {
@@ -1885,7 +1888,7 @@ static void jig_skip_shown()
  * would be the one from the dropped capture */
 static void jig_rebuild_refs()
 {
-    for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
+    for (uint8_t slot = 0; slot < JIG_SLOT_COUNT; ++slot)
     {
         ref_known[slot] = false;
         ref_value[slot] = 0;
@@ -1938,7 +1941,7 @@ static void jig_restart_piece(uint8_t type, uint8_t piece)
     jig_rebuild_refs();
 
     Serial.print("   ");
-    Serial.print(kJigTypeHints[type]);
+    Serial.print(JIG_TYPE_HINTS[type]);
     Serial.print(" piece ");
     Serial.print(static_cast<int>(piece) + 1);
     Serial.print(" restarted, ");
@@ -1974,7 +1977,7 @@ static void jig_undo_last()
         Serial.println(static_cast<int>(last.slot) + 1);
         break;
     case JigKind::Census:
-        Serial.print(kJigTypeHints[last.type]);
+        Serial.print(JIG_TYPE_HINTS[last.type]);
         Serial.print(" piece ");
         Serial.print(static_cast<int>(last.piece) + 1);
         Serial.print(" orient ");
@@ -2101,9 +2104,9 @@ void jig_poll()
          * whole slot. The reading has to land where an idle can: near the
          * level this slot last showed, or near the reference slot's own */
         const uint16_t expected = ref_known[target.slot] ? ref_value[target.slot] :
-                                                           jig_ref_for(kJigReferenceSlot);
+                                                           jig_ref_for(JIG_REFERENCE_SLOT);
         if (!capture_now && expected != 0 &&
-            jig_gap(mean, expected) > static_cast<int32_t>(kJigIdlePlausible))
+            jig_gap(mean, expected) > static_cast<int32_t>(JIG_IDLE_PLAUSIBLE))
         {
             jig_plateau_reset();
             /* Silence would look like a hang: say what is refused and how to
@@ -2112,7 +2115,7 @@ void jig_poll()
             {
                 ++idle_rejects;
             }
-            if (idle_rejects == kJigIdleRejectHint)
+            if (idle_rejects == JIG_IDLE_REJECT_HINT)
             {
                 Serial.print("   idle reads ");
                 Serial.print(mean);
@@ -2160,7 +2163,7 @@ void jig_poll()
     if (!capture_now)
     {
         /* A piece has to be present... */
-        if (jig_gap(mean, ref) < static_cast<int32_t>(kJigPresentDelta))
+        if (jig_gap(mean, ref) < static_cast<int32_t>(JIG_PRESENT_DELTA))
         {
             jig_plateau_reset();
             return;
@@ -2170,21 +2173,21 @@ void jig_poll()
          * centred magnet never moves, so after a few refusals the capture is
          * taken anyway and the prompt says the value did not change */
         if (has_captured && captured_slot == target.slot &&
-            jig_gap(mean, captured_value) < static_cast<int32_t>(kJigRearmDelta))
+            jig_gap(mean, captured_value) < static_cast<int32_t>(JIG_REARM_DELTA))
         {
             if (unchanged_polls < 0xFF)
             {
                 ++unchanged_polls;
             }
-            if (unchanged_polls < kJigStuckPolls)
+            if (unchanged_polls < JIG_STUCK_POLLS)
             {
                 jig_plateau_reset();
                 return;
             }
-            if (unchanged_polls == kJigStuckPolls)
+            if (unchanged_polls == JIG_STUCK_POLLS)
             {
                 Serial.print("   reading did not move by ");
-                Serial.print(kJigRearmDelta);
+                Serial.print(JIG_REARM_DELTA);
                 Serial.println(" counts: recording it as it stands");
             }
         }

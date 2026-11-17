@@ -19,9 +19,9 @@ void health_run_i2c_tests()
 {
     Serial.println("\n--- ADS1115 I2C TEST (3V3 rail ON) ---");
 
-    for (uint8_t i = 0; i < kAdsCount; ++i)
+    for (uint8_t i = 0; i < ADS_COUNT; ++i)
     {
-        const AdsTestEntry &entry = kAdsTests[i];
+        const AdsTestEntry &entry = ADS_TESTS[i];
 
         /* Check if device is accessible */
         bool deviceFound;
@@ -92,7 +92,7 @@ void health_run_i2c_tests()
 
 #ifdef TEST_ADS1115_CONVERSION_READS
         Serial.print("          conversion path test enabled (timeout-guarded, mean samples=");
-        Serial.print(kAdsMeanSamples);
+        Serial.print(ADS_MEAN_SAMPLES);
         Serial.println(")");
         for (uint8_t ch = 0; ch < 4; ++ch)
         {

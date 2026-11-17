@@ -13,7 +13,7 @@
 /* Piece thresholds come from the shared piece_thresholds.h with their
  * static asserts: same numbers as the production firmware */
 
-constexpr uint32_t kI2c1ClockHz = 100000;
+constexpr uint32_t I2C1_CLOCK_HZ = 100000;
 
 #ifndef TEST_ADS1115_MEAN_SAMPLES
 #define TEST_ADS1115_MEAN_SAMPLES 10
@@ -21,13 +21,13 @@ constexpr uint32_t kI2c1ClockHz = 100000;
 
 static_assert(TEST_ADS1115_MEAN_SAMPLES > 0, "TEST_ADS1115_MEAN_SAMPLES must be >= 1");
 
-constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
+constexpr uint8_t ADS_MEAN_SAMPLES = TEST_ADS1115_MEAN_SAMPLES;
 
 /* Settle time after the sensor rail changes state: a hall sensor answers in
  * microseconds, so 250 ms covers the rail's own RC plus margin. Every read
  * raises the rail for its duration and drops it again (see
  * ads_read_single_ended_mean), so this is also the pause between two readings */
-constexpr uint16_t kRailSettleDelayMs = 250;
+constexpr uint16_t RAIL_SETTLE_DELAY_MS = 250;
 
 /* Raise the sensor rail when it is down and report whether this call did it,
  * so the caller drops it again only in that case: a rail someone else holds
@@ -64,14 +64,14 @@ struct AdsTestEntry
 
 /* Five ADS1115 modules of four slots each, fixed by the board wiring;
  * the shared per-slot threshold table covers the same slots */
-constexpr uint8_t kAdsCount             = 5;
-constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
+constexpr uint8_t ADS_COUNT              = 5;
+constexpr uint8_t CALIBRATION_SLOT_COUNT = ADS_COUNT * 4;
 
 /* The packet's slot count and the number of sensors this firmware reads
  * describe the same board. The radio send test walks the packet slots and uses
- * each as an index into kAdsTests, so the two must stay equal, or the loop
+ * each as an index into ADS_TESTS, so the two must stay equal, or the loop
  * would run past the table. Refuse to build rather than overrun at runtime */
-static_assert(BOX_TOTAL_SLOTS == kCalibrationSlotCount, "packet slots must match the ADS scan");
+static_assert(BOX_TOTAL_SLOTS == CALIBRATION_SLOT_COUNT, "packet slots must match the ADS scan");
 
 void shell_handle_usb_commands();
 
@@ -166,8 +166,8 @@ void shell_print_usb_help();
 /* ========================================== */
 extern TwoWire &i2c1;
 extern RF24 radio;
-extern AdsTestEntry kAdsTests[kAdsCount];
-extern CalibrationStats calibration_stats[kCalibrationSlotCount];
+extern AdsTestEntry ADS_TESTS[ADS_COUNT];
+extern CalibrationStats calibration_stats[CALIBRATION_SLOT_COUNT];
 extern uint32_t calibration_scan_counter;
 
 void ads_probe_i2c_devices();
@@ -193,14 +193,14 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 #ifndef APA_LED_COUNT
 #define APA_LED_COUNT 3
 #endif
-constexpr uint16_t kApaPixelCount = APA_LED_COUNT;
+constexpr uint16_t APA_PIXEL_COUNT = APA_LED_COUNT;
 
 /* Global output level handed to FastLED (255 = full); override with
  * -D APA_LED_INTENSITY=n when full scale is too harsh on the bench */
 #ifndef APA_LED_INTENSITY
 #define APA_LED_INTENSITY 80
 #endif
-constexpr uint8_t kApaIntensity = APA_LED_INTENSITY;
+constexpr uint8_t APA_INTENSITY = APA_LED_INTENSITY;
 
 /* Prepare the data pin and send one dark frame; call it AFTER the 5V
  * rail is up and settled (the APA106 ignores frames while unpowered) */

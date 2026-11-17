@@ -23,12 +23,12 @@ struct I2CProbeEntry
  * slots 1-4 ADS at 0x4B (ADDR->SCL), 5-8 at 0x48 (ADDR->GND),
  * 9-12 at 0x4A (ADDR->SDA), 13-16 at 0x49 (ADDR->VCC),
  * 17-20 on I2C3 at 0x4A (ADDR->SDA). Entries follow slot order */
-static const I2CProbeEntry kI2CProbes[] = {
+static const I2CProbeEntry I2C_PROBES[] = {
     {false, &i2c1, 0x4B, "I2C1 0x4B (ADDR->SCL)"},  {false, &i2c1, 0x48, "I2C1 0x48 (ADDR->GND)"},
     {false, &i2c1, 0x4A, "I2C1 0x4A (ADDR->SDA)"},  {false, &i2c1, 0x49, "I2C1 0x49 (ADDR->VCC)"},
     {true, nullptr, 0x4A, "I2C3 0x4A (ADDR->SDA)"},
 };
-constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
+constexpr uint8_t PROBE_COUNT = sizeof(I2C_PROBES) / sizeof(I2C_PROBES[0]);
 
 /* Probe one module with retries: right after the 3V3 rail powers up the
  * modules are still coming up and a bare transaction can NACK — all four
@@ -37,9 +37,9 @@ constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
  * believed */
 static bool ads_probe_one_device(bool useBitBang, TwoWire *wire, uint8_t address)
 {
-    constexpr uint8_t kProbeRetries  = 2;
-    constexpr uint16_t kProbeRetryMs = 200;
-    for (uint8_t attempt = 0; attempt <= kProbeRetries; ++attempt)
+    constexpr uint8_t PROBE_RETRIES   = 2;
+    constexpr uint16_t PROBE_RETRY_MS = 200;
+    for (uint8_t attempt = 0; attempt <= PROBE_RETRIES; ++attempt)
     {
         bool ack;
         if (useBitBang)
@@ -55,9 +55,9 @@ static bool ads_probe_one_device(bool useBitBang, TwoWire *wire, uint8_t address
         {
             return true;
         }
-        if (attempt < kProbeRetries)
+        if (attempt < PROBE_RETRIES)
         {
-            delay(kProbeRetryMs);
+            delay(PROBE_RETRY_MS);
         }
     }
     return false;
@@ -66,9 +66,9 @@ static bool ads_probe_one_device(bool useBitBang, TwoWire *wire, uint8_t address
 void ads_probe_i2c_devices()
 {
     Serial.println("\n--- ADS1115 I2C PROBE (3V3 rail ON) ---");
-    for (uint8_t i = 0; i < kProbeCount; ++i)
+    for (uint8_t i = 0; i < PROBE_COUNT; ++i)
     {
-        const I2CProbeEntry &e = kI2CProbes[i];
+        const I2CProbeEntry &e = I2C_PROBES[i];
         const bool ack         = ads_probe_one_device(e.useBitBang, e.wire, e.address);
 
         if (ack)
@@ -87,25 +87,25 @@ void ads_probe_i2c_devices()
 #ifdef TEST_ADS1115
 /* Slot ranges (wired on the board): 1-4=0x4B(SCL), 5-8=0x48(GND), */
 /* 9-12=0x4A(SDA), 13-16=0x49(VCC), 17-20=I2C3 0x4A (bit-bang) */
-AdsTestEntry kAdsTests[] = {
+AdsTestEntry ADS_TESTS[] = {
     {false, &i2c1, 0x4B, "I2C1", "ADDR->SCL"},  {false, &i2c1, 0x48, "I2C1", "ADDR->GND"},
     {false, &i2c1, 0x4A, "I2C1", "ADDR->SDA"},  {false, &i2c1, 0x49, "I2C1", "ADDR->VCC"},
     {true, nullptr, 0x4A, "I2C3", "ADDR->SDA"},
 };
 
-static_assert(sizeof(kAdsTests) / sizeof(kAdsTests[0]) == kAdsCount,
+static_assert(sizeof(ADS_TESTS) / sizeof(ADS_TESTS[0]) == ADS_COUNT,
               "probe table must list all five ADS modules");
 
-CalibrationStats calibration_stats[kCalibrationSlotCount] = {};
+CalibrationStats calibration_stats[CALIBRATION_SLOT_COUNT] = {};
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
-static bool last_probe_state[kAdsCount + 1] = {};
+static bool last_probe_state[ADS_COUNT + 1] = {};
 static bool probe_state_valid               = false;
 
 void ads_reset_calibration_stats()
 {
-    for (uint8_t i = 0; i < kCalibrationSlotCount; ++i)
+    for (uint8_t i = 0; i < CALIBRATION_SLOT_COUNT; ++i)
     {
         calibration_stats[i] = CalibrationStats{};
     }
@@ -116,19 +116,19 @@ void ads_reset_calibration_stats()
  * no printing, plus the nRF24 chip state as the last entry */
 void ads_report_probe_changes()
 {
-    bool current[kAdsCount + 1];
+    bool current[ADS_COUNT + 1];
 
-    for (uint8_t i = 0; i < kAdsCount; ++i)
+    for (uint8_t i = 0; i < ADS_COUNT; ++i)
     {
-        const AdsTestEntry &entry = kAdsTests[i];
+        const AdsTestEntry &entry = ADS_TESTS[i];
         current[i] = ads_probe_one_device(entry.useBitBang, entry.wire, entry.address);
     }
-    current[kAdsCount] = radio.isChipConnected();
+    current[ADS_COUNT] = radio.isChipConnected();
 
     if (probe_state_valid)
     {
         bool unchanged = true;
-        for (uint8_t i = 0; i <= kAdsCount; ++i)
+        for (uint8_t i = 0; i <= ADS_COUNT; ++i)
         {
             if (current[i] == last_probe_state[i])
             {
@@ -136,11 +136,11 @@ void ads_report_probe_changes()
             }
             unchanged = false;
             Serial.print("   [CHANGE] ");
-            if (i < kAdsCount)
+            if (i < ADS_COUNT)
             {
-                Serial.print(kAdsTests[i].busName);
+                Serial.print(ADS_TESTS[i].busName);
                 Serial.print(" 0x");
-                Serial.print(kAdsTests[i].address, HEX);
+                Serial.print(ADS_TESTS[i].address, HEX);
             }
             else
             {
@@ -161,7 +161,7 @@ void ads_report_probe_changes()
         Serial.println("   baseline recorded (no previous run to compare)");
     }
 
-    for (uint8_t i = 0; i <= kAdsCount; ++i)
+    for (uint8_t i = 0; i <= ADS_COUNT; ++i)
     {
         last_probe_state[i] = current[i];
     }
@@ -195,7 +195,7 @@ void ads_rearm_module(const AdsTestEntry *entry)
 
     entry->wire->end();
     entry->wire->begin();
-    entry->wire->setClock(kI2c1ClockHz);
+    entry->wire->setClock(I2C1_CLOCK_HZ);
     Adafruit_ADS1115 ads;
     ads.begin(entry->address, entry->wire);
     ads.setGain(GAIN_ONE);
@@ -265,7 +265,7 @@ bool ads_read_config_register(const AdsTestEntry *entry, uint16_t &config)
 
 static bool ads_read_single_ended(const AdsTestEntry *entry, uint8_t channel, int16_t &raw)
 {
-    static constexpr uint16_t kMuxByChannel[4] = {
+    static constexpr uint16_t MUX_BY_CHANNEL[4] = {
         ADS1X15_REG_CONFIG_MUX_SINGLE_0,
         ADS1X15_REG_CONFIG_MUX_SINGLE_1,
         ADS1X15_REG_CONFIG_MUX_SINGLE_2,
@@ -278,8 +278,8 @@ static bool ads_read_single_ended(const AdsTestEntry *entry, uint8_t channel, in
     }
 
     uint16_t config = ADS1X15_REG_CONFIG_CQUE_NONE | ADS1X15_REG_CONFIG_MODE_SINGLE |
-                      ADS1X15_REG_CONFIG_PGA_4_096V | kMuxByChannel[channel] | RATE_ADS1115_128SPS |
-                      ADS1X15_REG_CONFIG_OS_SINGLE;
+                      ADS1X15_REG_CONFIG_PGA_4_096V | MUX_BY_CHANNEL[channel] |
+                      RATE_ADS1115_128SPS | ADS1X15_REG_CONFIG_OS_SINGLE;
 
     if (entry->useBitBang)
     {
@@ -359,7 +359,7 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
     }
 
     int32_t sum = 0;
-    for (uint8_t sample = 0; sample < kAdsMeanSamples; ++sample)
+    for (uint8_t sample = 0; sample < ADS_MEAN_SAMPLES; ++sample)
     {
         int16_t raw = 0;
         if (!ads_read_single_ended(entry, channel, raw))
@@ -372,7 +372,7 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 
     power_sensor_rail_release(acquired);
 
-    meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(kAdsMeanSamples));
+    meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(ADS_MEAN_SAMPLES));
     return true;
 }
 

@@ -23,7 +23,7 @@ bool radio_menu_active = false;
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
 
-constexpr uint16_t kCalibrationScanPeriodMs = 1000;
+constexpr uint16_t CALIBRATION_SCAN_PERIOD_MS = 1000;
 
 #ifdef TEST_ADS1115
 TestMode test_mode        = TestMode::Health;
@@ -62,11 +62,11 @@ void setup()
     /* The 5V rail comes up BEFORE the first frames: the APA106 ignores
      * every frame sent while unpowered */
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
-    delay(kRailSettleDelayMs);
+    delay(RAIL_SETTLE_DELAY_MS);
     Serial.println("   5V LED rail ON (settled) before APA106 init");
     leds_begin();
     Serial.print("APA106 init: ");
-    Serial.print(kApaPixelCount);
+    Serial.print(APA_PIXEL_COUNT);
     Serial.println(" pixel(s) on PB8, first frame sent (all dark)");
 
     /* --- nRF24L01+ SPI Test --- */
@@ -101,14 +101,14 @@ void setup()
     /* --- I2C init --- */
     Serial.println("\n3. Initializing I2C buses...");
     i2c1.begin();
-    i2c1.setClock(kI2c1ClockHz);
+    i2c1.setClock(I2C1_CLOCK_HZ);
     Serial.println("   I2C1 (SCL=PB6, SDA=PB7) @ 100kHz initialized.");
 
     /* Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered */
     Serial.println("\n4. Turning ON 3V3_SWITCHED to power ADS1115 modules...");
     digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
     calibration_rails_on = true;               /* the lease must not drop it from here */
-    delay(kRailSettleDelayMs);                 /* Wait for modules to initialize */
+    delay(RAIL_SETTLE_DELAY_MS);               /* Wait for modules to initialize */
     Serial.println("   [OK] 3V3_SWITCHED activated - ADS1115 modules should be powered");
 
     /* Initialize I2C3 bit-banging */
@@ -180,7 +180,7 @@ void loop()
             return; /* mode changed while waiting: skip the rest delay */
         }
 
-        shell_delay_with_usb(kCalibrationScanPeriodMs);
+        shell_delay_with_usb(CALIBRATION_SCAN_PERIOD_MS);
         return;
     }
 
@@ -200,5 +200,5 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
-    shell_delay_with_usb(kCalibrationScanPeriodMs);
+    shell_delay_with_usb(CALIBRATION_SCAN_PERIOD_MS);
 }

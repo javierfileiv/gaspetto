@@ -30,11 +30,11 @@ void shell_print_usb_help()
  * not be interrupted */
 void shell_delay_with_usb(uint32_t totalMs)
 {
-    constexpr uint32_t kSliceMs = 50;
+    constexpr uint32_t SLICE_MS = 50;
     uint32_t remaining          = totalMs;
     while (remaining > 0)
     {
-        const uint32_t slice = remaining > kSliceMs ? kSliceMs : remaining;
+        const uint32_t slice = remaining > SLICE_MS ? SLICE_MS : remaining;
         delay(slice);
         remaining -= slice;
         shell_handle_usb_commands();
@@ -218,11 +218,11 @@ void shell_handle_usb_commands()
          * the word still matches, any other character breaks the sequence
          * and is handled normally. NVIC_SystemReset never returns: it goes
          * through the full boot path (rails, APA106 dark frame, menus) */
-        static const char kResetWord[] = "reset";
+        static const char RESET_WORD[] = "reset";
         static uint8_t resetWordSeen   = 0;
-        if (incoming == kResetWord[resetWordSeen])
+        if (incoming == RESET_WORD[resetWordSeen])
         {
-            if (++resetWordSeen == sizeof(kResetWord) - 1U)
+            if (++resetWordSeen == sizeof(RESET_WORD) - 1U)
             {
                 resetWordSeen = 0;
                 Serial.println("\n--- MCU RESET ---");
@@ -237,11 +237,11 @@ void shell_handle_usb_commands()
          * The letters are consumed only while the word still matches: any
          * other character breaks the sequence and is handled normally. The
          * shared enterDfuBootloader() never returns */
-        static const char kDfuWord[] = "dfu";
+        static const char DFU_WORD[] = "dfu";
         static uint8_t dfuWordSeen   = 0;
-        if (incoming == kDfuWord[dfuWordSeen])
+        if (incoming == DFU_WORD[dfuWordSeen])
         {
-            if (++dfuWordSeen == sizeof(kDfuWord) - 1U)
+            if (++dfuWordSeen == sizeof(DFU_WORD) - 1U)
             {
                 dfuWordSeen = 0;
                 Serial.println("\n--- DFU: reflash or power-cycle to exit ---");
@@ -306,7 +306,7 @@ void shell_handle_usb_commands()
                 Serial.println("forgetting a slot works in calibration mode ('c' to switch)");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > CALIBRATION_SLOT_COUNT)
             {
                 Serial.println("prefix the slot number: 19k forgets slot 19");
                 break;
@@ -319,7 +319,7 @@ void shell_handle_usb_commands()
                 Serial.println("slot monitor works in calibration mode ('c' to switch)");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > CALIBRATION_SLOT_COUNT)
             {
                 Serial.println("type '<slot>m' e.g. '5m' (monitor slot 5)");
                 break;
@@ -332,7 +332,7 @@ void shell_handle_usb_commands()
                 Serial.println("frozen monitor works in calibration mode ('c' to switch)");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > CALIBRATION_SLOT_COUNT)
             {
                 Serial.println("type '<slot>x' e.g. '5x' (frozen monitor slot 5)");
                 break;

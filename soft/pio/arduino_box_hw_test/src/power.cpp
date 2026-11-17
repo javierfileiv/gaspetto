@@ -19,7 +19,7 @@ bool power_sensor_rail_acquire()
         return false;
     }
     digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
-    delay(kRailSettleDelayMs);
+    delay(RAIL_SETTLE_DELAY_MS);
     calibration_rails_on = true;
     return true;
 }
@@ -56,10 +56,10 @@ static void power_wake_button_isr()
  * keeps running, so "b" can sleep again. */
 void power_run_deep_sleep_test()
 {
-    uint32_t sleepEntryMs                = 0;
-    bool realPress                       = false;
-    uint16_t spuriousWakes               = 0;
-    constexpr uint16_t kMaxSpuriousWakes = 20;
+    uint32_t sleepEntryMs                 = 0;
+    bool realPress                        = false;
+    uint16_t spuriousWakes                = 0;
+    constexpr uint16_t MAX_SPURIOUS_WAKES = 20;
 
     Serial.println();
     Serial.println("[stop] entering STOP mode: only the wake button (PB9) wakes the chip");
@@ -91,9 +91,9 @@ void power_run_deep_sleep_test()
 
         /* Stability of the wake line: one LOW sample already means the line drifts
          * or picks up noise, which turns into a spurious falling edge once asleep */
-        const uint16_t kLineSamples = 100;
+        const uint16_t LINE_SAMPLES = 100;
         uint16_t highSamples        = 0;
-        for (uint16_t i = 0; i < kLineSamples; ++i)
+        for (uint16_t i = 0; i < LINE_SAMPLES; ++i)
         {
             highSamples += (digitalRead(PIN_WAKE_BUTTON) == HIGH) ? 1U : 0U;
             delayMicroseconds(500);
@@ -101,8 +101,8 @@ void power_run_deep_sleep_test()
         Serial.print("[stop] wake line samples: ");
         Serial.print(highSamples);
         Serial.print("/");
-        Serial.print(kLineSamples);
-        Serial.println(highSamples == kLineSamples ? " HIGH, stable" : " HIGH, UNSTABLE");
+        Serial.print(LINE_SAMPLES);
+        Serial.println(highSamples == LINE_SAMPLES ? " HIGH, stable" : " HIGH, UNSTABLE");
         Serial.flush(); /* the sample report must reach the host before the detach */
 
         sleepEntryMs = millis();
@@ -179,7 +179,7 @@ void power_run_deep_sleep_test()
         Serial.println(": no button held, back to sleep");
         Serial.flush();
 
-        if (spuriousWakes >= kMaxSpuriousWakes)
+        if (spuriousWakes >= MAX_SPURIOUS_WAKES)
         {
             Serial.println("[stop] gave up after too many spurious wakes, back to the shell");
             break;
@@ -189,7 +189,7 @@ void power_run_deep_sleep_test()
     /* LEDs usable again, then the dark frame (the rail cut dropped the
      * chip state) and the confirmation flashes */
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
-    delay(kRailSettleDelayMs);
+    delay(RAIL_SETTLE_DELAY_MS);
     leds_blackout();
 
     detachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON));
@@ -204,7 +204,7 @@ void power_run_deep_sleep_test()
     /* Proof independent from USB: three green flashes on all LEDs */
     for (uint8_t flash = 0; flash < 3; ++flash)
     {
-        for (uint16_t led = 0; led < kApaPixelCount; ++led)
+        for (uint16_t led = 0; led < APA_PIXEL_COUNT; ++led)
         {
             leds_set_one(static_cast<uint8_t>(led), 0, 100, 0);
         }
