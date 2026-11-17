@@ -15,6 +15,7 @@
 #include "States.h"
 #include "TimeredEventQueue.h"
 #include "config_radio.h"
+#include "dfu_bootloader.h"
 
 #include <cstdint>
 
@@ -82,6 +83,9 @@ void setup()
 
     /* Initialize the GCar state machine. */
     gcar.setLowPowerModeCallback(enter_low_power_mode);
+    /* The radio delivers a DFU request as an event: the jump itself is a
+     * target concern, so main wires it and the state machine stays generic */
+    gcar.setDfuCallback(enterDfuBootloader);
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
     LOGLN(F("GCar init done"));

@@ -28,15 +28,19 @@ GCar::GCar(Context &ctx)
 
 void GCar::init(StateId initialStateId)
 {
+#ifdef USE_RADIO_CONTROLLER
+    /* The radio comes up before anything that can assert: a halted board
+     * cannot receive the DFU request that would rescue it */
+    LOGLN(F("GCar: init radio controller"));
+    G_ASSERT(_ctx.radioController);
+    _ctx.radioController->init();
+#endif
+
     LOGLN(F("GCar: checking movement controller"));
     G_ASSERT(_ctx.movementController);
     LOGLN(F("GCar: init movement controller"));
     _ctx.movementController->init(_ctx.pwm_freq);
-#ifdef USE_RADIO_CONTROLLER
-    LOGLN(F("GCar: init radio controller"));
-    G_ASSERT(_ctx.radioController);
-    _ctx.radioController->init();
-#else
+#ifndef USE_RADIO_CONTROLLER
     LOGLN(F("GCar: timered event queue mode"));
     G_ASSERT(_ctx.timeredEventQueue);
 #endif
@@ -121,12 +125,32 @@ void GCar::work(void)
             LOG(commandIdToString(evt.getPayload()));
         }
         LOGLN();
+
+        /* A DFU request is a device command, not a state behaviour: it has to
+         * work from IDLE and from PROCESSING alike, so the state machine
+         * never sees it. The motors are stopped first because the boot ROM
+         * leaves the bridge pins exactly as the application left them */
+        if (evt.getEventId() == EventId::DFU_REQUEST) {
+            LOGLN(F("GCar: DFU request, stopping the motors"));
+            stopBothMotors();
+            if (dfuCallback_ != nullptr) {
+                dfuCallback_();
+            }
+            return;
+        }
+
         currentState->processEvent(evt);
     }
+
     if (getCurrentStateId() != StateId::IDLE && isTargetReached()) {
         LOGLN(F("Target reached. Transitioning to IDLE state."));
         transitionTo(StateId::IDLE);
     }
+}
+
+void GCar::setDfuCallback(void (*callback)(void))
+{
+    dfuCallback_ = callback;
 }
 
 void GCar::enterLowPowerMode()

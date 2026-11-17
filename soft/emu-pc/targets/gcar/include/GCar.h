@@ -77,6 +77,11 @@ public:
 
     bool isTargetReached(void);
 
+    /** setDfuCallback(): Install the function that enters the DFU bootloader
+     * @callback: called once the motors are stopped; null keeps the request inert
+     */
+    void setDfuCallback(void (*callback)(void));
+
     /**
      * transitionTo(): Transition to a new state (expose base class method).
      * @param newStateId Target state.
@@ -92,4 +97,5 @@ private:
 
 private:
     Context &_ctx;
+    void (*dfuCallback_)(void) = nullptr;
 };

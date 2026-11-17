@@ -19,6 +19,7 @@ add_executable(
   gcar/test_system_pid.cpp
   gcar/test_motor_imu.cpp
   gcar/test_queue_clear.cpp
+  gcar/test_dfu_request.cpp
   mocks/mock_arduino.cpp
   mocks/mock_RF24.cpp
   mocks/mock_MovementController.cpp

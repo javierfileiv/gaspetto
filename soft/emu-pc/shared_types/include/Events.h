@@ -18,6 +18,7 @@ enum class EventId : uint8_t {
     ACTION, /**< Motor command. */
     BUTTON_PRESSED, /**< Button press. */
     RADIO_TX, /**< Radio transmission. */
+    DFU_REQUEST, /**< Enter the STM32 DFU bootloader. */
 };
 
 /**
@@ -44,6 +45,8 @@ inline const char *eventIdToString(EventId id)
         return "BUTTON_PRESSED";
     case EventId::RADIO_TX:
         return "RADIO_TX";
+    case EventId::DFU_REQUEST:
+        return "DFU_REQUEST";
     default:
         return "UNKNOWN";
     }

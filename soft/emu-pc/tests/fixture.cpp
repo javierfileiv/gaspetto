@@ -16,8 +16,10 @@ void enter_low_power_mode(void)
 
 void Fixture::expect_car_init()
 {
-    expect_movement_controller_init();
+    /* GCar initialises the radio first: a halted board must still be able to
+     * receive the DFU request that would rescue it */
     expect_radio_initialization();
+    expect_movement_controller_init();
     EXPECT_CALL(_mock_arduino, SwitchToLowPowerMode);
 }
 
