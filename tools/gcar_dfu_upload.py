@@ -33,8 +33,10 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
+import zlib
 
 DFU_VID = "0483"
 DFU_PID = "df11"
@@ -44,6 +46,13 @@ NRF_BOOT_WAIT = 2.0  # Optiboot holds the Uno ~1s before the app runs
 NRF_PORT_ENV = "GCAR_NRF_PORT"
 NRF_PORT_DEFAULT = "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"
 GCAR_ENV = "gcar"
+# The application starts after the bootloader's 32 kB; the bootloader itself is
+# flashed once at 0x08000000 and is never touched by an application upload
+GCAR_APP_ADDRESS = "0x08008000"
+# Validation record the bootloader reads before jumping: magic, format,
+# image length and CRC32. It lives at the start of the free sector 5, which
+# writing it erases without touching the application
+GCAR_META_ADDRESS = "0x08020000"
 
 
 def _root():
@@ -166,20 +175,65 @@ def _enter_dfu():
     return False
 
 
-def _flash(firmware):
-    print("[gcar_dfu] Uploading via dfu-util ...", flush=True)
+def _dfu_write(address, firmware, leave):
     cmd = [
         "dfu-util",
         "-d", f"{DFU_VID}:{DFU_PID}",
         "-a", "0",
-        "-s", "0x08000000:leave",
+        "-s", f"{address}:leave" if leave else address,
         "-D", firmware,
     ]
     print(" ".join(cmd), flush=True)
-    result = subprocess.call(cmd)
+    return subprocess.call(cmd)
+
+
+def _write_metadata(image, crc):
+    """Record the length and CRC the bootloader will verify before jumping"""
+    payload = struct.pack("<4sHHII", b"GCAR", 1, 0, len(image), crc)
+    handle, path = tempfile.mkstemp(prefix="gcar_meta_", suffix=".bin")
+
+    try:
+        os.write(handle, payload)
+    finally:
+        os.close(handle)
+
+    try:
+        return _dfu_write(GCAR_META_ADDRESS, path, leave=True)
+    finally:
+        os.unlink(path)
+
+
+def _image_payload(image):
+    """The 16-byte DFU suffix PIO appends is not part of the image"""
+    if len(image) > 16 and image[-8:-5] == b"UFD" and image[-5] == 16:
+        return image[:-16]
+    return image
+
+
+def _flash(firmware):
+    with open(firmware, "rb") as handle:
+        image = handle.read()
+
+    payload = _image_payload(image)
+    crc = zlib.crc32(payload) & 0xFFFFFFFF
+    print(
+        f"[gcar_dfu] {len(payload)} bytes, CRC32 0x{crc:08X}",
+        flush=True,
+    )
+
+    print("[gcar_dfu] Uploading the application ...", flush=True)
+    result = _dfu_write(GCAR_APP_ADDRESS, firmware, leave=False)
     if result != 0:
-        print(f"[gcar_dfu] dfu-util failed (exit {result})")
+        print(f"[gcar_dfu] dfu-util failed on the application (exit {result})")
         return result
+
+    print("[gcar_dfu] Uploading the validation record ...", flush=True)
+    result = _write_metadata(payload, crc)
+    if result != 0:
+        print(f"[gcar_dfu] dfu-util failed on the record (exit {result})")
+        print("[gcar_dfu] The bootloader will refuse this image and blink")
+        return result
+
     print("[gcar_dfu] Upload complete.")
     return 0
 

@@ -132,6 +132,35 @@ A failed request costs nothing: the bootloader ROM is not installed, so a
 RESET returns to the application, and BOOT0 plus RESET is always available as
 a last resort.
 
+### Memory layout
+
+The board carries a small bootloader in the first 32 kB (sectors 0-1) and the
+application in the next 96 kB (sectors 2-4), so an application upload can never
+erase the bootloader:
+
+| Address      | Size   | Content                                      |
+|--------------|--------|----------------------------------------------|
+| `0x08000000` | 32 kB  | bootloader (`soft/pio/GCar_boot`)            |
+| `0x08008000` | 96 kB  | application (`soft/pio/GCar_pio`)            |
+| `0x08020000` | 128 kB | free, reserved for a future radio update     |
+
+The bootloader checks that an image is present, that the validation record
+matches it, and jumps to it. It is flashed by hand, and again only when it
+changes: put the board in DFU, then `pio run -d soft/pio/GCar_boot -t upload`.
+Application uploads go to `0x08008000`, which `tools/gcar_dfu_upload.py` already
+uses. Each upload writes the record too: the image length and its CRC32.
+
+### When the bootloader refuses to start
+
+It has no serial port and no radio, so it says why with the LED on PC13:
+
+| Blinks | Meaning                                                       |
+|--------|---------------------------------------------------------------|
+| 1      | no image at all: the slot is erased or its vectors are nonsense |
+| 2      | the validation record is missing or unreadable                |
+| 3      | the record is there but the CRC does not match                |
+
+
 ## Tuning
 
 The `arduino_straight_drive` project (`soft/pio/arduino_straight_drive/`) provides two programs for PID tuning on real hardware:
