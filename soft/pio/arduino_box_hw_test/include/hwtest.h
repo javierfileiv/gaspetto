@@ -150,6 +150,12 @@ void radio_run_send_pieces_test();
 
 /* radio.cpp: listen to the car stream on _box_, the "e" shell key */
 void radio_run_car_stream_test();
+/* True while the car stream runs. The shell keeps its "any key stops"
+ * behaviour, but only the stream turns 'p' into a program send: the slot
+ * monitors share monitor_active and must not transmit anything */
+extern bool car_stream_active;
+/* Set by 'p' inside the stream, consumed by the stream loop after the send */
+extern bool car_stream_send_requested;
 
 /* radio.cpp: radio menu driven by the "t" shell key */
 void radio_start_menu();

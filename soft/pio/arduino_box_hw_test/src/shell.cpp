@@ -22,7 +22,8 @@ void shell_print_usb_help()
     Serial.println(
         "           green = ACK, amber = empty board, red = refused, RF error = no answer");
     Serial.println("           t = radio menu: 1 probe, 2 addresses, 3 test send, q quits");
-    Serial.println("   stream: e = listen to _box_ for the car telemetry and logs, key quits");
+    Serial.println("   stream: e = listen to _box_ for the car telemetry and logs");
+    Serial.println("           p inside that stream = scan, build and send; any other key quits");
 }
 
 /* Sliced delay so USB commands keep being polled while a test cycle waits.
@@ -108,9 +109,17 @@ void shell_handle_usb_commands()
 
         shell_echo_typed_key(incoming);
 
-        /* While the slot monitor runs, any key is a stop request */
+        /* While a monitor runs, any key is a stop request, except 'p' inside
+         * the car stream: there it sends the scanned program and the monitor
+         * keeps running. The slot monitors leave 'p' alone */
         if (monitor_active)
         {
+            if (car_stream_active && incoming == 'p')
+            {
+                car_stream_send_requested = true;
+                continue;
+            }
+
             monitor_exit  = true;
             pendingSlot   = 0;
             digitsStarted = false;

@@ -10,6 +10,11 @@
 #include <config_radio.h>
 #include <string.h>
 
+/* The stream is the only place where 'p' means "send the program": the slot
+ * monitors share monitor_active and leave the radio alone */
+bool car_stream_active         = false;
+bool car_stream_send_requested = false;
+
 /* ========================================== */
 /* Send the scanned board over the radio, key "p" */
 /* ========================================== */
@@ -268,17 +273,30 @@ void radio_run_car_stream_test()
         return;
     }
 
-    Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key to stop ---");
+    Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key stops, p sends ---");
     /* State the address being listened on, so it can be read against the
      * sender's without opening either firmware's menu */
     radio_print_address("   listening pipe1 = ", gbox_pipe_name);
 
-    monitor_active = true;
-    monitor_exit   = false;
+    monitor_active            = true;
+    monitor_exit              = false;
+    car_stream_active         = true;
+    car_stream_send_requested = false;
     radio.startListening();
 
     while (!monitor_exit)
     {
+        /* 'p' only sets the request: the send happens here, between two
+         * reads, so the program is never built while the loop is inside the
+         * chip's RX path. startListening() after it is mandatory, the send
+         * ends with stopListening() and the stream would go deaf */
+        if (car_stream_send_requested)
+        {
+            radio_run_send_pieces_test();
+            radio.startListening();
+            car_stream_send_requested = false;
+        }
+
         uint8_t pipe = 0;
 
         if (radio.available(&pipe))
@@ -365,7 +383,8 @@ void radio_run_car_stream_test()
         shell_delay_with_usb(20);
     }
 
-    monitor_active = false;
+    monitor_active    = false;
+    car_stream_active = false;
     radio.stopListening();
 
     Serial.print("--- CAR STREAM stopped, packets=");
