@@ -5,8 +5,10 @@ Send a firmware image to the GCar over the radio, through NrfLink.
 The car has no USB command channel, so the image travels over the nRF24 link:
 NrfLink turns a binary stream from its serial port into OTA packets. The stream
 is a 0x01 start byte, the image length and its CRC32 as two little-endian
-words, then the image itself, 28 bytes at a time. NrfLink answers one status
-byte per chunk, so the PC never outruns the radio.
+words, then the image itself, 28 bytes at a time. Nothing comes back per
+packet: the nRF24 acknowledges each one in hardware, and the serial port's own
+flow control paces the dump. The car only answers when it is ready to take the
+image, and once more when the CRC verdict is in.
 
 The image is the raw firmware payload: the DFU suffix PlatformIO appends is not
 part of it, and the CRC covers only what the receiver will count.
@@ -29,8 +31,22 @@ OTA_START = 0x01
 OTA_ACK = b"\x06"
 OTA_NAK = b"\x15"
 OTA_CHUNK = 28
-OTA_ACK_TIMEOUT = 3.0
+# The relay hands out one credit per group of four packets. The Uno consumes
+# the stream more slowly than the serial link delivers it, so without this the
+# port fills up and the UART drops the surplus in silence: the window is what
+# keeps the PC from ever getting ahead of what the board has taken
+OTA_CREDIT = b"\x11"
+OTA_CREDIT_BYTES = 4 * OTA_CHUNK
+OTA_WINDOW = OTA_CREDIT_BYTES
+# The car erases its staging sector before it can take a byte, and writes the
+# record through another erase once the whole image has been checked. NrfLink
+# tries the start three times, so the wait must outlast all of them or we give
+# up on a transfer that is still going on
+OTA_READY_TIMEOUT = 30.0
+OTA_VERDICT_TIMEOUT = 20.0
 OTA_LOG_SECONDS = 10.0
+# A port that takes nothing for this long is wedged, not merely slow
+OTA_STALL_SECONDS = 10.0
 NRF_BAUD = termios.B115200
 NRF_BOOT_WAIT = 2.0
 NRF_PORT_ENV = "GCAR_NRF_PORT"
@@ -137,8 +153,8 @@ def _write_all(fd, data):
         view = view[written:]
 
 
-def _wait_ack(fd):
-    deadline = time.time() + OTA_ACK_TIMEOUT
+def _wait_ack(fd, timeout):
+    deadline = time.time() + timeout
 
     while time.time() < deadline:
         ready, _, _ = select.select([fd], [], [], max(0.0, deadline - time.time()))
@@ -158,6 +174,8 @@ def _wait_ack(fd):
             return True
         if data == OTA_NAK:
             return False
+        if data == OTA_CREDIT:
+            continue  # flow control left over from the dump
 
         # Anything else is text from NrfLink: show it as it arrives
         sys.stdout.write(data.decode(errors="ignore"))
@@ -198,45 +216,110 @@ def _image_payload(image):
     return image
 
 
+def _write_image(fd, payload):
+    """Dump the image, never more than a window ahead of the relay.
+
+    The Uno reads at its own pace, slower than the line delivers, and its
+    serial buffer is small. The relay therefore sends one credit per group of
+    packets it has taken, and the count of credits is what allows the PC to
+    keep writing: the stream stays full without ever overrunning the board.
+    """
+    total = len(payload)
+    sent = 0
+    granted = 0
+    mark = 10
+    started = time.time()
+    last_change = started
+    previous = 0
+
+    while sent < total:
+        ready, _, _ = select.select([fd], [], [], 0)
+        if ready:
+            try:
+                data = os.read(fd, 256)
+            except BlockingIOError:
+                data = b""
+            if OTA_NAK in data:
+                return False
+
+            granted += data.count(OTA_CREDIT) * OTA_CREDIT_BYTES
+
+            # Anything else is text from NrfLink: show it as it arrives
+            text = data.replace(OTA_CREDIT, b"").replace(OTA_ACK, b"").replace(OTA_NAK, b"")
+            if text:
+                sys.stdout.write(text.decode(errors="ignore"))
+                sys.stdout.flush()
+
+        budget = granted + OTA_WINDOW - sent
+        if budget <= 0:
+            select.select([fd], [], [], 0.002)
+            if time.time() - last_change > OTA_STALL_SECONDS:
+                print("[gcar_ota] The relay stopped taking bytes")
+                return False
+            continue
+
+        _, writable, _ = select.select([], [fd], [], 0.05)
+        if not writable:
+            continue
+
+        try:
+            written = os.write(fd, payload[sent:sent + min(budget, 1024)])
+        except BlockingIOError:
+            continue
+
+        sent += written
+        if sent != previous:
+            previous = sent
+            last_change = time.time()
+
+        percent = 100 * sent // total
+        if percent >= mark:
+            elapsed = max(1e-3, time.time() - started)
+            print(f"[gcar_ota] {percent}% ({sent / elapsed / 1024.0:.1f} kB/s)", flush=True)
+            mark = percent - percent % 10 + 10
+
+    elapsed = time.time() - started
+    print(f"[gcar_ota] image dumped in {elapsed:.1f} s ({total / elapsed / 1024.0:.1f} kB/s)",
+          flush=True)
+    return True
+
+
 def _stream(fd, payload):
     crc = zlib.crc32(payload) & 0xFFFFFFFF
     chunks = (len(payload) + OTA_CHUNK - 1) // OTA_CHUNK
-    sent = 0
 
     print(f"[gcar_ota] {len(payload)} bytes, CRC32 0x{crc:08X}, {chunks} packets", flush=True)
 
     _write_all(fd, bytes([OTA_START]) + struct.pack("<II", len(payload), crc))
 
+    # The car erases its staging sector first, which takes a couple of seconds,
+    # and only then is it able to receive anything
+    ready = _wait_ack(fd, OTA_READY_TIMEOUT)
+    if ready is None:
+        print("[gcar_ota] NrfLink never started: check the radio")
+        return 1
+    if not ready:
+        print("[gcar_ota] The car refused the transfer")
+        return 1
+
     started = time.time()
-    for index in range(chunks):
-        _write_all(fd, payload[index * OTA_CHUNK:(index + 1) * OTA_CHUNK])
+    if not _write_image(fd, payload):
+        print("[gcar_ota] The car stopped the transfer")
+        return 1
 
-        ack = _wait_ack(fd)
-        if ack is None:
-            print(f"[gcar_ota] No answer after packet {index}: NrfLink stopped")
-            return 1, sent
-        if not ack:
-            print(f"[gcar_ota] Packet {index} was not transmitted (radio error)")
-            return 1, sent
-
-        sent += 1
-        if chunks >= 20 and index % (chunks // 20) == 0:
-            print(f"[gcar_ota] {100 * index // chunks}%", flush=True)
-
-    elapsed = time.time() - started
-    print(f"[gcar_ota] {sent} packets in {elapsed:.1f} s", flush=True)
-
-    # The last chunk only proves it was written; the car verifies the whole
-    # image and answers after the end packet
-    final = _wait_ack(fd)
+    # Only now does the car check the image against the CRC and write the
+    # record, so the verdict arrives well after the last byte
+    final = _wait_ack(fd, OTA_VERDICT_TIMEOUT)
     if final is None:
         print("[gcar_ota] The car did not confirm the image")
-        return 1, sent
+        return 1
     if not final:
         print("[gcar_ota] The car refused the image")
-        return 1, sent
+        return 1
 
-    return 0, sent
+    elapsed = time.time() - started
+    print(f"[gcar_ota] {chunks} packets in {elapsed:.1f} s", flush=True)
+    return 0
 
 
 def _usage():
@@ -300,7 +383,7 @@ def _main(argv):
         return 1
 
     try:
-        code, _ = _stream(fd, payload)
+        code = _stream(fd, payload)
         if log_seconds > 0:
             _show_logs(fd, log_seconds)
     finally:

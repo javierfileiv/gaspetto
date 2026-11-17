@@ -201,7 +201,12 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
     _radio.startListening();
 
     if (!result) {
-        LOGLN(F("RadioController::sendBuffer failed"));
+        /* An image transfer fails and retries by design, and a log line would
+         * take two more packets on the channel that is already the bottleneck,
+         * which is what turned one lost answer into a storm of losses */
+        if (static_cast<const uint8_t *>(data)[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+            LOGLN(F("RadioController::sendBuffer failed"));
+        }
     }
 
     return result;

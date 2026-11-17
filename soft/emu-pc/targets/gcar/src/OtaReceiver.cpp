@@ -13,6 +13,10 @@
 
 namespace
 {
+/* The radio gives up on a missing hardware acknowledgement after about twenty
+ * milliseconds, so three tries stay well inside the sender's own timeout */
+constexpr uint8_t kAnswerAttempts = 3;
+
 uint32_t readLe32(const uint8_t *at)
 {
     return static_cast<uint32_t>(at[0]) | (static_cast<uint32_t>(at[1]) << 8) |
@@ -73,13 +77,9 @@ void OtaReceiver::handleBegin(const OtaPacket &packet)
         return;
     }
 
-    /* A lost acknowledgement makes the sender repeat the Begin; erasing the
-     * sector again would cost two seconds for nothing */
-    if (_active && _length == length && _crc == crc) {
-        respond(OtaKind::Ack, kOtaBeginAck, OtaErrorCode::None);
-        return;
-    }
-
+    /* A repeated Begin is a restart, not a duplicate: the sender repeats it
+     * when the previous answer was lost, and by then the sector is already
+     * erased, so counting from zero again costs nothing */
     _length = length;
     _crc = crc;
     _expected = 0;
@@ -89,17 +89,23 @@ void OtaReceiver::handleBegin(const OtaPacket &packet)
 
 void OtaReceiver::handleData(const OtaPacket &packet)
 {
+    /* No answer here on purpose. The radio acknowledges every packet at the
+     * hardware level, which is what paces the stream, and answering from the
+     * application as well would force two turnarounds per packet on a channel
+     * that only one side can use at a time */
     if (!_active) {
-        respond(OtaKind::Error, packet.seq, OtaErrorCode::SequenceGap);
         return;
     }
     if (packet.seq < _expected) {
-        /* A retransmission of something already written: acknowledge it again
-         * so the sender moves on instead of restarting the session */
-        respond(OtaKind::Ack, packet.seq, OtaErrorCode::None);
+        /* The sender retried something already written: its acknowledgement
+         * was lost, the bytes are in flash, and silence is the right answer */
         return;
     }
-    if (packet.seq > _expected) {
+    if (packet.seq != _expected) {
+        /* A packet really did go missing: the stream is past it, so this
+         * session cannot produce a valid image and the sender has to restart */
+        LOGLN(F("OTA: sequence gap"));
+        _active = false;
         respond(OtaKind::Error, _expected, OtaErrorCode::SequenceGap);
         return;
     }
@@ -122,13 +128,13 @@ void OtaReceiver::handleData(const OtaPacket &packet)
     }
 
     ++_expected;
-    respond(OtaKind::Ack, packet.seq, OtaErrorCode::None);
 }
 
 void OtaReceiver::handleEnd(const OtaPacket &packet)
 {
     if (!_active) {
-        respond(OtaKind::Error, 0, OtaErrorCode::SequenceGap);
+        /* The session was abandoned on a gap or a bad write, and the sender
+         * already got that answer: repeating it would only cost a packet */
         return;
     }
 
@@ -187,5 +193,13 @@ void OtaReceiver::respond(OtaKind kind, uint16_t seq, OtaErrorCode error)
         packet.data[0] = static_cast<uint8_t>(error);
     }
 
-    _radio.sendBuffer(&packet, sizeof(packet));
+    /* The sender asks for the next packet as soon as this answer lands, so the
+     * channel is ours and a hardware acknowledgement that did not come means
+     * it was still turning around from its own transmission */
+    for (uint8_t attempt = 0; attempt < kAnswerAttempts; ++attempt) {
+        if (_radio.sendBuffer(&packet, sizeof(packet))) {
+            break;
+        }
+        delay(1);
+    }
 }

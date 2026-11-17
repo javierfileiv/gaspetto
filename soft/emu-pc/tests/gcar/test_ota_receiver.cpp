@@ -183,20 +183,17 @@ TEST_F(OtaReceiverTest, BeginReportsAnEraseFailure)
     EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::FlashFailure), answers[0].data[0]);
 }
 
-TEST_F(OtaReceiverTest, DataBeforeABeginReportsAGap)
+TEST_F(OtaReceiverTest, DataBeforeABeginIsIgnored)
 {
     const auto image = makeImage();
 
     receiver.handle(makeData(0, image));
 
-    ASSERT_EQ(1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers[0].kind);
-    EXPECT_EQ(0, answers[0].seq);
-    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::SequenceGap), answers[0].data[0]);
+    EXPECT_TRUE(answers.empty());
     EXPECT_EQ(0xFF, gStagingSector[0]);
 }
 
-TEST_F(OtaReceiverTest, RepeatedDataIsAcknowledgedAgain)
+TEST_F(OtaReceiverTest, RepeatedDataIsIgnored)
 {
     const auto image = makeImage();
     sendBegin(image);
@@ -204,13 +201,10 @@ TEST_F(OtaReceiverTest, RepeatedDataIsAcknowledgedAgain)
     receiver.handle(makeData(0, image));
     receiver.handle(makeData(0, image));
 
-    /* The sender retries because an answer was lost: acknowledge it again. */
-    ASSERT_EQ(3U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Ack), answers[2].kind);
-    EXPECT_EQ(0, answers[2].seq);
+    EXPECT_EQ(1U, answers.size()); /* Only the Begin answer. */
 }
 
-TEST_F(OtaReceiverTest, DataWithAGapReportsTheExpectedSequence)
+TEST_F(OtaReceiverTest, DataWithAGapAbandonsTheSession)
 {
     const auto image = makeImage();
     sendBegin(image);
@@ -222,10 +216,10 @@ TEST_F(OtaReceiverTest, DataWithAGapReportsTheExpectedSequence)
     EXPECT_EQ(0, answers[1].seq);
     EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::SequenceGap), answers[1].data[0]);
 
-    /* The session survives the gap: the missing packet can still arrive. */
+    /* The session is gone: a correct packet afterwards changes nothing. */
     receiver.handle(makeData(0, image));
-    ASSERT_EQ(3U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Ack), answers[2].kind);
+    receiver.handle(makeEnd(0));
+    EXPECT_EQ(2U, answers.size());
 }
 
 TEST_F(OtaReceiverTest, DataReportsAWriteFailure)
@@ -241,13 +235,11 @@ TEST_F(OtaReceiverTest, DataReportsAWriteFailure)
     EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::FlashFailure), answers[1].data[0]);
 }
 
-TEST_F(OtaReceiverTest, EndWithoutABeginReportsAGap)
+TEST_F(OtaReceiverTest, EndWithoutABeginIsIgnored)
 {
     receiver.handle(makeEnd(0));
 
-    ASSERT_EQ(1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers[0].kind);
-    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::SequenceGap), answers[0].data[0]);
+    EXPECT_TRUE(answers.empty());
 }
 
 TEST_F(OtaReceiverTest, EndWithAMissingPacketReportsTheGap)
@@ -258,10 +250,9 @@ TEST_F(OtaReceiverTest, EndWithAMissingPacketReportsTheGap)
 
     receiver.handle(makeEnd(0));
 
-    /* Begin and one Data were acknowledged, the End answer comes last. */
-    ASSERT_EQ(1U + 1U + 1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers.back().kind);
-    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::SequenceGap), answers.back().data[0]);
+    ASSERT_EQ(2U, answers.size());
+    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers[1].kind);
+    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::SequenceGap), answers[1].data[0]);
 }
 
 TEST_F(OtaReceiverTest, EndWithAWrongCrcIsRefused)
@@ -274,9 +265,9 @@ TEST_F(OtaReceiverTest, EndWithAWrongCrcIsRefused)
 
     receiver.handle(makeEnd(IMAGE_PACKETS - 1));
 
-    ASSERT_EQ(1U + IMAGE_PACKETS + 1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers.back().kind);
-    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::CrcMismatch), answers.back().data[0]);
+    ASSERT_EQ(2U, answers.size());
+    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers[1].kind);
+    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::CrcMismatch), answers[1].data[0]);
 
     AppRecord record = {};
     recordRead(&record);
@@ -293,9 +284,9 @@ TEST_F(OtaReceiverTest, EndStagesTheImageAndWritesTheRecord)
 
     receiver.handle(makeEnd(IMAGE_PACKETS - 1));
 
-    ASSERT_EQ(1U + IMAGE_PACKETS + 1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Ack), answers.back().kind);
-    EXPECT_EQ(IMAGE_PACKETS - 1, answers.back().seq);
+    ASSERT_EQ(2U, answers.size());
+    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Ack), answers[1].kind);
+    EXPECT_EQ(IMAGE_PACKETS - 1, answers[1].seq);
     EXPECT_EQ(0, std::memcmp(image.data(), gStagingSector, IMAGE_LENGTH));
 
     AppRecord record = {};
@@ -316,22 +307,18 @@ TEST_F(OtaReceiverTest, EndReportsARecordWriteFailure)
 
     receiver.handle(makeEnd(IMAGE_PACKETS - 1));
 
-    ASSERT_EQ(1U + IMAGE_PACKETS + 1U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers.back().kind);
-    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::FlashFailure), answers.back().data[0]);
+    ASSERT_EQ(2U, answers.size());
+    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Error), answers[1].kind);
+    EXPECT_EQ(static_cast<uint8_t>(OtaErrorCode::FlashFailure), answers[1].data[0]);
 }
 
-TEST_F(OtaReceiverTest, ARepeatedBeginIsAcknowledgedAgain)
+TEST_F(OtaReceiverTest, AnAnswerIsRetriedThreeTimesWhenTheRadioRefuses)
 {
     const auto image = makeImage();
-    sendBegin(image);
-    std::memset(gStagingSector, 0xAA, sizeof(gStagingSector));
+
+    EXPECT_CALL(radio, _write(_, _)).Times(3).WillRepeatedly(Return(false));
 
     sendBegin(image);
-
-    ASSERT_EQ(2U, answers.size());
-    EXPECT_EQ(static_cast<uint8_t>(OtaKind::Ack), answers[1].kind);
-    EXPECT_EQ(kOtaBeginAck, answers[1].seq);
 }
 
 TEST_F(OtaReceiverTest, AckAndErrorPacketsFromTheSenderAreIgnored)

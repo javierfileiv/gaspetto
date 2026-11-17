@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "CommandPacket.h"
+#include "Crc32.h"
 #include "Events.h"
 #include "Log.h"
 #include "OtaProtocol.h"
@@ -73,6 +74,11 @@ void setup()
     }
     radio.setPALevel(RF24_PA_LOW);
     radio.setDataRate(RF24_1MBPS);
+    /* Three retransmissions instead of the fifteen the library defaults to:
+     * an unanswered write must not block here for twenty milliseconds, or the
+     * image the PC keeps sending overflows the serial buffer and the whole
+     * stream shifts by the bytes we dropped */
+    radio.setRetries(2, 3);
     radio.setAddressWidth(5);
     /* Both payloads are 32 bytes, CommandPacket sets the size for both */
     radio.setPayloadSize(sizeof(CommandPacket));
@@ -389,14 +395,29 @@ void drainRadio()
 /* ========================================== */
 /* The PC streams a binary image on this port: a 0x01 start byte, the image
  * length and its CRC as two little-endian words, then the image itself. Every
- * 28-byte chunk becomes one Data packet, and one status byte goes back to the
- * PC so it never outruns the radio */
+ * 28-byte chunk becomes one Data packet. The nRF24 acknowledges each packet at
+ * the hardware level, so the car never answers during the data phase: it only
+ * speaks once after the erase, once for the CRC, and on a real error. That is
+ * what keeps the channel out of the turnaround race two thousand times over */
 constexpr uint8_t kOtaStart = 0x01;
 /* Control codes, not letters: NrfLink prints hex addresses and log lines
  * on the same port, and a plain 'F' would be read as a refusal */
 constexpr uint8_t kOtaAck = 0x06;
 constexpr uint8_t kOtaNak = 0x15;
-constexpr uint16_t kOtaTimeoutMs = 2000;
+/* Flow control, and the only byte that travels during the data phase: one
+ * credit per group of packets means "I have taken that much, send more" */
+constexpr uint8_t kOtaCredit = 0x11;
+constexpr uint8_t kOtaCreditPackets = 4;
+constexpr uint16_t kOtaTimeoutMs = 5000;
+/* The car erases the staging sector before it can take a byte, and writes the
+ * record through another erase when the image is complete */
+constexpr uint16_t kOtaBeginAckMs = 6000;
+constexpr uint16_t kOtaEndAckMs = 10000;
+/* A failed write already means the car's FIFO was full and cost two
+ * milliseconds of hardware retransmissions. Three tries cover a short backlog
+ * and still keep the whole stall under ten milliseconds, which is what the
+ * serial buffer can absorb while the PC keeps sending */
+constexpr uint8_t kOtaWriteAttempts = 3;
 
 bool readExact(uint8_t *buffer, uint8_t count, uint16_t timeoutMs)
 {
@@ -467,8 +488,8 @@ bool sendOtaBegin(uint32_t length, uint32_t crc)
 
 enum class OtaWait : uint8_t { Ok, Error, Timeout };
 
-/* Wait for the car's application-level answer. The radio acknowledgement only
- * says a packet reached the chip; this one says the image bytes were written */
+/* Wait for one of the car's rare answers. The radio acknowledgement only says
+ * a packet reached the chip; this one carries what the car decided */
 OtaWait waitOtaResponse(uint16_t seq, uint16_t timeoutMs, uint8_t &errorCode)
 {
     const uint32_t start = millis();
@@ -505,13 +526,46 @@ OtaWait waitOtaResponse(uint16_t seq, uint16_t timeoutMs, uint8_t &errorCode)
     return OtaWait::Timeout;
 }
 
+/* The car only speaks up to complain, so a look between two packets is enough:
+ * waiting here would give the channel away for nothing */
+bool pollReceiverError(uint8_t &errorCode)
+{
+    uint8_t pipe;
+
+    while (radio.available(&pipe)) {
+        uint8_t buffer[sizeof(OtaPacket)];
+        OtaPacket packet;
+
+        radio.read(buffer, sizeof(buffer));
+        if (buffer[0] == static_cast<uint8_t>(PacketTag::Log)) {
+            drainLogFragment(pipe, buffer);
+            continue;
+        }
+        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+            continue;
+        }
+
+        memcpy(&packet, buffer, sizeof(packet));
+        if (packet.kind == static_cast<uint8_t>(OtaKind::Error)) {
+            errorCode = packet.data[0];
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void runOtaStream()
 {
     uint8_t header[8];
     uint8_t chunk[sizeof(OtaPacket::data)];
     uint32_t length = 0;
     uint32_t crc = 0;
+    uint32_t expected = 0;
+    uint32_t received = 0;
+    uint32_t streamCrc = kCrc32Init;
     uint16_t seq = 0;
+    uint16_t radioRetries = 0;
     uint8_t error = 0;
 
     /* A device command leaves on the car pipe, whatever the current mode */
@@ -529,24 +583,30 @@ void runOtaStream()
     crc = static_cast<uint32_t>(header[4]) | (static_cast<uint32_t>(header[5]) << 8) |
           (static_cast<uint32_t>(header[6]) << 16) | (static_cast<uint32_t>(header[7]) << 24);
 
+    expected = length;
+
     Serial.print(F("[ota] image "));
     Serial.print(length);
     Serial.print(F(" bytes, crc 0x"));
     Serial.println(crc, HEX);
 
-    /* The radio acknowledgement is not the signal that matters here: the
-     * car erases the staging sector for two seconds and its FIFO refuses
-     * packets meanwhile. What counts is the application's answer, after it */
+    /* The radio acknowledgement is not the signal that matters here: the car
+     * erases the staging sector for two seconds and its FIFO refuses packets
+     * meanwhile. What counts is the application's answer, after it */
     bool accepted = false;
     for (uint8_t attempt = 0; attempt < 3 && !accepted; ++attempt) {
-        sendOtaBegin(length, crc);
+        Serial.print(F("[ota] begin attempt "));
+        Serial.print(attempt + 1);
+        Serial.println(sendOtaBegin(length, crc) ? F(", the radio acknowledged it") :
+                                                   F(", no answer from the chip"));
 
-        const OtaWait begin = waitOtaResponse(kOtaBeginAck, 5000, error);
+        const OtaWait begin = waitOtaResponse(kOtaBeginAck, kOtaBeginAckMs, error);
         if (begin == OtaWait::Ok) {
             accepted = true;
         } else if (begin == OtaWait::Error) {
             Serial.print(F("[ota] begin refused, error "));
             Serial.println(error);
+            Serial.write(kOtaNak);
             drainSerial(300);
             return;
         }
@@ -554,17 +614,32 @@ void runOtaStream()
 
     if (!accepted) {
         Serial.println(F("[ota] begin not accepted"));
+        Serial.write(kOtaNak);
         drainSerial(300);
         return;
     }
+
     Serial.println(F("[ota] begin accepted"));
+    /* The image waits until the car is listening again: the PC takes this byte
+     * as the order to start, and would otherwise overflow our serial buffer
+     * while we are still busy with the answer above */
+    Serial.write(kOtaAck);
 
     while (length > 0) {
         const uint8_t take = length > sizeof(chunk) ? sizeof(chunk) : static_cast<uint8_t>(length);
         bool delivered = false;
 
         if (!readExact(chunk, take, kOtaTimeoutMs)) {
-            Serial.println(F("[ota] stream stopped, image incomplete"));
+            /* The PC cannot be blamed any more: it never sends more than the
+             * credits below allow, so a shortfall here means the serial link
+             * itself lost bytes */
+            Serial.print(F("[ota] stream stopped after "));
+            Serial.print(received);
+            Serial.print(F(" of "));
+            Serial.print(expected);
+            Serial.print(F(" bytes, radio retries "));
+            Serial.println(radioRetries);
+            Serial.write(kOtaNak);
             drainSerial(300);
             return;
         }
@@ -573,52 +648,76 @@ void runOtaStream()
          * the receiver only counts the bytes the record covers */
         memset(&chunk[take], 0xFF, sizeof(chunk) - take);
 
-        for (uint8_t attempt = 0; attempt < 3 && !delivered; ++attempt) {
-            sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk));
-
-            const OtaWait wait = waitOtaResponse(seq, 500, error);
-            if (wait == OtaWait::Ok) {
-                delivered = true;
-            } else if (wait == OtaWait::Error) {
-                Serial.print(F("[ota] receiver error "));
-                Serial.println(error);
-                Serial.write(kOtaNak);
-                drainSerial(300);
-                return;
+        for (uint8_t attempt = 0; attempt < kOtaWriteAttempts && !delivered; ++attempt) {
+            delivered = sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk));
+            if (!delivered) {
+                ++radioRetries;
             }
         }
 
         if (!delivered) {
+            Serial.print(F("[ota] radio refused packet "));
+            Serial.println(seq);
             Serial.write(kOtaNak);
             drainSerial(300);
             return;
         }
 
-        Serial.write(kOtaAck);
+        if (pollReceiverError(error)) {
+            Serial.print(F("[ota] receiver error "));
+            Serial.println(error);
+            Serial.write(kOtaNak);
+            drainSerial(300);
+            return;
+        }
+
+        received += take;
+        /* Only the bytes the image really covers: the tail of the last packet
+         * is padding, and the PC's CRC does not include it */
+        streamCrc = crc32Update(streamCrc, chunk, take);
         ++seq;
         length -= take;
+
+        /* One credit per full group of packets. The PC may not send more than
+         * its credits allow, which keeps this board's serial buffer from
+         * overflowing: without it the PC runs ahead, the buffer fills, and the
+         * UART drops the surplus without anyone noticing */
+        if (seq % kOtaCreditPackets == 0) {
+            Serial.write(kOtaCredit);
+        }
+    }
+
+    /* The PC is the authority on the image, so the relay only has to check
+     * that what it received is what the PC announced. Catching it here says
+     * the loss happened on the serial link, not in the car */
+    streamCrc = crc32Finish(streamCrc);
+    if (streamCrc != crc) {
+        Serial.print(F("[ota] stream corrupt: crc 0x"));
+        Serial.print(streamCrc, HEX);
+        Serial.print(F(" instead of 0x"));
+        Serial.println(crc, HEX);
+        Serial.write(kOtaNak);
+        drainSerial(300);
+        return;
     }
 
     bool ended = false;
     for (uint8_t attempt = 0; attempt < 3 && !ended; ++attempt) {
         sendOtaPacket(OtaKind::End, seq, nullptr, 0);
 
-        const OtaWait wait = waitOtaResponse(seq, 5000, error);
+        const OtaWait wait = waitOtaResponse(seq, kOtaEndAckMs, error);
         if (wait == OtaWait::Ok) {
             ended = true;
         } else if (wait == OtaWait::Error) {
             Serial.print(F("[ota] receiver error "));
             Serial.println(error);
-            return;
+            break;
         }
     }
 
     Serial.println(ended ? F("[ota] image accepted") : F("[ota] end not accepted"));
-    /* One last status byte: the last chunk was acknowledged before the car
-     * verified the CRC, so without this the PC could not report the outcome */
     Serial.write(ended ? kOtaAck : kOtaNak);
 }
-
 void runOtaSelfTest()
 {
     uint8_t chunk[sizeof(OtaPacket::data)];
