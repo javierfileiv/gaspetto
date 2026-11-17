@@ -35,7 +35,7 @@ constexpr uint8_t kProbeCount = sizeof(kI2CProbes) / sizeof(kI2CProbes[0]);
  * addresses of the I2C1 bus miss together while each module answers fine a
  * few seconds later. A miss is therefore retried with pauses before it is
  * believed */
-static bool probeOneDevice(bool useBitBang, TwoWire *wire, uint8_t address)
+static bool ads_probe_one_device(bool useBitBang, TwoWire *wire, uint8_t address)
 {
     constexpr uint8_t kProbeRetries  = 2;
     constexpr uint16_t kProbeRetryMs = 200;
@@ -63,13 +63,13 @@ static bool probeOneDevice(bool useBitBang, TwoWire *wire, uint8_t address)
     return false;
 }
 
-void probeI2CDevices()
+void ads_probe_i2c_devices()
 {
     Serial.println("\n--- ADS1115 I2C PROBE (3V3 rail ON) ---");
     for (uint8_t i = 0; i < kProbeCount; ++i)
     {
         const I2CProbeEntry &e = kI2CProbes[i];
-        const bool ack         = probeOneDevice(e.useBitBang, e.wire, e.address);
+        const bool ack         = ads_probe_one_device(e.useBitBang, e.wire, e.address);
 
         if (ack)
         {
@@ -103,7 +103,7 @@ CalibrationStats calibration_stats[kCalibrationSlotCount] = {};
 static bool last_probe_state[kAdsCount + 1] = {};
 static bool probe_state_valid               = false;
 
-void resetCalibrationStats()
+void ads_reset_calibration_stats()
 {
     for (uint8_t i = 0; i < kCalibrationSlotCount; ++i)
     {
@@ -114,14 +114,14 @@ void resetCalibrationStats()
 
 /* Quiet variant of the probe used by the verbose one: same device list,
  * no printing, plus the nRF24 chip state as the last entry */
-void reportProbeChanges()
+void ads_report_probe_changes()
 {
     bool current[kAdsCount + 1];
 
     for (uint8_t i = 0; i < kAdsCount; ++i)
     {
         const AdsTestEntry &entry = kAdsTests[i];
-        current[i]                = probeOneDevice(entry.useBitBang, entry.wire, entry.address);
+        current[i] = ads_probe_one_device(entry.useBitBang, entry.wire, entry.address);
     }
     current[kAdsCount] = radio.isChipConnected();
 
@@ -168,12 +168,12 @@ void reportProbeChanges()
     probe_state_valid = true;
 }
 
-bool isI2c3Entry(const AdsTestEntry *entry)
+bool ads_is_i2c3_entry(const AdsTestEntry *entry)
 {
     return entry->useBitBang;
 }
 
-void recoverI2c3Bus()
+void ads_recover_i2c3_bus()
 {
     Serial.println("   [WARN] I2C3 transaction failed, reinitializing I2C3 bit-bang...");
     i2c3_bb_init();
@@ -186,7 +186,7 @@ void recoverI2c3Bus()
  * bit-banged I2C3 re-samples its pins on every operation and reads with a
  * span of 0 or 1 straight through a power cycle, so there is nothing to
  * restore there */
-void rearmAdsModule(const AdsTestEntry *entry)
+void ads_rearm_module(const AdsTestEntry *entry)
 {
     if (entry->useBitBang || entry->wire == nullptr)
     {
@@ -204,30 +204,30 @@ void rearmAdsModule(const AdsTestEntry *entry)
 /* Bring one ADS module back after a failed transaction: bit-banged
  * I2C3 re-inits the bus itself; hardware I2C1 needs a bus restart and
  * a fresh module begin before the next try can succeed */
-void recoverAdsModule(const AdsTestEntry *entry)
+void ads_recover_module(const AdsTestEntry *entry)
 {
     /* The recovery re-inits the module over I2C and the ADS chips hang on
      * the sensor rail. Every caller reaches this right after a failed read,
      * which is exactly the moment the lease drops the rail, so take it back
      * for the duration - unless an enclosing scan is already holding it */
-    const bool acquired = sensorRailAcquire();
+    const bool acquired = power_sensor_rail_acquire();
 
     if (entry->useBitBang)
     {
         /* The bit-banged bus needs nothing at rail-up, but it does after a
          * failed transaction: its lines can be left mid-byte by a timeout */
-        recoverI2c3Bus();
+        ads_recover_i2c3_bus();
     }
     else
     {
-        rearmAdsModule(entry);
+        ads_rearm_module(entry);
         Serial.println("   [RECOVERED] I2C1 module re-inited");
     }
 
-    sensorRailRelease(acquired);
+    power_sensor_rail_release(acquired);
 }
 
-bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
+bool ads_read_config_register(const AdsTestEntry *entry, uint16_t &config)
 {
     config = 0;
 
@@ -263,7 +263,7 @@ bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
     return true;
 }
 
-static bool readAdsSingleEnded(const AdsTestEntry *entry, uint8_t channel, int16_t &raw)
+static bool ads_read_single_ended(const AdsTestEntry *entry, uint8_t channel, int16_t &raw)
 {
     static constexpr uint16_t kMuxByChannel[4] = {
         ADS1X15_REG_CONFIG_MUX_SINGLE_0,
@@ -334,7 +334,7 @@ static bool readAdsSingleEnded(const AdsTestEntry *entry, uint8_t channel, int16
     return true;
 }
 
-bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw)
+bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw)
 {
     /* Raise the sensor rail for the reading and drop it again: the decode
      * depends on how long the rail has been up - a warm board reads about
@@ -344,7 +344,7 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
      * repeats between a calibration and a later scan. The lease keeps a
      * rail someone else holds: the health cycle raises it for its I2C
      * probes, and a reading must not take it away from under it */
-    const bool acquired = sensorRailAcquire();
+    const bool acquired = power_sensor_rail_acquire();
     if (acquired)
     {
         /* Power-cycling an ADS leaves both stale: the master waits on a
@@ -353,30 +353,30 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
          * conversions - worse than failing, since nothing reports it. The
          * recovery does both steps and is proven to give clean values, so
          * this is that same re-arm on every rail-up rather than only after
-         * every failure. rearmAdsModule is a no-op on the bit-banged bus,
+         * every failure. ads_rearm_module is a no-op on the bit-banged bus,
          * which reads straight through a power cycle */
-        rearmAdsModule(entry);
+        ads_rearm_module(entry);
     }
 
     int32_t sum = 0;
     for (uint8_t sample = 0; sample < kAdsMeanSamples; ++sample)
     {
         int16_t raw = 0;
-        if (!readAdsSingleEnded(entry, channel, raw))
+        if (!ads_read_single_ended(entry, channel, raw))
         {
-            sensorRailRelease(acquired);
+            power_sensor_rail_release(acquired);
             return false;
         }
         sum += raw;
     }
 
-    sensorRailRelease(acquired);
+    power_sensor_rail_release(acquired);
 
     meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(kAdsMeanSamples));
     return true;
 }
 
-void updateCalibrationStats(uint8_t slotIndex, int16_t raw)
+void ads_update_calibration_stats(uint8_t slotIndex, int16_t raw)
 {
     CalibrationStats &stats = calibration_stats[slotIndex];
     if (!stats.initialized)

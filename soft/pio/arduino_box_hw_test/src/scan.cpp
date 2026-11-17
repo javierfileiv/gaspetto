@@ -7,7 +7,7 @@
 
 uint32_t calibration_scan_counter = 0;
 
-const char *labelName(int index)
+const char *scan_label_name(int index)
 {
     switch (index)
     {
@@ -35,7 +35,7 @@ const char *labelName(int index)
  * delta against it. The running min/max on the slot lines span the whole
  * session, so a pass with a piece and one without look like thousands of
  * counts of noise; pairing only the last two passes is what a re-seat or a
- * cover move actually shifts. resetCalibrationStats() zeroes the counter on
+ * cover move actually shifts. ads_reset_calibration_stats() zeroes the counter on
  * a mode entry, which also drops this baseline */
 static uint16_t scan_prev_mean[kCalibrationSlotCount];
 static bool scan_prev_valid[kCalibrationSlotCount];
@@ -62,14 +62,14 @@ bool freeze_exit      = false;
 constexpr uint32_t kFreezeWindowMs = 3000;
 
 /* Defined below, next to the scan that also decodes with it */
-static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw);
+static const char *scan_piece_label_for_raw(uint8_t slotIndex, int16_t raw);
 
 /* Continuous readout of one slot: ~5 mean reads per second with running
  * min/max and the live decoded piece from the slot's compiled row. Any usb
  * key stops it. Clamp detection: a max pinned at the top of the scale (near
  * 26400 on the 3V3 rail) means the hall sensor output is saturated, not
  * that the piece reads high */
-void runSlotMonitor(uint8_t slotIndex)
+void scan_run_slot_monitor(uint8_t slotIndex)
 {
     const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
     const uint8_t channel     = slotIndex % 4;
@@ -89,12 +89,12 @@ void runSlotMonitor(uint8_t slotIndex)
     while (!monitor_exit)
     {
         int16_t rawMean = 0;
-        bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
+        bool readOk     = ads_read_single_ended_mean(&entry, channel, rawMean);
         if (!readOk)
         {
             Serial.println("   read TIMEOUT/FAIL, recovering module");
-            recoverAdsModule(&entry);
-            readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+            ads_recover_module(&entry);
+            readOk = ads_read_single_ended_mean(&entry, channel, rawMean);
         }
         if (readOk)
         {
@@ -150,7 +150,7 @@ void runSlotMonitor(uint8_t slotIndex)
                 /* What this slot's compiled row sees right now: the same
                  * decode the scan uses, so a placement can be checked live */
                 Serial.print("  ");
-                Serial.print(pieceLabelForRaw(slotIndex, rawMean));
+                Serial.print(scan_piece_label_for_raw(slotIndex, rawMean));
             }
             Serial.println();
         }
@@ -161,7 +161,7 @@ void runSlotMonitor(uint8_t slotIndex)
 
         /* The parser only sets monitor_exit here, so the sampling
          * period doubles as the usb response time */
-        delayWithUsb(200);
+        shell_delay_with_usb(200);
     }
     monitor_active = false;
 
@@ -179,7 +179,7 @@ void runSlotMonitor(uint8_t slotIndex)
         Serial.print(" span=");
         Serial.print(static_cast<int>(maxRaw - minRaw));
         Serial.print("  ");
-        Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(sum / count)));
+        Serial.println(scan_piece_label_for_raw(slotIndex, static_cast<int16_t>(sum / count)));
     }
 }
 
@@ -187,7 +187,7 @@ void runSlotMonitor(uint8_t slotIndex)
  * measurement window whose stats print as one self-contained line, so
  * rotating or placing the piece between two windows cannot pollute any
  * stat. The quit key stops a window early, the partial line still prints */
-void runFrozenSlotMonitor(uint8_t slotIndex)
+void scan_run_frozen_slot_monitor(uint8_t slotIndex)
 {
     const AdsTestEntry &entry = kAdsTests[slotIndex / 4];
     const uint8_t channel     = slotIndex % 4;
@@ -203,7 +203,7 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
     freeze_exit      = false;
     while (!freeze_exit)
     {
-        delayWithUsb(50);
+        shell_delay_with_usb(50);
         if (!freeze_measure)
         {
             continue;
@@ -219,11 +219,11 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
         while (millis() - startMs < kFreezeWindowMs && !freeze_exit)
         {
             int16_t rawMean = 0;
-            bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
+            bool readOk     = ads_read_single_ended_mean(&entry, channel, rawMean);
             if (!readOk)
             {
-                recoverAdsModule(&entry);
-                readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+                ads_recover_module(&entry);
+                readOk = ads_read_single_ended_mean(&entry, channel, rawMean);
             }
             if (readOk)
             {
@@ -239,7 +239,7 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
                 sum += raw;
                 ++count;
             }
-            delayWithUsb(20);
+            shell_delay_with_usb(20);
         }
         freeze_measuring = false;
 
@@ -262,7 +262,7 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
         Serial.print(" span=");
         Serial.print(static_cast<int>(maxRaw - minRaw));
         Serial.print("  ");
-        Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(mean)));
+        Serial.println(scan_piece_label_for_raw(slotIndex, static_cast<int16_t>(mean)));
     }
     freeze_active = false;
     Serial.println("--- FROZEN MONITOR stopped ---");
@@ -290,7 +290,7 @@ static const BoxPieceId kBandPieces[5] = {
     BoxPieceId::TURN_LEFT,  /* band 4: blue 4 mm, the most positive */
 };
 
-BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
+BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw)
 {
     if (raw < 0)
     {
@@ -325,12 +325,12 @@ BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
 }
 
 /* What the scan prints: the enum above under its label */
-static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
+static const char *scan_piece_label_for_raw(uint8_t slotIndex, int16_t raw)
 {
-    return labelName(static_cast<int>(pieceForRaw(slotIndex, raw)));
+    return scan_label_name(static_cast<int>(scan_piece_for_raw(slotIndex, raw)));
 }
 
-void runPieceCalibrationScan()
+void scan_run_piece_calibration()
 {
     /* This pass's mean per slot, filled as the loop goes, and whether the
      * slot produced a reading: the comparison block below pairs them with
@@ -339,7 +339,7 @@ void runPieceCalibrationScan()
     uint16_t passMean[kCalibrationSlotCount] = {};
     bool passValid[kCalibrationSlotCount]    = {};
 
-    /* resetCalibrationStats() zeroes the counter on a mode entry, so a zero
+    /* ads_reset_calibration_stats() zeroes the counter on a mode entry, so a zero
      * here means a fresh session and the stored pass belongs to before it */
     if (calibration_scan_counter == 0)
     {
@@ -372,7 +372,7 @@ void runPieceCalibrationScan()
         /* Check if device is accessible. The chip hangs on the sensor rail,
          * so take it for the probe and give it straight back: the readings
          * that follow must pulse it the way the game and 'p' do */
-        const bool probeRail = sensorRailAcquire();
+        const bool probeRail = power_sensor_rail_acquire();
 
         bool deviceFound;
         if (entry.useBitBang)
@@ -385,7 +385,7 @@ void runPieceCalibrationScan()
             deviceFound = ads.begin(entry.address, entry.wire);
         }
 
-        sensorRailRelease(probeRail);
+        power_sensor_rail_release(probeRail);
 
         if (!deviceFound)
         {
@@ -400,12 +400,12 @@ void runPieceCalibrationScan()
         for (uint8_t ch = 0; ch < 4; ++ch)
         {
             int16_t rawMean = 0;
-            bool readOk     = readAdsSingleEndedMean(&entry, ch, rawMean);
+            bool readOk     = ads_read_single_ended_mean(&entry, ch, rawMean);
 
-            if (!readOk && isI2c3Entry(&entry))
+            if (!readOk && ads_is_i2c3_entry(&entry))
             {
-                recoverI2c3Bus();
-                readOk = readAdsSingleEndedMean(&entry, ch, rawMean);
+                ads_recover_i2c3_bus();
+                readOk = ads_read_single_ended_mean(&entry, ch, rawMean);
             }
 
             const uint8_t slotIndex = static_cast<uint8_t>(deviceIndex * 4 + ch);
@@ -420,7 +420,7 @@ void runPieceCalibrationScan()
             Serial.print("] ");
 
             /* The slot's own decode boundaries, the exact numbers
-             * pieceLabelForRaw just compared against; uncalibrated slots
+             * scan_piece_label_for_raw just compared against; uncalibrated slots
              * decode INVALID whatever they read */
             const uint16_t *row = GASPETTO_ADC_SLOT_THRESHOLDS[slotIndex];
             if (row[GASPETTO_ADC_SLOT_COL_TURN_LEFT] == 0U)
@@ -447,7 +447,7 @@ void runPieceCalibrationScan()
                 continue;
             }
 
-            updateCalibrationStats(slotIndex, rawMean);
+            ads_update_calibration_stats(slotIndex, rawMean);
             passMean[slotIndex]           = static_cast<uint16_t>(rawMean);
             passValid[slotIndex]          = true;
             const CalibrationStats &stats = calibration_stats[slotIndex];
@@ -461,7 +461,7 @@ void runPieceCalibrationScan()
             Serial.print(" span=");
             Serial.print(stats.maxRaw - stats.minRaw);
             Serial.print(" => ");
-            Serial.println(pieceLabelForRaw(slotIndex, rawMean));
+            Serial.println(scan_piece_label_for_raw(slotIndex, rawMean));
         }
     }
 
@@ -544,17 +544,17 @@ void runPieceCalibrationScan()
  * decodes INVALID - a failed read, an uncalibrated row or a value outside
  * every band - which aborts the run: an INVALID is a fault, not the place
  * where the sequence stops */
-static bool scanOneSlot(uint8_t slot, BoxBoardPieces &board)
+static bool scan_one_slot(uint8_t slot, BoxBoardPieces &board)
 {
     const AdsTestEntry &entry = kAdsTests[slot / 4];
     const uint8_t channel     = slot % 4;
     int16_t rawMean           = 0;
 
-    bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    bool readOk = ads_read_single_ended_mean(&entry, channel, rawMean);
     if (!readOk)
     {
-        recoverAdsModule(&entry);
-        readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+        ads_recover_module(&entry);
+        readOk = ads_read_single_ended_mean(&entry, channel, rawMean);
     }
 
     Serial.print("   slot ");
@@ -565,11 +565,11 @@ static bool scanOneSlot(uint8_t slot, BoxBoardPieces &board)
         return false;
     }
 
-    const BoxPieceId piece = pieceForRaw(slot, rawMean);
+    const BoxPieceId piece = scan_piece_for_raw(slot, rawMean);
     Serial.print(": raw=");
     Serial.print(rawMean);
     Serial.print("  ");
-    Serial.println(labelName(static_cast<int>(piece)));
+    Serial.println(scan_label_name(static_cast<int>(piece)));
     if (piece == BoxPieceId::INVALID)
     {
         return false;
@@ -584,11 +584,11 @@ static bool scanOneSlot(uint8_t slot, BoxBoardPieces &board)
  * over and whatever lies after it is out of the program - what was already
  * read stays. Returns false on the first INVALID so the caller can raise
  * the build-error LEDs */
-bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
+bool scan_zone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
 {
     for (uint8_t slot = firstSlot; slot < endSlot; ++slot)
     {
-        if (!scanOneSlot(slot, board))
+        if (!scan_one_slot(slot, board))
         {
             return false;
         }

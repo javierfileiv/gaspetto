@@ -12,7 +12,7 @@
  * so the caller drops it again only in that case: a rail someone else holds
  * - the health cycle, an enclosing scan - is never taken away. The nesting
  * needs no counter, the flag is the state */
-bool sensorRailAcquire()
+bool power_sensor_rail_acquire()
 {
     if (calibration_rails_on)
     {
@@ -24,7 +24,7 @@ bool sensorRailAcquire()
     return true;
 }
 
-void sensorRailRelease(bool acquired)
+void power_sensor_rail_release(bool acquired)
 {
     if (!acquired)
     {
@@ -43,7 +43,7 @@ void sensorRailRelease(bool acquired)
  * interrupt happened to restart the chip" */
 static volatile bool wake_button_fired = false;
 
-static void wakeButtonIsr()
+static void power_wake_button_isr()
 {
     wake_button_fired = true;
 }
@@ -54,7 +54,7 @@ static void wakeButtonIsr()
  * PB9 can bring the chip back: USB is dead while asleep. After the wake
  * the board returns to the rest state of the active mode and the shell
  * keeps running, so "b" can sleep again. */
-void runDeepSleepTest()
+void power_run_deep_sleep_test()
 {
     uint32_t sleepEntryMs                = 0;
     bool realPress                       = false;
@@ -66,7 +66,7 @@ void runDeepSleepTest()
     Serial.println("[stop] the USB port drops now; it returns a few seconds after the wake");
     Serial.flush(); /* the warning must reach the host before clocks die */
 
-    blackoutLeds();
+    leds_blackout();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     /* Drop the latch too: the wake handler restores the rail from it, and
@@ -77,7 +77,7 @@ void runDeepSleepTest()
     wake_button_fired = false;
     /* Interrupt mode (not event) is mandatory: from STOP only an EXTI
      * interrupt restarts the core, and PB9 to GND gives the FALLING edge */
-    attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), wakeButtonIsr, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), power_wake_button_isr, FALLING);
 
     /* A spike puts the chip back in Run mode without anyone touching the
      * button, so go straight back to sleep instead of reporting a wake. Each
@@ -190,7 +190,7 @@ void runDeepSleepTest()
      * chip state) and the confirmation flashes */
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
     delay(kRailSettleDelayMs);
-    blackoutLeds();
+    leds_blackout();
 
     detachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON));
 
@@ -206,9 +206,9 @@ void runDeepSleepTest()
     {
         for (uint16_t led = 0; led < kApaPixelCount; ++led)
         {
-            setOneLed(static_cast<uint8_t>(led), 0, 100, 0);
+            leds_set_one(static_cast<uint8_t>(led), 0, 100, 0);
         }
-        blackoutLeds();
+        leds_blackout();
         delay(150);
     }
 

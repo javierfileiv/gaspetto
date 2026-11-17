@@ -17,22 +17,22 @@
 /* The LED verdict only shows if the 5V rail is up; calibration keeps it
  * down, so raise it for the animation and put it back, the same contract
  * the LED menu uses */
-static void runSendFeedback(void (*animation)())
+static void radio_run_send_feedback(void (*animation)())
 {
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
     delay(kRailSettleDelayMs);
     animation();
-    blackoutLeds();
+    leds_blackout();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
 }
 
 /* Scan -> build -> transmit, the chain production GBox runs when it
  * validates a program, without GBox itself: the decode is the compiled
- * per-slot row (pieceForRaw, the one walk), the build is the shared
+ * per-slot row (scan_piece_for_raw, the one walk), the build is the shared
  * buildProgramFromPieces, only the transport is this bench. The verdict
  * mirrors the production LED semantics: green on ACK, amber on an empty
  * board, red on a refused build, RF error when the car does not answer */
-void runSendPiecesTest()
+void radio_run_send_pieces_test()
 {
     BoxBoardPieces board = {};
     CommandPacket packet = {};
@@ -55,10 +55,10 @@ void runSendPiecesTest()
 
     /* Main zone first, in slot order: an EMPTY ends the sequence and leaves
      * the slots after it alone - they stay EMPTY from the initialisation */
-    if (!scanZone(0, BOX_MAIN_SLOTS, board, hasLoopCall))
+    if (!scan_zone(0, BOX_MAIN_SLOTS, board, hasLoopCall))
     {
         Serial.println("[send] INVALID slot: aborting, nothing sent");
-        runSendFeedback(runBuildErrorAnimationTest);
+        radio_run_send_feedback(leds_run_build_error_animation_test);
         return;
     }
 
@@ -66,10 +66,10 @@ void runSendPiecesTest()
      * without one those slots never reach the program */
     if (hasLoopCall)
     {
-        if (!scanZone(BOX_MAIN_SLOTS, BOX_TOTAL_SLOTS, board, hasLoopCall))
+        if (!scan_zone(BOX_MAIN_SLOTS, BOX_TOTAL_SLOTS, board, hasLoopCall))
         {
             Serial.println("[send] INVALID slot: aborting, nothing sent");
-            runSendFeedback(runBuildErrorAnimationTest);
+            radio_run_send_feedback(leds_run_build_error_animation_test);
             return;
         }
     }
@@ -84,13 +84,13 @@ void runSendPiecesTest()
         if (isEmpty)
         {
             Serial.println("[send] empty board: no command to send");
-            runSendFeedback(runEmptyBoardAnimationTest);
+            radio_run_send_feedback(leds_run_empty_board_animation_test);
         }
         else
         {
             Serial.println("[send] build FAILED: invalid slot or payload overflow");
             Serial.println("[send] nothing sent");
-            runSendFeedback(runBuildErrorAnimationTest);
+            radio_run_send_feedback(leds_run_build_error_animation_test);
         }
         return;
     }
@@ -121,11 +121,11 @@ void runSendPiecesTest()
 
     if (sent)
     {
-        runSendFeedback(runSuccessAnimationTest);
+        radio_run_send_feedback(leds_run_success_animation_test);
     }
     else
     {
-        runSendFeedback(runRfErrorAnimationTest);
+        radio_run_send_feedback(leds_run_rf_error_animation_test);
     }
 }
 
@@ -138,7 +138,7 @@ void runSendPiecesTest()
  * rigs do not hear each other. isChipConnected() does read the chip over
  * SPI, so entry 1 probes the hardware live instead of trusting the flag
  * setup() left behind */
-static void printRadioAddress(const char *label, const uint8_t *addr)
+static void radio_print_address(const char *label, const uint8_t *addr)
 {
     Serial.print(label);
     for (uint8_t i = 0; i < 5; ++i)
@@ -156,25 +156,25 @@ static void printRadioAddress(const char *label, const uint8_t *addr)
     Serial.println();
 }
 
-static void printRadioMenu()
+static void radio_print_menu()
 {
     Serial.println("   [radio] 1 probe | 2 addresses and config | 3 send test program | q quit");
 }
 
-void startRadioMenu()
+void radio_start_menu()
 {
     Serial.println("--- RADIO MENU ---");
     radio_menu_active = true;
-    printRadioMenu();
+    radio_print_menu();
 }
 
-static void stopRadioMenu()
+static void radio_stop_menu()
 {
     radio_menu_active = false;
     Serial.println("   [radio menu closed]");
 }
 
-void runRadioMenuKey(char key)
+void radio_run_menu_key(char key)
 {
     switch (key)
     {
@@ -188,8 +188,8 @@ void runRadioMenuKey(char key)
         const uint8_t pa                    = radio.getPALevel();
         const rf24_datarate_e rate          = radio.getDataRate();
 
-        printRadioAddress("   tx       = ", gcar_pipe_name);
-        printRadioAddress("   rx pipe1 = ", gbox_pipe_name);
+        radio_print_address("   tx       = ", gcar_pipe_name);
+        radio_print_address("   rx pipe1 = ", gbox_pipe_name);
         Serial.print("   pa=");
         Serial.print((pa < 4U) ? kPaNames[pa] : "?");
         Serial.print(" rate=");
@@ -237,7 +237,7 @@ void runRadioMenuKey(char key)
     }
 
     case 'q':
-        stopRadioMenu();
+        radio_stop_menu();
         return;
 
     default:
@@ -247,11 +247,11 @@ void runRadioMenuKey(char key)
 
     if (radio_menu_active)
     {
-        printRadioMenu(); /* the entries are chatty: reprint the prompt after them */
+        radio_print_menu(); /* the entries are chatty: reprint the prompt after them */
     }
 }
 
-void runCarStreamTest()
+void radio_run_car_stream_test()
 {
     uint8_t buffer[sizeof(CommandPacket)];
     uint8_t logLine[64];
@@ -271,7 +271,7 @@ void runCarStreamTest()
     Serial.println("\n--- CAR STREAM on _box_ (telemetry + logs), any key to stop ---");
     /* State the address being listened on, so it can be read against the
      * sender's without opening either firmware's menu */
-    printRadioAddress("   listening pipe1 = ", gbox_pipe_name);
+    radio_print_address("   listening pipe1 = ", gbox_pipe_name);
 
     monitor_active = true;
     monitor_exit   = false;
@@ -362,7 +362,7 @@ void runCarStreamTest()
             Serial.println(static_cast<int>(packets));
         }
 
-        delayWithUsb(20);
+        shell_delay_with_usb(20);
     }
 
     monitor_active = false;

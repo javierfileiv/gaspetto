@@ -64,7 +64,7 @@ void setup()
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
     delay(kRailSettleDelayMs);
     Serial.println("   5V LED rail ON (settled) before APA106 init");
-    ledsBegin();
+    leds_begin();
     Serial.print("APA106 init: ");
     Serial.print(kApaPixelCount);
     Serial.println(" pixel(s) on PB8, first frame sent (all dark)");
@@ -119,7 +119,7 @@ void setup()
     Serial.println("   NOTE: ADS1115 will be tested each cycle when 3V3 rail is ON.");
 
     Serial.println("   hw-test: runtime modes build");
-    printUsbHelp();
+    shell_print_usb_help();
     Serial.print("   mode: ");
     Serial.println(test_mode == TestMode::Calibration ? "calibration" : "health");
 
@@ -140,11 +140,11 @@ void setup()
 /* ========================================== */
 void loop()
 {
-    handleUsbCommands();
+    shell_handle_usb_commands();
 
     if (test_mode == TestMode::Calibration)
     {
-        /* No rail re-arm here: readAdsSingleEndedMean raises the sensor rail
+        /* No rail re-arm here: ads_read_single_ended_mean raises the sensor rail
          * for each reading and drops it again, so re-latching it would bring
          * back the warm board this change exists to avoid */
 
@@ -154,7 +154,7 @@ void loop()
              * itself, so a pass costs the settle time: the detector sees the
              * operator within half a second, which is faster than a hand
              * placing a piece */
-            pollJig();
+            jig_poll();
             return;
         }
 
@@ -171,7 +171,7 @@ void loop()
         if (run_test_requested)
         {
             run_test_requested = false;
-            runPieceCalibrationScan();
+            scan_run_piece_calibration();
         }
 #endif
 
@@ -180,7 +180,7 @@ void loop()
             return; /* mode changed while waiting: skip the rest delay */
         }
 
-        delayWithUsb(kCalibrationScanPeriodMs);
+        shell_delay_with_usb(kCalibrationScanPeriodMs);
         return;
     }
 
@@ -188,7 +188,7 @@ void loop()
     if (run_test_requested)
     {
         run_test_requested = false;
-        runHealthCycle();
+        health_run_cycle();
     }
 #endif
 
@@ -200,5 +200,5 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
-    delayWithUsb(kCalibrationScanPeriodMs);
+    shell_delay_with_usb(kCalibrationScanPeriodMs);
 }

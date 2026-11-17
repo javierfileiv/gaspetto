@@ -15,7 +15,7 @@
 /* ADS1115 TEST */
 /* ========================================== */
 
-void runI2CTests()
+void health_run_i2c_tests()
 {
     Serial.println("\n--- ADS1115 I2C TEST (3V3 rail ON) ---");
 
@@ -48,11 +48,11 @@ void runI2CTests()
         }
 
         uint16_t config = 0;
-        bool configOk   = readAdsConfigRegister(&entry, config);
-        if (!configOk && isI2c3Entry(&entry))
+        bool configOk   = ads_read_config_register(&entry, config);
+        if (!configOk && ads_is_i2c3_entry(&entry))
         {
-            recoverI2c3Bus();
-            configOk = readAdsConfigRegister(&entry, config);
+            ads_recover_i2c3_bus();
+            configOk = ads_read_config_register(&entry, config);
         }
 
         if (!configOk)
@@ -97,11 +97,11 @@ void runI2CTests()
         for (uint8_t ch = 0; ch < 4; ++ch)
         {
             int16_t rawMean = 0;
-            bool readOk     = readAdsSingleEndedMean(&entry, ch, rawMean);
-            if (!readOk && isI2c3Entry(&entry))
+            bool readOk     = ads_read_single_ended_mean(&entry, ch, rawMean);
+            if (!readOk && ads_is_i2c3_entry(&entry))
             {
-                recoverI2c3Bus();
-                readOk = readAdsSingleEndedMean(&entry, ch, rawMean);
+                ads_recover_i2c3_bus();
+                readOk = ads_read_single_ended_mean(&entry, ch, rawMean);
             }
 
             Serial.print("          ch");
@@ -129,7 +129,7 @@ void runI2CTests()
 /* ========================================== */
 /* HEALTH CYCLE (runs on demand) */
 /* ========================================== */
-void runHealthCycle()
+void health_run_cycle()
 {
     /* Quick double blink visual check on builtin LED. */
     for (int i = 0; i < 2; i++)
@@ -150,20 +150,20 @@ void runHealthCycle()
      * the three second wait below for no reason - about half its rail-on time.
      * The acquire settles the rail itself, and every read inside sees the
      * flag already set, so it leaves the rail alone */
-    const bool railHeld = sensorRailAcquire();
+    const bool railHeld = power_sensor_rail_acquire();
 
-    probeI2CDevices();
+    ads_probe_i2c_devices();
 
 #ifdef TEST_ADS1115
     /* Test ADS1115 modules while 3V3 is active */
-    runI2CTests();
+    health_run_i2c_tests();
 #endif
 
     /* The APA106 animations left this cycle: they cost several seconds each,
      * the LED menu ('l', key 0) runs them on demand instead */
-    reportProbeChanges();
+    ads_report_probe_changes();
 
-    sensorRailRelease(railHeld);
+    power_sensor_rail_release(railHeld);
 
     /* Quick double blink visual check on builtin LED. */
     for (int i = 0; i < 2; i++)
@@ -173,7 +173,7 @@ void runHealthCycle()
         digitalWrite(PIN_LED, HIGH);
         delay(100);
     }
-    delayWithUsb(DELAY);
+    shell_delay_with_usb(DELAY);
 
     if (test_mode != TestMode::Health)
     {
@@ -187,5 +187,5 @@ void runHealthCycle()
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH); /* Turn OFF Q1 */
 
     Serial.println("Cycle complete. 's' reruns the test.");
-    delayWithUsb(DELAY);
+    shell_delay_with_usb(DELAY);
 }

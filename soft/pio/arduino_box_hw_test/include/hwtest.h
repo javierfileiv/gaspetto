@@ -26,7 +26,7 @@ constexpr uint8_t kAdsMeanSamples = TEST_ADS1115_MEAN_SAMPLES;
 /* Settle time after the sensor rail changes state: a hall sensor answers in
  * microseconds, so 250 ms covers the rail's own RC plus margin. Every read
  * raises the rail for its duration and drops it again (see
- * readAdsSingleEndedMean), so this is also the pause between two readings */
+ * ads_read_single_ended_mean), so this is also the pause between two readings */
 constexpr uint16_t kRailSettleDelayMs = 250;
 
 /* Raise the sensor rail when it is down and report whether this call did it,
@@ -34,8 +34,8 @@ constexpr uint16_t kRailSettleDelayMs = 250;
  * (the health cycle, an enclosing scan) is never taken away. Every I2C access
  * to the ADS chips needs the rail, and it must be held for the whole
  * operation - probe, reads and recovery - not only around one reading */
-bool sensorRailAcquire();
-void sensorRailRelease(bool acquired);
+bool power_sensor_rail_acquire();
+void power_sensor_rail_release(bool acquired);
 
 struct CalibrationStats
 {
@@ -73,31 +73,19 @@ constexpr uint8_t kCalibrationSlotCount = kAdsCount * 4;
  * would run past the table. Refuse to build rather than overrun at runtime */
 static_assert(BOX_TOTAL_SLOTS == kCalibrationSlotCount, "packet slots must match the ADS scan");
 
-void handleUsbCommands();
+void shell_handle_usb_commands();
 
 /* Sliced delay so USB CDC commands are polled while the test cycles wait.
  * Rail settle delays keep the plain delay(): the electrical settling must
- * not be interrupted */
-
-inline void delayWithUsb(uint32_t totalMs)
-{
-    constexpr uint32_t kSliceMs = 50;
-    uint32_t remaining          = totalMs;
-    while (remaining > 0)
-    {
-        const uint32_t slice = remaining > kSliceMs ? kSliceMs : remaining;
-        delay(slice);
-        remaining -= slice;
-        handleUsbCommands();
-    }
-}
+ * not be interrupted. Defined in shell.cpp, next to the dispatch it pumps */
+void shell_delay_with_usb(uint32_t totalMs);
 
 /* ========================================== */
 /* scan.cpp - label names */
 /* ========================================== */
 /* Names a BoxPieceId value (0..6): the five pieces, plus the INVALID name
  * the decode returns for uncalibrated slots */
-const char *labelName(int index);
+const char *scan_label_name(int index);
 
 /* ========================================== */
 /* jig.cpp - piece census and slot gain campaign */
@@ -107,14 +95,14 @@ const char *labelName(int index);
  * keypress during the campaign: the reading says when a piece is in */
 extern bool jig_active;
 
-void startJigMode();
-void stopJigMode();
-void clearJigCaptures();
-void forgetJigSlot(uint8_t slot);
-void printJigHelp();
-void runJigKey(char key);
-void pollJig();
-void dumpJigCaptures();
+void jig_start_mode();
+void jig_stop_mode();
+void jig_clear_captures();
+void jig_forget_slot(uint8_t slot);
+void jig_print_help();
+void jig_run_key(char key);
+void jig_poll();
+void jig_dump_captures();
 
 /* ========================================== */
 /* scan.cpp - calibration scan and slot monitor */
@@ -129,17 +117,17 @@ extern bool freeze_measure;
 extern bool freeze_measuring;
 extern bool freeze_exit;
 
-void runSlotMonitor(uint8_t slotIndex);
-void runFrozenSlotMonitor(uint8_t slotIndex);
-void runPieceCalibrationScan();
+void scan_run_slot_monitor(uint8_t slotIndex);
+void scan_run_frozen_slot_monitor(uint8_t slotIndex);
+void scan_run_piece_calibration();
 
 /* Walk a zone in slot order and stop at the first EMPTY; false on the first
  * INVALID. Used by the "p" send test to read the board it transmits */
-bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall);
+bool scan_zone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall);
 
 /* The one piece decode: a raw reading against this slot's compiled row.
  * Every consumer (monitors, scan, radio send) goes through it */
-BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw);
+BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw);
 
 /* Mode state, defined by main.cpp and read by nearly every module */
 extern TestMode test_mode;
@@ -152,26 +140,26 @@ extern bool radio_menu_active;
 extern bool radio_ok;
 
 /* health.cpp: the periodic cycle run by the "s" key */
-void runHealthCycle();
+void health_run_cycle();
 
 /* power.cpp: deep sleep (STOP) test driven by the "b" shell key */
-void runDeepSleepTest();
+void power_run_deep_sleep_test();
 
 /* radio.cpp: scan -> build -> transmit test driven by the "p" shell key */
-void runSendPiecesTest();
+void radio_run_send_pieces_test();
 
 /* radio.cpp: listen to the car stream on _box_, the "e" shell key */
-void runCarStreamTest();
+void radio_run_car_stream_test();
 
 /* radio.cpp: radio menu driven by the "t" shell key */
-void startRadioMenu();
-void runRadioMenuKey(char key);
+void radio_start_menu();
+void radio_run_menu_key(char key);
 
 /* ========================================== */
 /* shell.cpp - usb key dispatch, echo and help */
 /* ========================================== */
-void enterMode(TestMode mode);
-void printUsbHelp();
+void shell_enter_mode(TestMode mode);
+void shell_print_usb_help();
 
 /* ========================================== */
 /* ads.cpp - I2C bus layer, ADS1115 reads, recovery and probe history */
@@ -182,16 +170,16 @@ extern AdsTestEntry kAdsTests[kAdsCount];
 extern CalibrationStats calibration_stats[kCalibrationSlotCount];
 extern uint32_t calibration_scan_counter;
 
-void probeI2CDevices();
-void reportProbeChanges();
-void resetCalibrationStats();
-void updateCalibrationStats(uint8_t slotIndex, int16_t raw);
-bool isI2c3Entry(const AdsTestEntry *entry);
-void recoverI2c3Bus();
-void recoverAdsModule(const AdsTestEntry *entry);
-void rearmAdsModule(const AdsTestEntry *entry);
-bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config);
-bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw);
+void ads_probe_i2c_devices();
+void ads_report_probe_changes();
+void ads_reset_calibration_stats();
+void ads_update_calibration_stats(uint8_t slotIndex, int16_t raw);
+bool ads_is_i2c3_entry(const AdsTestEntry *entry);
+void ads_recover_i2c3_bus();
+void ads_recover_module(const AdsTestEntry *entry);
+void ads_rearm_module(const AdsTestEntry *entry);
+bool ads_read_config_register(const AdsTestEntry *entry, uint16_t &config);
+bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw);
 
 /* ========================================== */
 /* leds.cpp - APA106 status LEDs and animations */
@@ -216,19 +204,19 @@ constexpr uint8_t kApaIntensity = APA_LED_INTENSITY;
 
 /* Prepare the data pin and send one dark frame; call it AFTER the 5V
  * rail is up and settled (the APA106 ignores frames while unpowered) */
-void ledsBegin();
-void blackoutLeds();
-void setOneLed(uint8_t led, uint8_t r, uint8_t g, uint8_t b);
-void setTwoLeds(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
-                uint8_t gB, uint8_t bB);
-void runLedWalkTest();
-void runScanAnimationTest();
-void runSuccessAnimationTest();
-void runBuildErrorAnimationTest();
-void runEmptyBoardAnimationTest();
-void runRfErrorAnimationTest();
-void runChannelOrderTest(uint8_t led);
-void runPowerOnCycleAnimation();
-void runPowerOffCycleAnimation();
-void startLedTestMenu();
-void runLedTestKey(char key);
+void leds_begin();
+void leds_blackout();
+void leds_set_one(uint8_t led, uint8_t r, uint8_t g, uint8_t b);
+void leds_set_two(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
+                  uint8_t gB, uint8_t bB);
+void leds_run_walk_test();
+void leds_run_scan_animation_test();
+void leds_run_success_animation_test();
+void leds_run_build_error_animation_test();
+void leds_run_empty_board_animation_test();
+void leds_run_rf_error_animation_test();
+void leds_run_channel_order_test(uint8_t led);
+void leds_run_power_on_cycle_animation();
+void leds_run_power_off_cycle_animation();
+void leds_start_test_menu();
+void leds_run_test_key(char key);
