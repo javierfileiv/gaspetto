@@ -91,7 +91,7 @@ void setup()
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
 
-    LOG(F("GCar firmware v"));
+    LOG(F("GCar firmware build "));
     LOG(FW_VERSION);
     LOG(F(" ("));
     LOG(FW_BUILD);

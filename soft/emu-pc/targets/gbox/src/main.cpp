@@ -177,7 +177,7 @@ void setup()
     gbox.initHardware();
     gbox.runHealthCheck();
 
-    LOG(F("GBox firmware v"));
+    LOG(F("GBox firmware build "));
     LOG(FW_VERSION);
     LOG(F(" ("));
     LOG(FW_BUILD);
