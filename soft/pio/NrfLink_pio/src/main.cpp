@@ -874,6 +874,19 @@ void printHelp()
     Serial.println("========================================\n");
 }
 
+/* The packet carries an absolute target and the raw yaw, so the difference
+ * alone can read -270 where the car is really turning +90 the other way */
+float wrapAngle(float degrees)
+{
+    while (degrees > 180.0f) {
+        degrees -= 360.0f;
+    }
+    while (degrees < -180.0f) {
+        degrees += 360.0f;
+    }
+    return degrees;
+}
+
 void displayTelemetry(const TelemetryPacket &t)
 {
     Serial.print(F("TLM yaw="));
@@ -881,7 +894,7 @@ void displayTelemetry(const TelemetryPacket &t)
     Serial.print(F(" tgt="));
     Serial.print(t.targetYaw, 1);
     Serial.print(F(" err="));
-    Serial.print(t.targetYaw - t.yaw, 2); /* err left the packet: the tag took its byte */
+    Serial.print(wrapAngle(t.targetYaw - t.yaw), 2); /* shortest way, as the car sees it */
     Serial.print(F(" imu state="));
     Serial.print(t.imuOk);
     Serial.print(F(" kp="));
