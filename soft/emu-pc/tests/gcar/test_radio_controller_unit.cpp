@@ -20,7 +20,9 @@ using ::testing::StrictMock;
 
 namespace
 {
-constexpr uint8_t kQueueCapacity = 10;
+/* Both queues take their capacity from config_event.h: hardcoding 10 here
+ * broke as soon as QUEUE_SIZE grew to hold a whole program */
+constexpr uint8_t kQueueCapacity = QUEUE_SIZE;
 
 bool same5(const uint8_t *lhs, const uint8_t *rhs)
 {

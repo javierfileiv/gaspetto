@@ -471,3 +471,35 @@ TEST_F(SystemPIDTest, ForwardThenTurnRight_FullSequence)
     }
     EXPECT_TRUE(isInState(StateId::IDLE));
 }
+
+/* A program arrives as several commands in one packet: each one has to run
+ * after the previous, not have the first swallow the rest */
+TEST_F(SystemPIDTest, QueuedMovementsRunOneAfterTheOther)
+{
+    setYaw(0.0f);
+    postEvent(forwardEvent);
+    postEvent(leftEvent);
+
+    /* The forward owns the car, the turn waits its turn in the queue */
+    runWorkCycles(1);
+    ASSERT_TRUE(isInState(StateId::PROCESSING));
+    EXPECT_FLOAT_EQ(movementController.buildTelemetryPacket().targetYaw, 0.0f);
+    ASSERT_EQ(eventQueue.GetSize(), 1);
+
+    runWorkCycles(10);
+    ASSERT_TRUE(isInState(StateId::PROCESSING));
+    EXPECT_FLOAT_EQ(movementController.buildTelemetryPacket().targetYaw, 0.0f);
+    ASSERT_EQ(eventQueue.GetSize(), 1);
+
+    /* The straight burst ends on its own, and only then the turn is taken */
+    for (int cycle = 0; cycle < 100 && isInState(StateId::PROCESSING); ++cycle) {
+        runWorkCycles(1);
+    }
+    ASSERT_TRUE(isInState(StateId::IDLE));
+    ASSERT_EQ(eventQueue.GetSize(), 1);
+
+    runWorkCycles(1);
+    ASSERT_TRUE(isInState(StateId::PROCESSING));
+    EXPECT_NEAR(movementController.buildTelemetryPacket().targetYaw, 90.0f, 0.01f);
+    EXPECT_EQ(eventQueue.GetSize(), 0);
+}
