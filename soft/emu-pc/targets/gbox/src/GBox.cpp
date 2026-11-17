@@ -5,6 +5,7 @@
 #include "CommandPacket.h"
 #include "Context.h"
 #include "Events.h"
+#include "PieceProgram.h"
 #include "RadioController.h"
 #include "piece_thresholds.h"
 #include "pin_definitions.h"
@@ -182,44 +183,6 @@ const char *busName(AdsBus bus)
 {
     return bus == AdsBus::BUS_1 ? "I2C1" : "I2C3";
 }
-
-CommandId pieceToCommand(BoxPieceId piece)
-{
-    switch (piece) {
-    case BoxPieceId::FORWARD:
-        return CommandId::MOTOR_FORWARD;
-    case BoxPieceId::BACKWARD:
-        return CommandId::MOTOR_BACKWARD;
-    case BoxPieceId::TURN_RIGHT:
-        return CommandId::MOTOR_TURN_RIGHT;
-    case BoxPieceId::TURN_LEFT:
-        return CommandId::MOTOR_TURN_LEFT;
-    default:
-        return CommandId::NONE;
-    }
-}
-
-bool appendCommand(CommandPacket &packet, CommandId command)
-{
-    if (packet.count >= BOX_MAX_PAYLOAD_COMMANDS) {
-        return false;
-    }
-
-    packet.commands[packet.count] = static_cast<uint8_t>(command);
-    ++packet.count;
-    return true;
-}
-
-bool appendPieceCommand(CommandPacket &packet, BoxPieceId piece)
-{
-    const CommandId command = pieceToCommand(piece);
-
-    if (command == CommandId::NONE) {
-        return piece == BoxPieceId::EMPTY;
-    }
-
-    return appendCommand(packet, command);
-}
 }
 
 GBox::GBox(Context &ctx)
@@ -299,63 +262,6 @@ void GBox::debounceAndEnqueue(Event &evt, unsigned long currentTime)
         LOGLN("Event queue is full! Unable to enqueue event.\n");
     }
 #endif
-}
-
-bool GBox::buildProgramFromPieces(const BoxBoardPieces &boardPieces, CommandPacket &packet,
-                                  bool &isEmpty)
-{
-    std::array<BoxPieceId, BOX_LOOP_SLOTS> loopPieces = {};
-
-    packet.count = 0;
-    for (std::size_t index = 0; index < BOX_MAX_PAYLOAD_COMMANDS; ++index) {
-        packet.commands[index] = static_cast<uint8_t>(CommandId::NONE);
-    }
-
-    for (std::size_t slot = 0; slot < BOX_LOOP_SLOTS; ++slot) {
-        loopPieces[slot] = boardPieces[BOX_MAIN_SLOTS + slot];
-        if (loopPieces[slot] == BoxPieceId::INVALID) {
-            isEmpty = false;
-            return false;
-        }
-        if (loopPieces[slot] == BoxPieceId::LOOP_CALL) {
-            loopPieces[slot] = BoxPieceId::EMPTY;
-        }
-    }
-
-    for (std::size_t slot = 0; slot < BOX_MAIN_SLOTS; ++slot) {
-        const BoxPieceId piece = boardPieces[slot];
-
-        if (piece == BoxPieceId::EMPTY) {
-            continue;
-        }
-
-        if (piece == BoxPieceId::INVALID) {
-            isEmpty = false;
-            return false;
-        }
-
-        if (piece == BoxPieceId::LOOP_CALL) {
-            for (std::size_t loopSlot = 0; loopSlot < BOX_LOOP_SLOTS; ++loopSlot) {
-                if (loopPieces[loopSlot] == BoxPieceId::EMPTY) {
-                    continue;
-                }
-
-                if (!appendPieceCommand(packet, loopPieces[loopSlot])) {
-                    isEmpty = false;
-                    return false;
-                }
-            }
-            continue;
-        }
-
-        if (!appendPieceCommand(packet, piece)) {
-            isEmpty = false;
-            return false;
-        }
-    }
-
-    isEmpty = packet.count == 0;
-    return !isEmpty;
 }
 
 bool GBox::routeForSlot(std::size_t slot, AdsRouteInfo &route)

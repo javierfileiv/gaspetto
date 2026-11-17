@@ -24,7 +24,6 @@ endif()
 # Project options for conditional builds
 option(GCAR "Build Gaspetto Car target" OFF)
 option(GBOX "Build Gaspetto Box target" OFF)
-option(NRF_SENDER "Build NRF Sender target" OFF)
 option(BUILD_TESTS "Build unit tests" OFF)
 
 # Define global compile definitions before adding subdirectories
@@ -32,8 +31,8 @@ add_compile_definitions(
   USE_RADIO_CONTROLLER LOW_POWER_MODE GASPETTO_LOG NRF_LOG PC_KEYBOARD_RADIO_SIM
 )
 
-# Interface library carrying the target-specific compile definition (GCAR / GBOX / NRF_SENDER) so
-# that all sub-libraries (radio_controller, arduino_framework, etc.) see the right -D flag.
+# Interface library carrying the target-specific compile definition (GCAR / GBOX) so that all
+# sub-libraries (radio_controller, arduino_framework, etc.) see the right -D flag.
 if(GCAR)
   add_library(target_config_itf INTERFACE)
   target_compile_definitions(target_config_itf INTERFACE GCAR)
@@ -60,7 +59,4 @@ if(BUILD_TESTS)
 endif()
 if(GBOX OR BUILD_TESTS)
   add_subdirectory(targets/gbox)
-endif()
-if(NRF_SENDER)
-  add_subdirectory(targets/nrf_sender)
 endif()

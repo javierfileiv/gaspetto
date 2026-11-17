@@ -19,6 +19,8 @@ RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
         this->writing_addr[i] = writing_addr[i];
         this->reading_addr[i] = reading_addr[i];
     }
+    logLineLen = 0;
+    std::memset(logLine, 0, sizeof(logLine));
 }
 
 void RadioController::init()
@@ -70,41 +72,64 @@ void RadioController::processRadio()
         LOGLN();
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
 
-        /* Heuristic: Detect packet type based on buffer content.
-         * EventPacket: eventId (byte 0) = 0-4, payload (byte 1) = CommandId
-         * CommandPacket: count (byte 0) = 0-31, commands[0] = CommandId
-         * If byte[0] <= 31 AND byte[1] is valid CommandId, assume BoxProgram.
-         */
-        uint8_t second_byte = buffer[1];
-        uint8_t maxCommandId = static_cast<uint8_t>(CommandId::MAX_COMMAND_ID);
-
-        /* Check if it looks like a CommandPacket. */
-        if (second_byte < maxCommandId) {
+        /* Byte 0 names the packet: a program keeps its command count
+         * there (never above 31) and every other kind carries a
+         * PacketTag, so one switch routes them all. The old heuristic
+         * read byte 1, which is a CommandId on a program and on an
+         * event alike: an event carrying a low CommandId was decoded as
+         * a program. */
+        switch (static_cast<PacketTag>(buffer[0])) {
+        case PacketTag::Event: {
+            EventPacket eventPacket;
+            std::memcpy(&eventPacket, buffer, sizeof(eventPacket));
+            LOG(F("Radio RX: EventPacket "));
+            LOG(eventIdToString(static_cast<EventId>(eventPacket.eventId)));
+            LOG(F(" "));
+            LOG(commandIdToString(static_cast<CommandId>(eventPacket.payload)));
+            LOGLN(F("."));
+            if (gaspettoQueue == nullptr) {
+                LOGLN(F("Radio RX: app queue unavailable."));
+                break;
+            }
+            if (gaspettoQueue->IsFull()) {
+                LOGLN(F("Radio RX: app queue full."));
+                break;
+            }
+            /* Post to active object queue. */
+            Event evt = Event::fromPacket(eventPacket);
+            gaspettoQueue->enqueue(evt);
+            LOG(F("Radio RX: queued event; app queue size="));
+            LOGLN(static_cast<int>(gaspettoQueue->GetSize()));
+            break;
+        }
+        case PacketTag::Telemetry: {
+            TelemetryPacket telemetry;
+            std::memcpy(&telemetry, buffer, sizeof(telemetry));
+            /* Watched, not acted on: the command that hands telemetry to
+             * the application is still to be written */
+            LOG(F("Radio RX: Telemetry yaw="));
+            LOG(telemetry.yaw, 1);
+            LOG(F(" tgt="));
+            LOG(telemetry.targetYaw, 1);
+            LOG(F(" state="));
+            LOGLN(static_cast<int>(telemetry.state));
+            break;
+        }
+        case PacketTag::Log:
+            handleLogFragment(buffer);
+            break;
+        default:
+            /* Not a tag: byte 0 is the command count of a program, and a
+             * count above the maximum means an unknown tag after all */
+            if (buffer[0] > BOX_MAX_PAYLOAD_COMMANDS) {
+                LOGLN(F("Radio RX: unknown packet tag, dropped."));
+                break;
+            }
             CommandPacket *boxPacket = reinterpret_cast<CommandPacket *>(buffer);
             LOG(F("Radio RX: CommandPacket count="));
             LOGLN(static_cast<int>(boxPacket->count));
             decodeCommandPacket(*boxPacket);
-        } else {
-            /* Treat as EventPacket. */
-            EventPacket *eventPacket = reinterpret_cast<EventPacket *>(buffer);
-            LOG(F("Radio RX: EventPacket "));
-            LOG(eventIdToString(static_cast<EventId>(eventPacket->eventId)));
-            LOG(F(" "));
-            LOG(commandIdToString(static_cast<CommandId>(eventPacket->payload)));
-            LOGLN(F("."));
-            Event evt = Event::fromPacket(*eventPacket);
-            if (gaspettoQueue == nullptr) {
-                LOGLN(F("Radio RX: app queue unavailable."));
-                return;
-            }
-            if (gaspettoQueue->IsFull()) {
-                LOGLN(F("Radio RX: app queue full."));
-                return;
-            }
-            /* Post to active object queue. */
-            gaspettoQueue->enqueue(evt);
-            LOG(F("Radio RX: queued event; app queue size="));
-            LOGLN(static_cast<int>(gaspettoQueue->GetSize()));
+            break;
         }
     }
     /* TX processing. Only send the first one. */
@@ -118,6 +143,7 @@ void RadioController::processRadio()
         LOG(F(" - "));
         LOGLN(commandIdToString(evt.getPayload()));
         evt.toPacket(packet);
+        packet.tag = static_cast<uint8_t>(PacketTag::Event);
         /* Stop listening. */
         _radio.stopListening();
         _radio.write(&packet, sizeof(packet));
@@ -164,12 +190,14 @@ bool RadioController::isChipConnected()
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 {
-    bool result = false;
-    /* Switch to telemetry address for transmission. */
-    _radio.openWritingPipe(gcar_telemetry_pipe_name);
-    result = sendBuffer(&telemetry, sizeof(telemetry));
-    /* Restore command pipe and resume listening. */
-    _radio.openWritingPipe(writing_addr);
+    /* One address for everything this device sends: sendBuffer() switches
+     * no pipe, so the telemetry rides writing_addr (_box_ for the car) like
+     * an event does, and the auto-ack comes back on pipe 0 as always. The
+     * tag is stamped here so no caller has to know the wire format. */
+    TelemetryPacket packet = telemetry;
+    packet.tag = static_cast<uint8_t>(PacketTag::Telemetry);
+
+    const bool result = sendBuffer(&packet, sizeof(packet));
     if (!result) {
         LOGLN(F("Telemetry send failed"));
     }
@@ -213,4 +241,30 @@ void RadioController::decodeCommandPacket(const CommandPacket &packet)
         LOG(F(" queued; app queue size="));
         LOGLN(static_cast<int>(gaspettoQueue->GetSize()));
     }
+}
+
+void RadioController::handleLogFragment(const uint8_t *buffer)
+{
+    const uint8_t flags = buffer[1];
+    const uint8_t dataLen = flags & 0x7FU;
+    const bool hasMore = (flags & 0x80U) != 0U;
+    const uint8_t room = static_cast<uint8_t>(sizeof(logLine) - logLineLen);
+    const uint8_t copy = (dataLen < room) ? dataLen : room;
+
+    if (copy < dataLen) {
+        LOGLN(F("Radio RX: log line too long, truncated."));
+    }
+
+    std::memcpy(&logLine[logLineLen], &buffer[2], copy);
+    logLineLen = static_cast<uint8_t>(logLineLen + copy);
+
+    if (hasMore) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < logLineLen; ++i) {
+        LOG(static_cast<char>(logLine[i]));
+    }
+    LOGLN();
+    logLineLen = 0;
 }

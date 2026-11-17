@@ -31,7 +31,11 @@ IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
 EventQueue eventQueue;
-RadioController radioController(radio, &eventQueue, gbox_pipe_name, gcar_pipe_name);
+/* Pipe names designate the destination: the Box transmits commands on the
+ * Car's pipe (_car_) and listens on its own (_box_). Passing them in the
+ * GCar order made the Box listen where the Car listens and transmit where
+ * nobody listens. */
+RadioController radioController(radio, &eventQueue, gcar_pipe_name, gbox_pipe_name);
 Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };
@@ -152,7 +156,7 @@ void setup()
 {
     Serial.begin(115200);
 #ifdef GASPETTO_LOG_OVER_NRF24
-    Log::attachNrf24(radio, gbox_log_pipe_name, gbox_pipe_name);
+    Log::attachNrf24(radio, gcar_pipe_name, gcar_pipe_name);
 #endif
 #ifdef ARDUINO
     /* Wait for CDC USB enumeration on Arduino before printing. */

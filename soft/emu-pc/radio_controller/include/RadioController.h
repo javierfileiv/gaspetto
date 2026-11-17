@@ -42,9 +42,15 @@ private:
      */
     void decodeCommandPacket(const CommandPacket &packet);
 
+    /* Reassemble one received log fragment and print the line once the
+     * final piece arrives */
+    void handleLogFragment(const uint8_t *buffer);
+
     RF24 &_radio;
     uint8_t writing_addr[5];
     uint8_t reading_addr[5];
     EventQueue radioQueue;
     EventQueue *gaspettoQueue;
+    uint8_t logLine[64];
+    uint8_t logLineLen;
 };

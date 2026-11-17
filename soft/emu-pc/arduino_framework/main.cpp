@@ -53,9 +53,6 @@ static void keyboardInput(void)
             gbox_input_switch(ch);
             ISR();
 #endif
-#if NRF_SENDER
-            nrf_sender_input_switch(ch);
-#endif
             std::cout << "Exiting low-power mode due to keyboard input.\n";
             lowPowerMode.store(false);
         }

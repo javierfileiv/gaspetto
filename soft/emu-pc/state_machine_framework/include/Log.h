@@ -4,10 +4,15 @@
 
 #ifdef ARDUINO
 #include <Print.h>
-#include <cstring>
+/* string.h, not <cstring>: the AVR toolchain ships no C++ standard
+ * library headers at all, <cstring> simply does not exist there */
+#include <string.h>
 
 #ifdef GASPETTO_LOG_OVER_NRF24
 #include "RF24.h"
+/* The tag lives in shared_types: that is the one include path every
+ * project that logs over the radio already carries */
+#include "PacketTag.h"
 #endif
 #else
 #include "Serial.h"
@@ -20,22 +25,27 @@
 namespace gaspetto_log
 {
 #ifdef GASPETTO_LOG_OVER_NRF24
+/* Radio payload width of a log fragment: every Gaspetto packet is 32 bytes.
+ * Named because an array parameter decays to a pointer, so sizeof() on one
+ * would give the pointer size (2 on AVR) instead of this */
+constexpr uint8_t kLogPayloadSize = 32;
+
 class NrfLogOutput : public Print {
 public:
     NrfLogOutput()
             : _radio(nullptr)
             , _lineLen(0)
     {
-        std::memset(_line, 0, sizeof(_line));
-        std::memset(_logAddress, 0, sizeof(_logAddress));
-        std::memset(_restoreAddress, 0, sizeof(_restoreAddress));
+        memset(_line, 0, sizeof(_line));
+        memset(_logAddress, 0, sizeof(_logAddress));
+        memset(_restoreAddress, 0, sizeof(_restoreAddress));
     }
 
     void attach(RF24 &radio, const uint8_t logAddress[5], const uint8_t restoreAddress[5])
     {
         _radio = &radio;
-        std::memcpy(_logAddress, logAddress, sizeof(_logAddress));
-        std::memcpy(_restoreAddress, restoreAddress, sizeof(_restoreAddress));
+        memcpy(_logAddress, logAddress, sizeof(_logAddress));
+        memcpy(_restoreAddress, restoreAddress, sizeof(_restoreAddress));
     }
 
     size_t write(uint8_t b) override
@@ -43,7 +53,7 @@ public:
         _line[_lineLen++] = static_cast<char>(b);
         if (b == '\n') {
             flushLineFinal();
-        } else if (_lineLen >= 31) {
+        } else if (_lineLen >= 30) {
             flushLineContinuation();
         }
         return 1;
@@ -64,9 +74,10 @@ private:
         }
 
         uint8_t payload[32];
-        payload[0] = 0x80 | 31; // Continuation flag (bit 7) + 31 bytes of data
+        payload[0] = static_cast<uint8_t>(PacketTag::Log);
+        payload[1] = 0x80 | 30; // Continuation flag (bit 7) + 30 bytes of data
 
-        std::memcpy(&payload[1], _line, 31);
+        memcpy(&payload[2], _line, 30);
 
         sendPayload(payload);
         _lineLen = 0;
@@ -84,19 +95,24 @@ private:
         }
 
         uint8_t payload[32] = { 0 };
-        payload[0] = (_lineLen & 0x7F); // End packet: no continuation flag, length in bits 6-0
+        payload[0] = static_cast<uint8_t>(PacketTag::Log);
+        payload[1] = (_lineLen & 0x7F); // End packet: no continuation flag, length in bits 6-0
 
-        std::memcpy(&payload[1], _line, _lineLen);
+        memcpy(&payload[2], _line, _lineLen);
 
         sendPayload(payload);
         _lineLen = 0;
     }
 
-    void sendPayload(const uint8_t payload[32])
+    void sendPayload(const uint8_t payload[kLogPayloadSize])
     {
         _radio->stopListening();
         _radio->openWritingPipe(_logAddress);
-        _radio->write(payload, sizeof(payload));
+        /* kLogPayloadSize, not sizeof(payload): the parameter is a pointer
+         * inside this function, and sizeof would be 2 on AVR. The chip would
+         * then transmit two bytes and pad the rest with zeros, which is what
+         * made every log line arrive with its content blank */
+        _radio->write(payload, kLogPayloadSize);
         _radio->openWritingPipe(_restoreAddress);
         _radio->startListening();
     }

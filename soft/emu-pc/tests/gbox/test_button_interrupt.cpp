@@ -46,7 +46,7 @@ struct BoxTestRig {
     TestableGBox box;
 
     BoxTestRig()
-            : radioController(mockRf24, &eventQueue, gbox_pipe_name, gcar_pipe_name)
+            : radioController(mockRf24, &eventQueue, gcar_pipe_name, gbox_pipe_name)
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
