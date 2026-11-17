@@ -259,7 +259,9 @@ void radio_run_menu_key(char key)
 void radio_run_car_stream_test()
 {
     uint8_t buffer[sizeof(CommandPacket)];
-    uint8_t logLine[64];
+    /* The car's longest line is 80 bytes, and the relay sends 30 per packet:
+     * a 64 byte buffer cut them and printed "line too long" */
+    uint8_t logLine[96];
     uint8_t logLineLen       = 0;
     uint32_t packets         = 0;
     uint32_t lastHeartbeatMs = millis();
@@ -295,6 +297,10 @@ void radio_run_car_stream_test()
             radio_run_send_pieces_test();
             radio.startListening();
             car_stream_send_requested = false;
+            /* The stream was deaf for the whole scan and animation, so the
+             * half line being reassembled has lost its middle: dropping it
+             * stops the tail gluing itself to the next line */
+            logLineLen = 0;
         }
 
         uint8_t pipe = 0;
