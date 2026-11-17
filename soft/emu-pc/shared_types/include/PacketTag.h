@@ -12,4 +12,5 @@ enum class PacketTag : uint8_t {
     Event = 0x80,
     Telemetry = 0x81,
     Log = 0x82,
+    Ota = 0x83,
 };
