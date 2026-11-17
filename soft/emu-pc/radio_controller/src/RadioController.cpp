@@ -58,6 +58,11 @@ void RadioController::init()
 #endif
     _radio.powerUp();
     _radio.startListening();
+#ifdef GASPETTO_LOG_OVER_NRF24
+    /* The chip answered begin(), so fragments can be framed and sent from
+     * here on: until this point the log output mirrored onto the console */
+    Log::markNrf24Ready();
+#endif
 }
 
 void RadioController::processRadio()
