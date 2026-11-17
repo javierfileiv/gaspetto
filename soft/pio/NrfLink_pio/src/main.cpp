@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <avr/wdt.h>
+#include <string.h>
 
 /* Mode 1 emulates the car: it listens for the program the Box sends on
  * _car_ and answers with telemetry on _box_, where the box listens. Mode 2
@@ -36,12 +37,20 @@ uint16_t gLogTick = 0;
 /* Program builder and queue, mode 2 only */
 CommandPacket currentProgram{};
 
+/* A line is printed as its fragments arrive. Buffering a whole line would cap
+ * its length, and the longest lines are exactly the ones worth reading: the
+ * "Ignoring new motor command while already processing a movement" notice is
+ * 78 bytes. One flag per source says whether the prefix was already printed */
+uint8_t gLogLineStarted[2] = { 0, 0 };
+
 /* Forward declarations */
 void printHelp();
 void setMode(uint8_t mode);
 void sendTelemetry();
 void sendCarLog();
+void sendDfuRequest();
 void drainRadio();
+void drainLogFragment(uint8_t pipe, const uint8_t *payload);
 void displayTelemetry(const TelemetryPacket &t);
 void displayCommandPacket(const CommandPacket &pkt);
 
@@ -65,6 +74,9 @@ void setup()
     /* Both payloads are 32 bytes, CommandPacket sets the size for both */
     radio.setPayloadSize(sizeof(CommandPacket));
     radio.powerUp();
+    /* The chip answered begin(): log fragments can now ride the air instead
+     * of the console */
+    Log::markNrf24Ready();
 
     setMode(kModeCar);
 
@@ -206,6 +218,33 @@ void sendCommand(CommandId cmd)
     Serial.println(commandIdToString(cmd));
 }
 
+/* The car takes a tagged event as a device command: no motor command byte is
+ * spent on it and no program can produce it. The payload is written at the
+ * full 32 byte width so the receiver never depends on the chip padding the
+ * tail of a short write */
+void sendDfuRequest()
+{
+    uint8_t payload[sizeof(CommandPacket)] = { 0 };
+    bool sent;
+
+    payload[0] = static_cast<uint8_t>(PacketTag::Event);
+    payload[1] = static_cast<uint8_t>(EventId::DFU_REQUEST);
+    payload[2] = static_cast<uint8_t>(CommandId::NONE);
+
+    /* Car emulation transmits on _box_, so the request would never reach the
+     * car: the box mode owns the _car_ writing pipe */
+    if (gMode != kModeBox) {
+        setMode(kModeBox);
+    }
+
+    radio.stopListening();
+    sent = radio.write(payload, sizeof(payload));
+    radio.startListening();
+
+    Serial.print(sent ? "DFU request ACKed by the car" : "DFU request FAILED (no ACK)");
+    Serial.println(", the board should re-enumerate in about a second");
+}
+
 void addCommandToProgram(CommandId cmd)
 {
     if (currentProgram.count < BOX_MAX_PAYLOAD_COMMANDS) {
@@ -275,33 +314,69 @@ bool consumeResetWord(char ch)
     return seen == 1;
 }
 
+/* One log line per source: fragments are printed as they arrive, the prefix
+ * only on the first one, and a newline once the continuation bit clears */
+void drainLogFragment(uint8_t pipe, const uint8_t *payload)
+{
+    const uint8_t flags = payload[1];
+    const uint8_t dataLen = flags & 0x7FU;
+    const bool hasMore = (flags & 0x80U) != 0U;
+    const uint8_t index = pipe & 1U;
+
+    if (gLogLineStarted[index] == 0) {
+        /* Pipe 1 is the other side's channel, and which device that is follows
+         * the mode: car emulation reads the box, box emulation reads the car */
+        Serial.print(gMode == kModeCar ? "[BOX] " : "[CAR] ");
+        gLogLineStarted[index] = 1;
+    }
+
+    for (uint8_t i = 0; i < dataLen; ++i) {
+        Serial.write(payload[2 + i]);
+    }
+
+    if (!hasMore) {
+        if (dataLen == 0 || payload[2 + dataLen - 1] != '\n') {
+            Serial.println();
+        }
+        gLogLineStarted[index] = 0;
+    }
+}
+
 void drainRadio()
 {
     uint8_t pipe;
 
     while (radio.available(&pipe)) {
+        uint8_t payload[sizeof(CommandPacket)] = { 0 };
+
+        radio.read(payload, sizeof(payload));
+
         /* pipe 1 carries the other side's payload: a program in car mode,
-         * telemetry in box mode. pipe 0 is the address this mode transmits
-         * to, so whatever lands on it is traffic meant for the other
-         * device and is dropped */
-        if (pipe == 1) {
-            if (gMode == kModeCar) {
-                CommandPacket cmd;
+         * telemetry and logs in box mode. pipe 0 is the address this mode
+         * transmits to, so whatever lands on it is traffic meant for the
+         * other device and is dropped */
+        if (pipe != 1) {
+            continue;
+        }
 
-                radio.read(&cmd, sizeof(cmd));
-                displayCommandPacket(cmd);
-            } else {
-                TelemetryPacket tlm;
+        /* Byte 0 says what arrived: a tag for a log, telemetry or event, and
+         * the command count for a program. One comparison per case, instead
+         * of assuming the payload matches the mode */
+        if (payload[0] == static_cast<uint8_t>(PacketTag::Log)) {
+            drainLogFragment(pipe, payload);
+        } else if (gMode == kModeCar) {
+            CommandPacket cmd;
 
-                radio.read(&tlm, sizeof(tlm));
-                displayTelemetry(tlm);
-            }
+            memcpy(&cmd, payload, sizeof(cmd));
+            displayCommandPacket(cmd);
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::Telemetry)) {
+            TelemetryPacket tlm;
+
+            memcpy(&tlm, payload, sizeof(tlm));
+            displayTelemetry(tlm);
         } else {
-            uint8_t sink[sizeof(CommandPacket)];
-
-            /* Not a payload this mode interprets: drop it so the FIFO
-             * cannot fill up and stall the radio */
-            radio.read(sink, sizeof(sink));
+            Serial.print("[rx] ignored packet, tag=0x");
+            Serial.println(payload[0], HEX);
         }
     }
 }
@@ -318,6 +393,11 @@ void handleKey(char ch)
         break;
     case '2':
         setMode(kModeBox);
+        break;
+    case 'f':
+        /* A device command, not a motor one: it works from any mode and
+         * switching to the box mode is part of sending it */
+        sendDfuRequest();
         break;
     case '?':
     case 'h':
@@ -395,7 +475,10 @@ void loop()
         handleKey(static_cast<char>(Serial.read()));
     }
 
-    delay(100);
+    /* Short, not 100 ms: the receiver's FIFO is three packets deep, so a burst
+     * of car logs during boot overflows it and whole lines are lost. Draining
+     * often is what keeps a log readable */
+    delay(5);
 }
 
 void printHelp()
@@ -406,6 +489,7 @@ void printHelp()
     Serial.println("     on _car_ and answers with telemetry and logs on _box_");
     Serial.println("  2: box/sender - sends commands on _car_, reads telemetry on _box_");
     Serial.println("  ?: this help");
+    Serial.println("  f: ask the car to enter its DFU bootloader (works in any mode)");
     Serial.println("  reset: type the five letters in a row to reboot the MCU");
     Serial.println("\nMode 2 keys:");
     Serial.println("  w/s/a/d/x: send a single command");
