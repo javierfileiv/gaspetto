@@ -48,14 +48,14 @@ void Fixture::expect_move_backward(float speed, uint32_t timeout_ms)
     EXPECT_CALL(_mock_movementController, startStraightDriving(-speed, timeout_ms));
 }
 
-void Fixture::expect_turn_left(float target_yaw, float speed, uint32_t timeout_ms)
+void Fixture::expect_turn_left(float delta_yaw, float speed, uint32_t timeout_ms)
 {
-    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
+    EXPECT_CALL(_mock_movementController, startTurningBy(delta_yaw, speed, timeout_ms));
 }
 
-void Fixture::expect_turn_right(float target_yaw, float speed, uint32_t timeout_ms)
+void Fixture::expect_turn_right(float delta_yaw, float speed, uint32_t timeout_ms)
 {
-    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
+    EXPECT_CALL(_mock_movementController, startTurningBy(delta_yaw, speed, timeout_ms));
 }
 
 void Fixture::expect_stop_both_motors()

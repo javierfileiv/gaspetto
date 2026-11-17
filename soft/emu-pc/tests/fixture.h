@@ -56,8 +56,8 @@ public:
     }
     void expect_move_forward(float speed, uint32_t timeout_ms);
     void expect_move_backward(float speed, uint32_t timeout_ms);
-    void expect_turn_left(float target_yaw, float speed, uint32_t timeout_ms);
-    void expect_turn_right(float target_yaw, float speed, uint32_t timeout_ms);
+    void expect_turn_left(float delta_yaw, float speed, uint32_t timeout_ms);
+    void expect_turn_right(float delta_yaw, float speed, uint32_t timeout_ms);
     void expect_stop_both_motors();
     void expect_update_movement();
     void expect_target_reached();

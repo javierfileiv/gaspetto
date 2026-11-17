@@ -60,6 +60,11 @@ void GCar::setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t time
     _ctx.movementController->startTurningInPlace(final_yaw_angle, speed, timeout_ms);
 }
 
+void GCar::setMotorTurnBy(float delta_yaw, float speed, uint32_t timeout_ms)
+{
+    _ctx.movementController->startTurningBy(delta_yaw, speed, timeout_ms);
+}
+
 void GCar::stopBothMotors(void)
 {
     _ctx.movementController->stopBothMotors();

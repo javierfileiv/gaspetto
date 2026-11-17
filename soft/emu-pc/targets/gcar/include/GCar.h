@@ -26,8 +26,14 @@ const uint32_t MOTOR_FREQ = 15;
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
 
 const float INITIAL_MOTOR_SPEED = 37;
-const uint32_t TURN_MOTOR_SPEED = 35;
+/* Turns need more duty than the straight drive: the wheels scrub sideways. At
+ * 35 the car turned at 12 deg/s, and at 100 it reached 250 deg/s and overshot
+ * the target by 60 degrees, so the usable range sits between the two */
+const uint32_t TURN_MOTOR_SPEED = 70;
 const uint32_t MOTOR_TIMEOUT_MS = 2500; /* Default timeout for motor commands. */
+/* A quarter turn takes longer than a forward burst, and this timeout is only
+ * the safety net: the turn ends on its angle, well before it */
+const uint32_t TURN_MOTOR_TIMEOUT_MS = 4000;
 
 /**
  * @brief Active object base type for GCar.
@@ -58,6 +64,13 @@ public:
      * @duration_ms: optional duration in milliseconds (0 for unlimited)
      */
     void setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms);
+
+    /** * setMotorTurnBy: turn by a delta from the current heading
+     * @delta_yaw: signed angle in degrees, positive turns counter-clockwise
+     * @speed: base speed for turning
+     * @timeout_ms: optional duration in milliseconds (0 for unlimited)
+     */
+    void setMotorTurnBy(float delta_yaw, float speed, uint32_t timeout_ms);
 
     /* stopBothMotors: stop all motor movement immediately */
     void stopBothMotors(void);

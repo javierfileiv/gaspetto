@@ -32,7 +32,7 @@ EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
 IMUOrientation imu;
-MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD);
+MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_FWD, MOTOR_RIGHT_BWD);
 MovementController carMovementController(motorControl, imu);
 RadioController radioControllerCar(radio, &eventQueue, gbox_pipe_name, gcar_pipe_name);
 

@@ -315,7 +315,8 @@ TEST_F(PIDMovementTest, TurningWithLargeErrorClampsMotorSpeeds)
                 right = r;
             });
 
-    runPIDCycles(3);
+    /* The duty is ramped, so give it time to reach the clamp. */
+    runPIDCycles(40);
 
     EXPECT_LE(left, 255u);
     EXPECT_LE(right, 255u);

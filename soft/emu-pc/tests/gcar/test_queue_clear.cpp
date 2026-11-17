@@ -100,7 +100,7 @@ TEST_F(QueueClearTest, TurnMovementQueueClearReceived)
     radio_receive_event(&rightEvent);
     set_exit_low_power_mode();
     expect_update_movement();
-    expect_turn_right(90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_turn_right(-90.0f, TURN_MOTOR_SPEED, TURN_MOTOR_TIMEOUT_MS);
     expect_target_not_reached();
     gaspettoCar.work();
     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);

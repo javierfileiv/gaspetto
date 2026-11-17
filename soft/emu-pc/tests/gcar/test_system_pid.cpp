@@ -326,8 +326,8 @@ TEST_F(SystemPIDTest, TurnRightCommand_StopsWhenYawReachesTarget)
     postEvent(rightEvent);
     runWorkCycles(1); /* Start the turn. */
 
-    /* Simulate the car gradually reaching 90°. */
-    const float steps[] = { 20, 45, 70, 85, 89, 90, 90, 90, 90 };
+    /* A right turn drives the yaw down to -90. */
+    const float steps[] = { -20, -45, -70, -85, -89, -90, -90, -90, -90 };
     for (float yaw : steps) {
         setYaw(yaw);
         ON_CALL(mockRF24, _available(_)).WillByDefault(Return(false));
@@ -345,7 +345,7 @@ TEST_F(SystemPIDTest, TurnLeftCommand_StopsWhenYawReachesTarget)
     postEvent(leftEvent);
     runWorkCycles(1);
 
-    const float steps[] = { -20, -45, -70, -85, -89, -90, -90, -90, -90 };
+    const float steps[] = { 20, 45, 70, 85, 89, 90, 90, 90, 90 };
     for (float yaw : steps) {
         setYaw(yaw);
         ON_CALL(mockRF24, _available(_)).WillByDefault(Return(false));
@@ -355,6 +355,31 @@ TEST_F(SystemPIDTest, TurnLeftCommand_StopsWhenYawReachesTarget)
 
     EXPECT_FALSE(movementController.isMoving());
     EXPECT_TRUE(isInState(StateId::IDLE));
+}
+
+TEST_F(SystemPIDTest, TwoLeftTurnsAccumulateFromTheCurrentHeading)
+{
+    setYaw(0.0f);
+    postEvent(leftEvent);
+    runWorkCycles(1);
+
+    /* First turn: from 0 to +90. */
+    const float steps[] = { 20, 45, 70, 85, 89, 90, 90, 90, 90 };
+    for (float yaw : steps) {
+        setYaw(yaw);
+        ON_CALL(mockRF24, _available(_)).WillByDefault(Return(false));
+        advanceTime(PID_PERIOD_MS);
+        gaspettoCar.work();
+    }
+    ASSERT_TRUE(isInState(StateId::IDLE));
+
+    /* Second turn: a relative +90 from +90 must aim at +180, not come back to
+     * +90 like an absolute target would */
+    setYaw(90.0f);
+    postEvent(leftEvent);
+    runWorkCycles(1);
+
+    EXPECT_NEAR(movementController.buildTelemetryPacket().targetYaw, 180.0f, 1.0f);
 }
 
 /* ---- Stop ---- */
@@ -431,13 +456,13 @@ TEST_F(SystemPIDTest, ForwardThenTurnRight_FullSequence)
     runWorkCycles(101);
     ASSERT_TRUE(isInState(StateId::IDLE));
 
-    /* 2) Turn right, yaw reaches 90°. */
+    /* 2) Turn right, yaw reaches -90°. */
     setYaw(0.0f);
     postEvent(rightEvent);
     runWorkCycles(1);
     ASSERT_TRUE(isInState(StateId::PROCESSING));
 
-    const float steps[] = { 30, 60, 85, 89, 90, 90, 90, 90 };
+    const float steps[] = { -30, -60, -85, -89, -90, -90, -90, -90 };
     for (float yaw : steps) {
         setYaw(yaw);
         ON_CALL(mockRF24, _available(_)).WillByDefault(Return(false));
