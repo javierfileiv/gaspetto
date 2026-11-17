@@ -26,10 +26,12 @@ const uint32_t MOTOR_FREQ = 15;
 constexpr uint8_t CAR_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
 
 const float INITIAL_MOTOR_SPEED = 37;
-/* Turns need more duty than the straight drive: the wheels scrub sideways. At
- * 35 the car turned at 12 deg/s, and at 100 it reached 250 deg/s and overshot
- * the target by 60 degrees, so the usable range sits between the two */
-const uint32_t TURN_MOTOR_SPEED = 70;
+/* Turns need more duty than the straight drive: the wheels scrub sideways.
+ * Measured at 15 Hz, a steady 20 turned at about 10 deg/s and a saturated 70
+ * at about 86 deg/s. The duty is now held at this value for the whole turn,
+ * which that curve puts near 30 deg/s, so a quarter turn takes about three
+ * seconds instead of a burst followed by a crawl */
+const uint32_t TURN_MOTOR_SPEED = 34;
 const uint32_t MOTOR_TIMEOUT_MS = 2500; /* Default timeout for motor commands. */
 /* A quarter turn takes longer than a forward burst, and this timeout is only
  * the safety net: the turn ends on its angle, well before it */

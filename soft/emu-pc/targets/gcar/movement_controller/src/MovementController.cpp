@@ -237,17 +237,16 @@ void MovementController::applyPidOutput()
             return;
         }
 
-        double correctionScale = motorOffsetOutput / 180.0;
-        correctionScale = constrain(correctionScale, -1.0, 1.0);
+        /* One steady rate for the whole turn. A duty proportional to the
+         * error saturated from the start and then collapsed onto the floor,
+         * so a quarter turn was a burst followed by a crawl; now the error
+         * only says which way to go */
+        const int turnPWM = static_cast<int>(baseSpeed);
 
-        int turnPWM = static_cast<int>(safe_fabs(correctionScale) * baseSpeed);
-        if (turnPWM < 20)
-            turnPWM = 20;
-
-        /* Ramp the duty instead of jumping to it: an instant 70 turns a slow
+        /* Ramp the duty instead of jumping to it: an instant 34 turns a slow
          * pivot into a jolt the chassis feels */
-        const int RAMP_STEP = 10; /* Per PID cycle. */
-        int requestedLeft = (correctionScale >= 0) ? -turnPWM : turnPWM;
+        const int RAMP_STEP = 5; /* Per PID cycle, so the start takes ~350 ms. */
+        int requestedLeft = (motorOffsetOutput >= 0.0) ? -turnPWM : turnPWM;
         if (requestedLeft > turnLeftPwm + RAMP_STEP) {
             turnLeftPwm += RAMP_STEP;
         } else if (requestedLeft < turnLeftPwm - RAMP_STEP) {
