@@ -180,14 +180,16 @@ void recoverI2c3Bus()
     delay(20);
 }
 
-/* Bring one ADS module back after a failed transaction: bit-banged
- * I2C3 re-inits the bus itself; hardware I2C1 needs a bus restart and
- * a fresh module begin before the next try can succeed */
-void recoverAdsModule(const AdsTestEntry *entry)
+/* Bring the bus and the module back, silently. The same work the recovery
+ * does, minus its report: a caller that re-arms on every rail-up must not be
+ * drowned in [RECOVERED] lines. Only the hardware bus needs it - the
+ * bit-banged I2C3 re-samples its pins on every operation and reads with a
+ * span of 0 or 1 straight through a power cycle, so there is nothing to
+ * restore there */
+void rearmAdsModule(const AdsTestEntry *entry)
 {
-    if (entry->useBitBang)
+    if (entry->useBitBang || entry->wire == nullptr)
     {
-        recoverI2c3Bus();
         return;
     }
 
@@ -197,7 +199,32 @@ void recoverAdsModule(const AdsTestEntry *entry)
     Adafruit_ADS1115 ads;
     ads.begin(entry->address, entry->wire);
     ads.setGain(GAIN_ONE);
-    Serial.println("   [RECOVERED] I2C1 module re-inited");
+}
+
+/* Bring one ADS module back after a failed transaction: bit-banged
+ * I2C3 re-inits the bus itself; hardware I2C1 needs a bus restart and
+ * a fresh module begin before the next try can succeed */
+void recoverAdsModule(const AdsTestEntry *entry)
+{
+    /* The recovery re-inits the module over I2C and the ADS chips hang on
+     * the sensor rail. Every caller reaches this right after a failed read,
+     * which is exactly the moment the lease drops the rail, so take it back
+     * for the duration - unless an enclosing scan is already holding it */
+    const bool acquired = sensorRailAcquire();
+
+    if (entry->useBitBang)
+    {
+        /* The bit-banged bus needs nothing at rail-up, but it does after a
+         * failed transaction: its lines can be left mid-byte by a timeout */
+        recoverI2c3Bus();
+    }
+    else
+    {
+        rearmAdsModule(entry);
+        Serial.println("   [RECOVERED] I2C1 module re-inited");
+    }
+
+    sensorRailRelease(acquired);
 }
 
 bool readAdsConfigRegister(const AdsTestEntry *entry, uint16_t &config)
@@ -309,16 +336,41 @@ static bool readAdsSingleEnded(const AdsTestEntry *entry, uint8_t channel, int16
 
 bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t &meanRaw)
 {
+    /* Raise the sensor rail for the reading and drop it again: the decode
+     * depends on how long the rail has been up - a warm board reads about
+     * 370 counts higher than a cold one, more than half the narrowest EMPTY
+     * band, which flips ten of the twenty slots to another piece with the
+     * pieces untouched. A short pulse from cold is the only state that
+     * repeats between a calibration and a later scan. The lease keeps a
+     * rail someone else holds: the health cycle raises it for its I2C
+     * probes, and a reading must not take it away from under it */
+    const bool acquired = sensorRailAcquire();
+    if (acquired)
+    {
+        /* Power-cycling an ADS leaves both stale: the master waits on a
+         * slave that was unpowered mid-transaction, and the module itself
+         * comes back in a state where it answers but returns wrong
+         * conversions - worse than failing, since nothing reports it. The
+         * recovery does both steps and is proven to give clean values, so
+         * this is that same re-arm on every rail-up rather than only after
+         * every failure. rearmAdsModule is a no-op on the bit-banged bus,
+         * which reads straight through a power cycle */
+        rearmAdsModule(entry);
+    }
+
     int32_t sum = 0;
     for (uint8_t sample = 0; sample < kAdsMeanSamples; ++sample)
     {
         int16_t raw = 0;
         if (!readAdsSingleEnded(entry, channel, raw))
         {
+            sensorRailRelease(acquired);
             return false;
         }
         sum += raw;
     }
+
+    sensorRailRelease(acquired);
 
     meanRaw = static_cast<int16_t>(sum / static_cast<int32_t>(kAdsMeanSamples));
     return true;

@@ -14,7 +14,7 @@ The production and test firmware must agree on thresholds, so both read the same
 ## Runtime Modes
 
 - **Health** (default at boot) — idles until a key asks for a test (`s` runs the cycle); the board LED heartbeat runs while quiet, and each cycle reports probe/radio changes against the previous one
-- **Calibration** — keeps the 5V LED rail off, powers the 3V3 sensor rail, and allows piece labeling
+- **Calibration** — keeps the 5V LED rail off, raises the 3V3 sensor rail for each reading rather than holding it on, and allows piece labeling
 
 ## USB Commands
 
@@ -26,8 +26,8 @@ The production and test firmware must agree on thresholds, so both read the same
 | `?` | Print the active mode and rail states |
 | `m` | Continuous readout of a slot with a live decoded piece (`<slot>m`, the number is required) |
 | `x` | Frozen monitor: waits without sampling, SPACE opens one clean 3 s measurement (`<slot>x`, the number is required) |
-| `g` | Start game mode (calibration only); `<slot>g` or `<slot>g<piece>` scopes a retake |
-| `w` | Reprint the per-slot analysis and the paste-ready generated rows |
+| `j` | Start or resume jig mode: piece census then slot gains, no keypress during the walk (calibration only) |
+| `k` | Forget one slot's jig captures so the plan asks for it again: `<slot>k` (calibration only) |
 | `l` | LED test menu: 1 walk, 2-4 channels on LED 0-2, 5-9 animations, 0 all, `q` quits (5V rail is switched for the menu) |
 | `p` | Scan the 20 slots, build the production payload and send it to the car; the LEDs show the verdict (green ACK, amber empty, red refused, RF error no answer) |
 | `e` | Listen to `_box_`: prints the car's telemetry and log fragments until a key stops it |
@@ -51,8 +51,9 @@ All printed values are raw ADS1115 counts (GAIN_ONE, single-ended, 3V3
 rail) — the same scale the production decode compares against, so pasted
 thresholds need no conversion.
 
-Capture runs through the guided game mode below; manual per-key labeling
-retired with the global-table workflow (gap analysis `t` and header `x` are gone too; `w` reprints the rows any time).
+Capture runs through the jig mode below; the guided game walk and the manual
+per-key labeling it replaced are gone, and `j` reprints the analysis and the
+rows at any time.
 
 ## Slot Monitor (`m`)
 
@@ -106,123 +107,157 @@ swallowed (one key, one measure).
 
 Full campaign recipe, in order:
 
-1. Flash the firmware, open the serial monitor, press `c` — calibration mode powers the 3V3 sensor rail and enables capture
-2. Run the guided game (next section): `g`, then follow every prompt until the firmware prints the per-slot analysis and the generated rows
+1. Flash the firmware, open the serial monitor, press `c` — calibration mode enables capture, and every reading raises the 3V3 sensor rail for its own duration
+2. Run the jig walk (next section): `j`, then follow the prompts until the firmware prints the analysis, the verification sheet and the generated rows
 3. Paste the generated rows over the `BEGIN/END GENERATED PER-SLOT ROWS` block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h`, rebuild and flash
 4. Verify: `s` runs the scan pass — every calibrated slot must decode its placed piece; watch real re-seating variance with `<slot>m` before trusting a boundary
 
-A slot that needs rework later: `5R` clears its clusters and a fresh game run
-rebuilds them.
+Each scan now ends with a `--- PASS COMPARISON ---` block: for every slot it
+prints the previous pass's mean, this pass's mean and their delta, so a piece
+that was placed, removed or nudged between two passes is obvious instead of
+hiding inside the session-wide `min`/`max`. Deltas past 150 counts are flagged
+`<<`. The first scan of a session only stores the baseline; a failed read keeps
+the slot's last valid reading as the reference. The running `min`/`max` on the
+slot lines still span the whole session, so a piece that moves between passes
+inflates their `span` — use the comparison block, not that span, to judge
+stability.
 
-## Game Mode (Guided Calibration)
+A slot that needs rework later: `19k` forgets its captures, and the next `j`
+asks for it again — ten seconds instead of a campaign.
 
-Game mode replaces manual `<slot><label>` typing with a guided sequence that prevents mislabeling and enforces reading stability. Activate it in calibration mode with `g`.
+## Jig Mode (Piece Census and Slot Gains)
 
-### How It Works
+The measured bench path for a full table regeneration. Enter it in calibration mode with `j`. It replaces the game's slot-major walk with a type-major one: one piece stays in the operator's hand for a whole pass, and **no keypress is needed during the walk** — the reading says when a piece is in and when it has settled.
 
-The firmware walks through all (piece, slot) combinations in a fixed order:
+### Two Quantities, Not One
 
-1. **By piece**: EMPTY → FORWARD → LOOP_CALL → TURN_RIGHT → TURN_LEFT
-2. **By slot**: for each piece, all 20 slots (`kGameSlotCount = 20`, the fully populated board)
-3. **By sample**: 8 readings per combination (configurable via `kGameSamplesPerCombo`)
+A piece is characterised by its **deviation** from the slot's idle level, and a slot by the **gain** that scales every deviation. Everything else follows from those two.
 
-Total: 5 pieces × 20 slots × 8 samples = **800 steps**. EMPTY is special: one SPACE confirms the whole board is clear and records every slot at once.
+Working in deviations is what makes the numbers usable: the rail wanders by about 0.2 % over minutes, and the scan fought that wander for a whole evening. A deviation is taken against an idle level measured seconds earlier in the same slot, so a shift of the supply moves both terms and cancels. That is also why the warm-up rule of the scan does not apply here: nothing is compared across minutes except ratios.
 
-### Sequence
+The exception is a census spread over several minutes, where an early capture taken against a much older idle would be biased — the reference slot's idle is therefore re-measured at the start of each type, and the gain pass re-measures it in every slot, the reference one included, so both ends of every ratio come from the same pass.
 
-At each step, the firmware:
+### Phases
 
-1. Displays the instruction: `[step/total] slot N, PIECE_HINT [sample/8]`
-2. In auto-capture (default, toggle with `a`), polls the current slot and records a sample as soon as the reading settles — the operator only places and removes pieces
-3. With auto-capture off, SPACE triggers the capture attempt
-4. Either way: 5 rapid readings, stability check (span < 100 counts), then the mean is recorded with the outlier guard (±20%) and the sequence advances
-5. If unstable: prints the span and stays on the same step — adjust the piece (or SPACE again with auto off)
+1. **Idle** of the reference slot (slot 1): the datum every deviation is taken against
+2. **Census**: five pieces per type, four orientations per piece while they matter, all in slot 1
+3. **Gains**: the same reference piece in all 20 slots, each preceded by its own idle — the reference slot included, so both ends of every ratio come from the same pass. Which piece it was is read back from the captures, not from the census, so a census redone later does not orphan a gain pass that is still valid
+4. **Analysis**: the type medians and spreads, the slot gains and margins, and the pasteable rows
 
-### Keys During Game Mode
+The plan is recomputed from what is missing at every step, so a capture can simply be repeated by replacing the piece: the newest one wins. Orientation is only asked four times while it moves the reading by more than 50 counts; after three pieces the firmware drops to one placement per piece and says so.
+
+A piece placed badly is **restarted** with `n`: its poses are dropped and the walk asks for it again from orientation 1, so a mistake costs four placements instead of the whole census. It acts on the piece just measured, not on the one on screen — by the time a mistake is noticed the prompt has already moved on, and that next piece is not the one anybody wants to redo. **`b`** steps back a single capture for the same reason, when only the last orientation was captured badly. A broken or lost piece is **written off** with `N`: all four orientations are dropped from the plan, and a type is treated as complete from **three pieces up**, which is still enough for a median and a spread.
+
+### Detector
+
+A reading 200 counts away from the slot's idle or more is a piece; six consecutive readings inside a 25-count span are a settled plateau and the capture happens. A wild first reading widens the span and resets the plateau on its own, so no explicit discard is needed.
+
+A new capture in the same slot also needs the reading to have **moved by 30 counts since the previous one**. That is what stops a placement that has not moved from being recorded twice, and it replaces a first design that armed on a return to idle: a reading costs the rail's settle time, so a piece lifted and turned in a third of a second was invisible to it and the walk stalled until SPACE was pressed.
+
+30 counts is only just above the jitter two identical placements show (0 to 15). A first value of 150 was wrong in a way worth recording: it treated "the piece did not move" and "the piece turned but the reading moved by less than 150" as the same thing, and a turn that shifts the reading by 48 counts is a real turn. When a piece genuinely reads the same in every orientation, the guard gives way after eight polls, records the value and says only that — the firmware has no way to know the magnet is centred, so it no longer claims it. The census prints each piece's **rotation spread**, which is the measurement that answers the question.
+
+An idle level is refused when it reads more than 900 counts from the expected one, which is how a piece left in the slot is kept from becoming that slot's reference. SPACE lifts both guards but never the stability requirement: a forced capture is still a settled plateau, never a single reading.
+
+### Marking the Pieces
+
+The census measures four orientations per piece and the analysis keeps the one that lands closest to its family's centre, because an off-centre magnet can move the reading by a thousand counts a quarter turn apart. What it prints has to be something the operator can act on, so the winning pose is named together with the edge to paint:
+
+```
+    piece 1 dev -2459 rotation spread 1125 mark: text upside down, paint the edge at the bottom of the text
+```
+
+| pose that won | edge to paint |
+|---|---|
+| text readable | the edge at the top of the text |
+| text 90 cw | the edge at the left of the text |
+| text upside down | the edge at the bottom of the text |
+| text 270 cw | the edge at the right of the text |
+
+The rule given to the player should then be absolute, not relative: **the arrow points to the hinge**. "Pointing up" depends on where the player stands, while the hinge is a fixed feature of the box that anyone can check at a glance.
+
+### Colours, Not Names
+
+The operator handles the pieces by colour, so the whole walk speaks in colours: the prompts, the dump and the analysis all start with `green 4mm`, `blue 4mm`, `red 2mm` or `yellow 2mm`. The name a piece carries in the shared table (`FORWARD`, `TURN_LEFT`, ...) is the bench firmware's business, and it is only printed where it matters — as `green 4mm as TURN_LEFT` — so nobody has to relabel a piece.
+
+That mapping lives in **one array**, `kBandPieces` in `scan.cpp`, and `kJigTypeHints` holds the matching colours. The bands ascend with the raw reading, and this batch reads the greens lowest and the blues highest, so the band order here is:
+
+```
+band 0  green 4mm   FORWARD      the most negative
+band 1  yellow 2mm  TURN_RIGHT
+band 2  -           EMPTY        the slot's own idle
+band 3  red 2mm     LOOP_CALL
+band 4  blue 4mm    TURN_LEFT    the most positive
+```
+
+The names follow the measurement instead of asking twenty magnets to be flipped. Rebuilding the pieces the other way round flips that one array, nothing else — and nothing has to be relabelled on the pieces either way.
+
+### Canonical Order Check
+
+The bands ascend with the raw reading, so the table's columns follow one order and the decode depends on it: `FORWARD < TURN_RIGHT < EMPTY < LOOP_CALL < TURN_LEFT` for this batch. A piece built with the other pole lands in the wrong band, and then every slot would be reported as an overlap without ever saying why. Before emitting anything, the analysis prints the measured order next to the expected one and refuses to produce rows when a family is out of place — the fix is the `kBandPieces` mapping, not a threshold.
+
+### Threshold Placement
+
+Each row is seeded from the compiled `GASPETTO_ADC_SLOT_THRESHOLDS`, so a slot the run could not trust keeps the row it already had instead of dropping to zeros. For the slots it could compute, every boundary sits **at the midpoint of the gap** between the two measured bands, rounded to 5:
+
+```
+band of a class = slot idle + median × gain  ±  (spread + play allowance) × gain
+boundary between two classes = (upper of the lower + lower of the upper) / 2
+```
+
+The midpoint is the fix for what the game does (`min − 150`, which leaves 150 counts on one side and the whole rest of the gap on the other): it splits the risk evenly, so a badly placed piece and an empty slot are equally far from a wrong verdict.
+
+The play allowance covers the fact that a piece lands anywhere within the slot's play, and the field error that follows is proportional to the deviation — the field falls with the cube of the distance, so this is not a fixed count. Keeping it out would make the bands optimistic: the census picks each piece's best of four placements, and a player who does not reproduce that lucky landing would fall outside a band sized without it. `kJigPlayPermille` holds the value, derived from the 588-count spread measured over four orientations on a piece reading about 2700, and meant to be replaced by the 8-placement test.
+
+Two bands that touch mean the slot cannot separate the pieces — the row is refused and reported.
+
+### Idle History
+
+The analysis opens with every idle measurement grouped by slot, each shown as its distance to that slot's median:
+
+```
+--- IDLE HISTORY (counts, deltas to the slot median) ---
+  slot  1  median 13110  -15, -15, +26, +26, 0
+  slot 12  median 12430  -160, +160 <<
+```
+
+Two measurements of one slot minutes apart have to agree to a few tens of counts: the rail wanders by that much, not by hundreds. A larger spread means one of them caught a piece lying next to the slot or a hand over it, and every deviation of that family is shifted by the same amount. It is reported, not corrected — dropping the family costs twenty poses, and re-basing it is a judgement call the operator should make with the numbers in front of them.
+
+### Verification Sheet
+
+After the rows, a sheet lists **only the slots that need bench work**, with the absolute counts a well placed sensor would read:
+
+```
+--- VERIFICATION SHEET (targets at the median gain) ---
+   median gain 1.02
+  slot 19  gain 0.38  reads low: bring the sensor closer
+            idle 12430 | FORWARD 15440 +-430 | TURN_RIGHT 13720 +-200 | EMPTY 12430 +-150 | LOOP_CALL 11870 +-180 | TURN_LEFT 9820 +-400
+```
+
+The targets use the **median gain**, not the slot's own. With its own gain the sheet would always agree with what is read, and moving the sensor would have no visible goal; with the median it names the reading to aim for, so the loop is: read with `<slot>x`, heat and move, read again, stop when close. A slot is flagged when two bands touch, when the smallest gap falls under 300 counts, or when its gain is more than 30 % off the median — in either direction, since too high brings the strongest piece near the sensor's 26400-count ceiling.
+
+### Keys During Jig Mode
 
 | Key | Action |
 |-----|--------|
-| `SPACE` | Record one sample (auto-capture off) or confirm the EMPTY sweep (whole board, or the scoped slot) |
-| `a` | Toggle auto-capture (on by default: readings record themselves when they settle) |
-| `r` | Reset the current (slot, piece) cluster and retry the step from scratch |
-| `q` | Quit game mode and generate thresholds from collected data |
-| `?` | Show game mode commands and current instruction |
+| `SPACE` | Force a capture: lifts the presence and re-arm guards, a settled plateau is still required |
+| `d` | Dump every capture as text, one line each |
+| `n` | Restart the piece **just measured**: its poses are dropped and it is asked again from orientation 1 |
+| `b` | Undo the last capture; its pose comes back on screen |
+| `N` | Write off the piece on screen (broken or lost): its four orientations leave the plan |
+| `q`, `x` or `j` | Stop the walk, captures kept in RAM |
+| `X` | Clear all captures and stop |
+| `19k` | Forget slot 19 so the plan asks for it again after a sensor is moved; type it from the shell, not while the walk is running |
+| `?` | Show the jig keys |
 
-### Scoped Retakes
+`printJigHelp()` is the single source of that list: the shell's `?` and the jig's own `?` both call it, so a new key cannot appear in one and not the other.
 
-Re-record one sensor without walking the whole campaign. A slot number
-prefixes `g`, then one optional piece letter narrows it further:
+### Surviving a Reset
 
-```text
-7R      # clear all slot 7 clusters first
-7g      # scope slot 7: waits for a piece letter, or a second g for all five
-7gg     # whole slot campaign (40 steps, EMPTY confirmed for slot 7 only)
-7gf     # only slot 7 FORWARD: 8 captures, then the campaign ends and emits
-```
+Captures are journalled to flash, so a reset no longer costs a campaign. The part has no EEPROM, so the core emulates one in its last flash page: `jigStoreLoad()` reads it at the first `j`, the plan skips whatever is already there, and the walk resumes on the pose it stopped at.
 
-Piece letters: `e` empty, `f` forward, `L` loop, `r` turn right, `l` turn
-left. Any other key cancels the armed scope. On every end — natural or
-`q` — the firmware re-emits all twenty rows from the RAM clusters, so the
-untouched slots keep the data they already had from an earlier run; a scoped
-run on a cold board will honestly print `[NO DATA]` for the others. `w`
-reprints analysis and rows at any time without entering the game.
+The emulated page is erased and rewritten on every save, and on this part that erases a 128 kB sector — about a second. So saves are throttled: one every four captures, which bounds what a reset can cost to the last few placements, and an immediate save whenever a session ends (`q`, `X`, `<slot>k`, `n`, `b`).
 
-### Threshold Generation
-
-When the game completes all steps (or you press `q`), the firmware analyzes **each slot's own clusters** — sensors idle up to 940 counts apart across the board, so one slot's clean gap can be the next slot's overlap — and prints one verdict per slot under `--- PER-SLOT THRESHOLD ANALYSIS ---`:
-
-- `[OK] piece[min..max] ... gaps a,b,c,d` — the five classes separated on that sensor; thresholds sit at the midpoints and the printed gaps are the margins
-- `[OVERLAP A/B gap=N, row zeroed]` — two classes overlap on this slot; its row decodes INVALID
-- `[NO DATA]` / `[INCOMPLETE, row zeroed]` — this slot was not fully recorded
-- `[BAD ORDER, row zeroed]` — this slot's means sort the classes differently than the canonical ascending order: a mislabeled piece or a wildly foreign idle level
-
-A zeroed row decodes INVALID on purpose — an untrusted slot must never inject a false piece. Then `--- GENERATED PER-SLOT ROWS ---` prints the full paste-ready `GASPETTO_ADC_SLOT_THRESHOLDS` table between the `BEGIN/END GENERATED PER-SLOT ROWS` markers. Columns are ascending piece starts; the loop piece occupies the band below the EMPTY idle, and the last column (`LOOP_START`) is pinned to 65535: no piece plays above FORWARD, so no reading can ever reach that band and FORWARD's range simply extends to the top of the scale.
-
-### Configuration
-
-Game mode parameters are defined in `src/game.cpp`:
-
-- `kGameSlotCount` — number of slots covered (20, the fully populated board)
-- `kGameSamplesPerCombo` — samples per (piece, slot) combination (default 8)
-- `kGameStabilitySpanMax` — max span for stability check (default 100 counts)
-- `kGamePieceCount` — entries the walk visits (5: the empty board plus the four played pieces)
-
-### Example Session
-
-```text
-c                    # calibration mode
-g                    # start game mode
---- GAME MODE STARTED ---
-   800 steps (5 pieces x 20 slots x 8 samples)
-   [1/800] slot 1, EMPTY (remove piece) [1/8]
-   -> place/adjust, wait for stability, then SPACE
-SPACE                # one SPACE for the EMPTY sweep records every slot
-...
-   [169/800] slot 2, FORWARD (green, 4mm N) [1/8]   # auto-capture mode:
-   recorded raw=15276 (span=3)                     # no SPACE, the settle does it
-...
-   [800/800] slot 20, TURN_LEFT (blue, 4mm S) [8/8]
-   recorded raw=8763 (span=2)
-
---- GAME MODE ENDED ---
-
---- PER-SLOT THRESHOLD ANALYSIS ---
-   slot 1  [OK] TURN_LEFT[10848..10848] LOOP_CALL[13104..13106] EMPTY[13472..13472]
-              TURN_RIGHT[14224..14224] FORWARD[14896..14896] gaps 2256,366,752,672
-   slot 10 [OVERLAP TURN_RIGHT/FORWARD gap=-48, row zeroed]
-   ...
-   calibrated slots: 19/20
-
---- GENERATED PER-SLOT ROWS ---
-/* --- BEGIN GENERATED PER-SLOT ROWS --- */
-static const uint16_t GASPETTO_ADC_SLOT_THRESHOLDS[GASPETTO_ADC_SLOTS][GASPETTO_ADC_COLS] = {
-    /* slot 1 */ { 10848, 11976, 13289, 13848, 14560, 16396 },
-    ...
-};
-/* --- END GENERATED PER-SLOT ROWS --- */
-```
-
-Copy the generated rows over the marker block of `soft/emu-pc/targets/gbox/include/piece_thresholds.h` and rebuild. This firmware decodes with those rows right away; production keeps using the legacy global defines until it adopts the same per-slot scan.
+The journal holds 272 records of 12 bytes, well under the 8 kB page, and a fresh save blanks the tail of the previous one so a shorter run cannot be read as a longer one. `X` clears both the RAM and the flash. Wear is a non-issue: a campaign costs about thirty erases, and the page takes thousands.
 
 ## Send Pieces (`p`)
 
@@ -248,7 +283,7 @@ returning **true** means the car's radio answered the auto-ack — that is the
 delivery proof.
 
 ```text
-c                    # calibration mode: the 3V3 sensor rail must be up
+c                    # calibration mode (each read raises the 3V3 sensor rail)
 p                    # scan + build + transmit
 --- SEND PIECES: scan -> build -> radio ---
    slot 1: raw=14896  FORWARD

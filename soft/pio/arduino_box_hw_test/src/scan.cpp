@@ -7,6 +7,45 @@
 
 uint32_t gCalibrationScanCounter = 0;
 
+const char *labelName(int index)
+{
+    switch (index)
+    {
+    case 0:
+        return "EMPTY";
+    case 1:
+        return "FORWARD";
+    case 2:
+        return "BACKWARD";
+    case 3:
+        return "TURN_RIGHT";
+    case 4:
+        return "TURN_LEFT";
+    case 5:
+        return "LOOP_CALL";
+    case 6: /* INVALID: the decode name, never a cluster label */
+        return "INVALID";
+    default:
+        return "?";
+    }
+}
+
+/* Previous scan pass, kept for the pass-to-pass comparison: every scan
+ * stores the mean it read per slot and the next scan prints the signed
+ * delta against it. The running min/max on the slot lines span the whole
+ * session, so a pass with a piece and one without look like thousands of
+ * counts of noise; pairing only the last two passes is what a re-seat or a
+ * cover move actually shifts. resetCalibrationStats() zeroes the counter on
+ * a mode entry, which also drops this baseline */
+static uint16_t gScanPrevMean[kCalibrationSlotCount];
+static bool gScanPrevValid[kCalibrationSlotCount];
+static bool gScanHasPrev = false;
+
+/* Delta past which the comparison flags a slot: the readings gigue is 0-16
+ * counts on I2C3 and around 100 on I2C1, so this catches real movement (a
+ * re-seated piece, a cover shift) without flagging the bus noise */
+static constexpr uint32_t kScanDeltaAlert = 150;
+
 /* Continuous slot monitor ('m'): while active, usb keys only stop it */
 bool gMonitorActive = false;
 bool gMonitorExit   = false;
@@ -40,11 +79,6 @@ void runSlotMonitor(uint8_t slotIndex)
     Serial.print(" (");
     Serial.print(entry.busName);
     Serial.println("), any key to stop ---");
-    if (!gCalibrationRailsOn)
-    {
-        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
-    }
-
     uint16_t minRaw = 0xFFFF;
     uint16_t maxRaw = 0;
     uint32_t count  = 0;
@@ -163,11 +197,6 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
     Serial.print(" (");
     Serial.print(entry.busName);
     Serial.println("), SPACE = measure, any other key to quit ---");
-    if (!gCalibrationRailsOn)
-    {
-        Serial.println("   NOTE: 3V3 rail is OFF, readings will be garbage");
-    }
-
     gFreezeActive    = true;
     gFreezeMeasure   = false;
     gFreezeMeasuring = false;
@@ -246,6 +275,21 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
  * decode in the firmware: the monitors, the scan and the radio send all go
  * through it, so a label printed here and a piece sent over the air can
  * never come from two different walks */
+/* Which piece each band carries. The bands ascend with the raw reading, so
+ * this array is the single place where a name is bound to a physical family.
+ * This batch was mounted with the opposite pole throughout, which puts the
+ * greens at the bottom and the blues at the top; the operator asked for the
+ * greens to be FORWARD and the reds LOOP_CALL, so the mapping follows the
+ * measurement instead of asking twenty magnets to be flipped. Rebuilding the
+ * pieces the other way round flips this array, nothing else */
+static const BoxPieceId kBandPieces[5] = {
+    BoxPieceId::FORWARD,    /* band 0: green 4 mm, the most negative */
+    BoxPieceId::TURN_RIGHT, /* band 1: yellow 2 mm */
+    BoxPieceId::EMPTY,      /* band 2: the slot's own idle level */
+    BoxPieceId::LOOP_CALL,  /* band 3: red 2 mm */
+    BoxPieceId::TURN_LEFT,  /* band 4: blue 4 mm, the most positive */
+};
+
 BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
 {
     if (raw < 0)
@@ -259,25 +303,23 @@ BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw)
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
     {
-        return BoxPieceId::TURN_LEFT;
+        return kBandPieces[0];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
     {
-        /* Band 1 is the loop piece now; the shared enum column name still
-         * says BACKWARD until the production migration renames it */
-        return BoxPieceId::LOOP_CALL;
+        return kBandPieces[1];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
     {
-        return BoxPieceId::EMPTY;
+        return kBandPieces[2];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_FORWARD])
     {
-        return BoxPieceId::TURN_RIGHT;
+        return kBandPieces[3];
     }
     if (raw < t[GASPETTO_ADC_SLOT_COL_TO_REMOVE])
     {
-        return BoxPieceId::FORWARD;
+        return kBandPieces[4];
     }
     return BoxPieceId::INVALID;
 }
@@ -290,6 +332,24 @@ static const char *pieceLabelForRaw(uint8_t slotIndex, int16_t raw)
 
 void runPieceCalibrationScan()
 {
+    /* This pass's mean per slot, filled as the loop goes, and whether the
+     * slot produced a reading: the comparison block below pairs them with
+     * the previous pass, and a failed read keeps the old entry so a
+     * transient timeout is not reported as a movement */
+    uint16_t passMean[kCalibrationSlotCount] = {};
+    bool passValid[kCalibrationSlotCount]    = {};
+
+    /* resetCalibrationStats() zeroes the counter on a mode entry, so a zero
+     * here means a fresh session and the stored pass belongs to before it */
+    if (gCalibrationScanCounter == 0)
+    {
+        for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+        {
+            gScanPrevValid[slotIndex] = false;
+        }
+        gScanHasPrev = false;
+    }
+
     Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
     Serial.print("scan=");
     Serial.println(++gCalibrationScanCounter);
@@ -300,11 +360,20 @@ void runPieceCalibrationScan()
      * production legacy table and the scan never used them */
     Serial.println("decode: per-slot rows, see row=[...] on each slot line");
 
+    /* No rail held around the scan: the readings below pulse it themselves,
+     * exactly like the game and 'p' do. Holding it here would warm the board
+     * through the whole scan, so this path would calibrate against a
+     * temperature those two never read - which is what the offsets were.
+     * Only the probe needs it, and that one takes it inside the loop */
     for (uint8_t deviceIndex = 0; deviceIndex < kAdsCount; ++deviceIndex)
     {
         const AdsTestEntry &entry = kAdsTests[deviceIndex];
 
-        /* Check if device is accessible */
+        /* Check if device is accessible. The chip hangs on the sensor rail,
+         * so take it for the probe and give it straight back: the readings
+         * that follow must pulse it the way the game and 'p' do */
+        const bool probeRail = sensorRailAcquire();
+
         bool deviceFound;
         if (entry.useBitBang)
         {
@@ -315,6 +384,8 @@ void runPieceCalibrationScan()
             Adafruit_ADS1115 ads;
             deviceFound = ads.begin(entry.address, entry.wire);
         }
+
+        sensorRailRelease(probeRail);
 
         if (!deviceFound)
         {
@@ -377,6 +448,8 @@ void runPieceCalibrationScan()
             }
 
             updateCalibrationStats(slotIndex, rawMean);
+            passMean[slotIndex]           = static_cast<uint16_t>(rawMean);
+            passValid[slotIndex]          = true;
             const CalibrationStats &stats = gCalibrationStats[slotIndex];
 
             Serial.print("mean=");
@@ -392,28 +465,73 @@ void runPieceCalibrationScan()
         }
     }
 
-    Serial.println("--- LABELED PIECE SAMPLES ---");
-    for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+    /* Pass-to-pass comparison: the running min/max on the lines above span
+     * the whole session, so a pass with a piece and one without read as
+     * thousands of counts of noise. Pairing only the last two passes shows
+     * what actually moved - a re-seated piece, a shifted cover - and a delta
+     * past kScanDeltaAlert is flagged */
+    Serial.print("--- PASS COMPARISON");
+    if (gScanHasPrev)
     {
-        for (int label = 0; label < 6; ++label)
+        Serial.print(" vs scan ");
+        Serial.print(gCalibrationScanCounter - 1);
+    }
+    Serial.println(" ---");
+
+    if (!gScanHasPrev)
+    {
+        Serial.println("   first pass of this session, baseline stored: rerun to compare");
+    }
+    else
+    {
+        for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
         {
-            const LabelCluster &cluster = gPieceClusters[slotIndex][label];
-            if (cluster.count == 0)
-            {
-                continue;
-            }
             Serial.print("   slot ");
             Serial.print(static_cast<int>(slotIndex) + 1);
-            Serial.print(" ");
-            Serial.print(labelName(label));
-            Serial.print(": n=");
-            Serial.print(cluster.count);
-            Serial.print(" raw ");
-            Serial.print(cluster.min);
-            Serial.print("-");
-            Serial.print(cluster.max);
-            Serial.print(" mean=");
-            Serial.println(static_cast<int>(cluster.sum / cluster.count));
+            Serial.print(": ");
+
+            if (!passValid[slotIndex])
+            {
+                Serial.println("read FAIL, no comparison");
+                continue;
+            }
+            if (!gScanPrevValid[slotIndex])
+            {
+                Serial.print(passMean[slotIndex]);
+                Serial.println(" (no previous pass)");
+                continue;
+            }
+
+            const int32_t delta = static_cast<int32_t>(passMean[slotIndex]) -
+                                  static_cast<int32_t>(gScanPrevMean[slotIndex]);
+            Serial.print(gScanPrevMean[slotIndex]);
+            Serial.print(" -> ");
+            Serial.print(passMean[slotIndex]);
+            Serial.print("  delta=");
+            if (delta >= 0)
+            {
+                Serial.print('+');
+            }
+            Serial.print(delta);
+            if ((delta > static_cast<int32_t>(kScanDeltaAlert)) ||
+                (delta < -static_cast<int32_t>(kScanDeltaAlert)))
+            {
+                Serial.print("  <<");
+            }
+            Serial.println();
         }
     }
+
+    /* Hand this pass to the next comparison. Mean and validity are copied
+     * per slot: a slot that failed keeps its last valid reading as the
+     * reference instead of losing the baseline */
+    for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
+    {
+        if (passValid[slotIndex])
+        {
+            gScanPrevMean[slotIndex]  = passMean[slotIndex];
+            gScanPrevValid[slotIndex] = true;
+        }
+    }
+    gScanHasPrev = true;
 }

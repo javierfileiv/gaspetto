@@ -10,9 +10,8 @@ void printUsbHelp()
 {
     Serial.println("   modes: h = health | c = calibration | s = rerun test | ? = this help");
     Serial.println("   slots: 5m = live monitor | 5x = frozen monitor: SPACE = clean 3s");
-    Serial.println("          measure, any other key quits | 5R = clear slot 5 samples");
-    Serial.println("   game:  g = full campaign | 7g = slot 7 only | 7gf = slot 7 FORWARD only");
-    Serial.println("          in game: SPACE record, a toggle auto-capture, r retry, q quit+emit");
+    Serial.println("          measure, any other key quits");
+    printJigHelp();
     Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
     Serial.println("   rows:  w = reprint analysis and pasteable table");
     Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
@@ -57,12 +56,6 @@ void handleUsbCommands()
     static uint16_t pendingSlot = 0;
     static bool digitsStarted   = false;
 
-    /* Armed scoped start: '<slot>g' waits one more key for the piece
-     * letter before launching, so it must survive the Enter that a
-     * line-buffered terminal appends */
-    static bool gameArmed    = false;
-    static uint8_t armedSlot = 0;
-
     while (Serial.available() > 0)
     {
         const int incoming = Serial.read();
@@ -75,7 +68,6 @@ void handleUsbCommands()
             gMonitorExit  = true;
             pendingSlot   = 0;
             digitsStarted = false;
-            gameArmed     = false;
             /* Drop the rest of the burst: this stop key cuts a command typed
              * while the monitor ran, and the surviving tail would decode as a
              * different command. The operator retypes it once the monitor has
@@ -155,82 +147,13 @@ void handleUsbCommands()
             continue;
         }
 
-        /* Armed scoped start: the key after '<slot>g' decides. A piece
-         * letter scopes the campaign to that slot and piece, a second 'g'
-         * walks every entered piece of the slot; line endings keep the
-         * state alive, anything else cancels and is handled normally */
-        if (gameArmed)
+        /* Jig mode intercepts its own keys, like the game does: the walk is
+         * driven by the polling loop and only the escape hatches are here */
+        if (gJigActive)
         {
-            if (incoming == '\n' || incoming == '\r')
+            if (incoming != '\n' && incoming != '\r')
             {
-                continue;
-            }
-            gameArmed = false;
-            if (incoming == 'g')
-            {
-                startGameScoped(armedSlot, -1);
-            }
-            else
-            {
-                const int pieceIndex = gamePieceForChar(static_cast<char>(incoming));
-                if (pieceIndex >= 0)
-                {
-                    startGameScoped(armedSlot, pieceIndex);
-                }
-                else
-                {
-                    Serial.println("   [scope cancelled]");
-                }
-            }
-            pendingSlot   = 0;
-            digitsStarted = false;
-            continue;
-        }
-
-        /* Game mode intercepts its own keys; any other key is dropped so
-         * it cannot leak into the normal label/digit handler */
-        if (gGameActive)
-        {
-            switch (incoming)
-            {
-            case ' ': {
-                const BoxPieceId currentPiece = kGamePieces[gGamePieceIndex];
-                bool ok;
-                if (currentPiece == BoxPieceId::EMPTY)
-                {
-                    ok = recordCurrentEmptyStep();
-                }
-                else
-                {
-                    ok = recordGameSample(gGameSlotIndex, currentPiece, true) ==
-                         GameSampleResult::Recorded;
-                }
-                if (ok)
-                {
-                    gGameOutlierWarned = false;
-                    advanceGameState();
-                }
-            }
-            break;
-            case 'a':
-                gGameAuto = !gGameAuto;
-                Serial.print("   auto-capture ");
-                Serial.println(gGameAuto ? "ON" : "OFF");
-                displayGameInstruction();
-                break;
-            case 'r':
-                retryGameStep();
-                break;
-            case 'q':
-                stopGameMode();
-                break;
-            case '?':
-                Serial.println("\n   Game mode commands:");
-                Serial.println("   SPACE = record, 'a' = toggle auto, 'r' = retry, 'q' = quit");
-                displayGameInstruction();
-                break;
-            default:
-                break;
+                runJigKey(static_cast<char>(incoming));
             }
             pendingSlot   = 0;
             digitsStarted = false;
@@ -298,14 +221,6 @@ void handleUsbCommands()
             Serial.println(gMode == TestMode::Health ? "health" : "calibration");
             printUsbHelp();
             break;
-        case 'w':
-            if (gMode != TestMode::Calibration)
-            {
-                Serial.println("row reprints work in calibration mode ('c' to switch)");
-                break;
-            }
-            emitGameThresholds();
-            break;
         case 'l':
             if (gLedMenuActive)
             {
@@ -331,58 +246,26 @@ void handleUsbCommands()
         case 'e':
             runCarStreamTest();
             break;
-        case 'g':
-            if (gMode != TestMode::Calibration)
+        case 'j':
+            if (gJigActive)
             {
-                Serial.println("game mode works in calibration mode ('c' to switch)");
+                stopJigMode();
                 break;
             }
-            if (gGameActive)
-            {
-                Serial.println("game mode already active ('q' to stop)");
-                break;
-            }
-            if (digitsStarted)
-            {
-                if (pendingSlot >= 1 && pendingSlot <= kGameSlotCount)
-                {
-                    gameArmed = true;
-                    armedSlot = static_cast<uint8_t>(pendingSlot - 1);
-                    Serial.print("   game scoped to slot ");
-                    Serial.print(pendingSlot);
-                    Serial.println(": piece letter (e f L r l) or 'g' for all");
-                }
-                else
-                {
-                    Serial.println("slot out of range for the game (1..12)");
-                }
-            }
-            else
-            {
-                startGameMode();
-            }
+            startJigMode();
             break;
-        case 'R':
+        case 'k':
             if (gMode != TestMode::Calibration)
             {
-                Serial.println("sample reset works in calibration mode ('c' to switch)");
+                Serial.println("forgetting a slot works in calibration mode ('c' to switch)");
                 break;
             }
-            if (digitsStarted)
+            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
             {
-                if (pendingSlot >= 1 && pendingSlot <= kCalibrationSlotCount)
-                {
-                    resetLabeledSlot(static_cast<uint8_t>(pendingSlot - 1));
-                }
-                else
-                {
-                    Serial.println("slot out of range (1..20)");
-                }
+                Serial.println("prefix the slot number: 19k forgets slot 19");
+                break;
             }
-            else
-            {
-                Serial.println("type '<slot>R' e.g. '5R' (reset slot 5 samples)");
-            }
+            forgetJigSlot(static_cast<uint8_t>(pendingSlot - 1));
             break;
         case 'm':
             if (gMode != TestMode::Calibration)

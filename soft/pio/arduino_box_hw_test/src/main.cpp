@@ -34,7 +34,6 @@ bool gRadioMenuActive = false;
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
 
-constexpr uint16_t kRailSettleDelayMs       = 250;
 constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 
 #ifdef TEST_ADS1115
@@ -44,6 +43,32 @@ bool gCalibrationRailsOn = false;
 /* One test run is pending, set by 's' from any mode. False at boot: the
  * board waits for a key instead of running the health cycle on its own */
 bool gRunTestRequested = false;
+
+/* Raise the sensor rail when it is down and report whether this call did it,
+ * so the caller drops it again only in that case: a rail someone else holds
+ * - the health cycle, an enclosing scan - is never taken away. The nesting
+ * needs no counter, the flag is the state */
+bool sensorRailAcquire()
+{
+    if (gCalibrationRailsOn)
+    {
+        return false;
+    }
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
+    delay(kRailSettleDelayMs);
+    gCalibrationRailsOn = true;
+    return true;
+}
+
+void sensorRailRelease(bool acquired)
+{
+    if (!acquired)
+    {
+        return;
+    }
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    gCalibrationRailsOn = false;
+}
 
 void enterMode(TestMode mode)
 {
@@ -55,21 +80,19 @@ void enterMode(TestMode mode)
     }
 
     gMode = mode;
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     if (gMode == TestMode::Calibration)
     {
         resetCalibrationStats();
-        /* Force the rail state right away so the first scan sees powered
-         * sensors regardless of where the health cycle was interrupted */
-        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
-        gCalibrationRailsOn = true;
-        delay(kRailSettleDelayMs);
+        /* The sensor rail goes up per reading now, so entering the mode only
+         * takes it down: holding it up for the whole session is what warmed
+         * the board and shifted every reading by ~370 counts */
+        gCalibrationRailsOn = false;
         Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
     }
     else
     {
-        digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-        digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
         gCalibrationRailsOn = false;
         Serial.println("\n-> mode: health ('?' for status)");
     }
@@ -264,6 +287,7 @@ void setup()
     /* Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered */
     Serial.println("\n4. Turning ON 3V3_SWITCHED to power ADS1115 modules...");
     digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
+    gCalibrationRailsOn = true;                /* the lease must not drop it from here */
     delay(kRailSettleDelayMs);                 /* Wait for modules to initialize */
     Serial.println("   [OK] 3V3_SWITCHED activated - ADS1115 modules should be powered");
 
@@ -278,6 +302,16 @@ void setup()
     printUsbHelp();
     Serial.print("   mode: ");
     Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
+
+    /* Give both rails back before waiting for a key: the boot raised them
+     * for the APA106 first frames and for an ADS probe that no longer runs
+     * here, and nothing measures at this point. Every measurement takes its
+     * own rail now, so leaving them up would only warm the board before the
+     * first reading - the offset the pulse exists to avoid */
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    gCalibrationRailsOn = false;
+
     Serial.println("   waiting for a key ('?' for help)");
 }
 
@@ -298,11 +332,14 @@ void runHealthCycle()
     Serial.println("[health] cycle start ('c' = calibration, '?' = status)");
 
     Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
-    digitalWrite(PIN_MOSFET_5V_LEDS, LOW);     /* Turn ON Q1 */
-    Serial.println("-> TURNING ON 3V3_SWITCHED (Sensors)...");
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
+    digitalWrite(PIN_MOSFET_5V_LEDS, LOW); /* Turn ON Q1 */
 
-    delay(kRailSettleDelayMs);                 /* Let rails settle before I2C */
+    /* The sensor rail is taken only for the probes: the hall sensors warm up
+     * while it is up, and this cycle used to hold it through the blink and
+     * the three second wait below for no reason - about half its rail-on time.
+     * The acquire settles the rail itself, and every read inside sees the
+     * flag already set, so it leaves the rail alone */
+    const bool railHeld = sensorRailAcquire();
 
     probeI2CDevices();
 
@@ -314,6 +351,8 @@ void runHealthCycle()
     /* The APA106 animations left this cycle: they cost several seconds each,
      * the LED menu ('l', key 0) runs them on demand instead */
     reportProbeChanges();
+
+    sensorRailRelease(railHeld);
 
     /* Quick double blink visual check on builtin LED. */
     for (int i = 0; i < 2; i++)
@@ -327,15 +366,14 @@ void runHealthCycle()
 
     if (gMode != TestMode::Health)
     {
-        /* Mode changed while waiting: leave rails exactly as the new mode
-         * set them instead of tearing the 3V3 rail down under it */
+        /* Mode changed while waiting: leave the rails exactly as the new
+         * mode set them. The sensor rail needs no care here - it went down
+         * right after the probes - so only the LED rail is at stake */
         return;
     }
 
     Serial.println("-> TURNING OFF 5V_SWITCHED...");
-    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);     /* Turn OFF Q1 */
-    Serial.println("-> TURNING OFF 3V3_SWITCHED...");
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH); /* Turn OFF Q2 */
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH); /* Turn OFF Q1 */
 
     Serial.println("Cycle complete. 's' reruns the test.");
     delayWithUsb(DELAY);
@@ -378,6 +416,9 @@ void runDeepSleepTest()
     blackoutLeds();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    /* Drop the latch too: the wake handler restores the rail from it, and
+     * after a sleep the readings must start from a cold board again */
+    gCalibrationRailsOn = false;
 
     pinMode(PIN_WAKE_BUTTON, INPUT_PULLUP);
     gWakeButtonFired = false;
@@ -518,11 +559,11 @@ void runDeepSleepTest()
         delay(150);
     }
 
-    /* Hand the board back with the rest state of the active mode: health
-     * keeps the LED rail up, calibration keeps it down; the sensor rail
-     * follows the calibration latch */
-    digitalWrite(PIN_MOSFET_5V_LEDS, gMode == TestMode::Calibration ? HIGH : LOW);
-    digitalWrite(PIN_MOSFET_3V3_SENSORS, gCalibrationRailsOn ? LOW : HIGH);
+    /* Hand the board back with both rails down. Every reading takes its own
+     * rail now, so the mode has no rest state to restore: leaving one up
+     * would only warm the board before the next measurement */
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     Serial.println("[stop] test done, back in the shell ('b' sleeps again)");
 }
 
@@ -630,9 +671,9 @@ void runSendPiecesTest()
         Serial.println("[send] radio is not up: re-probe with 's' in health mode");
         return;
     }
-    if (!gCalibrationRailsOn)
+    if (gMode != TestMode::Calibration)
     {
-        Serial.println("[send] 3V3 sensor rail is OFF, readings would be garbage ('c' to switch)");
+        Serial.println("[send] calibration mode required ('c' to switch)");
         return;
     }
 
@@ -962,25 +1003,17 @@ void loop()
 
     if (gMode == TestMode::Calibration)
     {
-        if (!gCalibrationRailsOn)
-        {
-            Serial.println("-> TURNING ON 3V3_SWITCHED (Calibration sensors)...");
-            digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
-            delay(kRailSettleDelayMs);
-            gCalibrationRailsOn = true;
-        }
+        /* No rail re-arm here: readAdsSingleEndedMean raises the sensor rail
+         * for each reading and drops it again, so re-latching it would bring
+         * back the warm board this change exists to avoid */
 
-        /* Game mode: auto-capture polls the current slot and records as
-         * soon as the reading settles; otherwise just USB polling between
-         * steps. EMPTY is excluded from auto (it needs one deliberate
-         * SPACE so a board that still holds pieces is not recorded) */
-        if (gGameActive)
+        if (gJigActive)
         {
-            if (gGameAuto && kGamePieces[gGamePieceIndex] != BoxPieceId::EMPTY)
-            {
-                pollGameAutoCapture();
-            }
-            delayWithUsb(50);
+            /* One reading per pass, and a reading raises and drops the rail
+             * itself, so a pass costs the settle time: the detector sees the
+             * operator within half a second, which is faster than a hand
+             * placing a piece */
+            pollJig();
             return;
         }
 
