@@ -160,6 +160,11 @@ It has no serial port and no radio, so it says why with the LED on PC13:
 | 2      | the validation record is missing or unreadable                |
 | 3      | the record is there but the CRC does not match                |
 
+The third code is the one worth provoking on a bench, because it proves the
+check actually runs: `./tools/gcar_dfu_upload.py --bad-crc` flashes the
+application with a deliberately wrong CRC, so the board must blink three times
+and never jump. Reflash without the flag to bring it back. `--no-record` leaves
+the record untouched and exercises the other refusal path.
 
 ## Tuning
 

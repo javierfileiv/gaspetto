@@ -210,7 +210,11 @@ def _image_payload(image):
     return image
 
 
-def _flash(firmware):
+def _dfu_detach():
+    return subprocess.call(["dfu-util", "-d", f"{DFU_VID}:{DFU_PID}", "-e"])
+
+
+def _flash(firmware, bad_crc=False, no_record=False):
     with open(firmware, "rb") as handle:
         image = handle.read()
 
@@ -227,6 +231,13 @@ def _flash(firmware):
         print(f"[gcar_dfu] dfu-util failed on the application (exit {result})")
         return result
 
+    if no_record:
+        print("[gcar_dfu] Leaving the record untouched, as asked", flush=True)
+        return _dfu_detach()
+
+    if bad_crc:
+        crc ^= 0xFFFFFFFF
+
     print("[gcar_dfu] Uploading the validation record ...", flush=True)
     result = _write_metadata(payload, crc)
     if result != 0:
@@ -238,7 +249,7 @@ def _flash(firmware):
     return 0
 
 
-def _upload(firmware):
+def _upload(firmware, bad_crc=False, no_record=False):
     print(f"[gcar_dfu] Firmware: {firmware}", flush=True)
 
     if _dfu_device_present():
@@ -246,7 +257,7 @@ def _upload(firmware):
     elif not _enter_dfu():
         return 1
 
-    return _flash(firmware)
+    return _flash(firmware, bad_crc=bad_crc, no_record=no_record)
 
 
 def _usage():
@@ -254,6 +265,9 @@ def _usage():
     print("       no option: rebuild the car firmware, then flash it")
     print("       --no-build: flash the binary already in the build directory")
     print("       --build-only: rebuild and stop there")
+    print("       --bad-crc: write a wrong CRC on purpose, to see the bootloader")
+    print("                  refuse the image with three LED blinks")
+    print("       --no-record: flash the application and leave the record alone")
     print(f"       default firmware: {_default_firmware()}")
     print("       or let PlatformIO drive it: pio run -e gcar -t upload")
 
@@ -282,7 +296,7 @@ def _main(argv):
         print("[gcar_dfu] Build it first with: pio run -e gcar")
         return 1
 
-    return _upload(firmware)
+    return _upload(firmware, bad_crc="--bad-crc" in argv, no_record="--no-record" in argv)
 
 
 def dfu_upload(source, target, env):
