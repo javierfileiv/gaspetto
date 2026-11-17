@@ -30,6 +30,34 @@ void printUsbHelp()
  * they arrive and build the line under the fingers; SPACE is a command key
  * with no visible glyph so it marks itself; CR is dropped because LF is the
  * line end (the same convention the import parser follows) */
+void enterMode(TestMode mode)
+{
+    if (gMode == mode)
+    {
+        gRunTestRequested = true; /* already active: re-run this mode test */
+        Serial.println("\n-> test already active, running it ('?' status)");
+        return;
+    }
+
+    gMode = mode;
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    if (gMode == TestMode::Calibration)
+    {
+        resetCalibrationStats();
+        /* The sensor rail goes up per reading now, so entering the mode only
+         * takes it down: holding it up for the whole session is what warmed
+         * the board and shifted every reading by ~370 counts */
+        gCalibrationRailsOn = false;
+        Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
+    }
+    else
+    {
+        gCalibrationRailsOn = false;
+        Serial.println("\n-> mode: health ('?' for status)");
+    }
+}
+
 static void echoTypedKey(int incoming)
 {
     if (incoming == '\n')

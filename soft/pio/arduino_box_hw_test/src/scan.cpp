@@ -535,3 +535,74 @@ void runPieceCalibrationScan()
     }
     gScanHasPrev = true;
 }
+
+/* ========================================== */
+/* Scan -> send helpers, used by the "p" key  */
+/* ========================================== */
+
+/* One slot of the scan: read, decode, report. Returns false when the slot
+ * decodes INVALID - a failed read, an uncalibrated row or a value outside
+ * every band - which aborts the run: an INVALID is a fault, not the place
+ * where the sequence stops */
+static bool scanOneSlot(uint8_t slot, BoxBoardPieces &board)
+{
+    const AdsTestEntry &entry = kAdsTests[slot / 4];
+    const uint8_t channel     = slot % 4;
+    int16_t rawMean           = 0;
+
+    bool readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    if (!readOk)
+    {
+        recoverAdsModule(&entry);
+        readOk = readAdsSingleEndedMean(&entry, channel, rawMean);
+    }
+
+    Serial.print("   slot ");
+    Serial.print(static_cast<int>(slot) + 1);
+    if (!readOk)
+    {
+        Serial.println(": READ FAIL -> INVALID");
+        return false;
+    }
+
+    const BoxPieceId piece = pieceForRaw(slot, rawMean);
+    Serial.print(": raw=");
+    Serial.print(rawMean);
+    Serial.print("  ");
+    Serial.println(labelName(static_cast<int>(piece)));
+    if (piece == BoxPieceId::INVALID)
+    {
+        return false;
+    }
+
+    board[slot] = piece;
+    return true;
+}
+
+/* Scan a zone in slot order and stop at the first EMPTY: the pieces are a
+ * contiguous run starting at slot 1, so an empty slot means the sequence is
+ * over and whatever lies after it is out of the program - what was already
+ * read stays. Returns false on the first INVALID so the caller can raise
+ * the build-error LEDs */
+bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall)
+{
+    for (uint8_t slot = firstSlot; slot < endSlot; ++slot)
+    {
+        if (!scanOneSlot(slot, board))
+        {
+            return false;
+        }
+        if (board[slot] == BoxPieceId::EMPTY)
+        {
+            Serial.print("[send] slot ");
+            Serial.print(static_cast<int>(slot) + 1);
+            Serial.println(" empty: sequence ends here");
+            return true;
+        }
+        if (board[slot] == BoxPieceId::LOOP_CALL)
+        {
+            sawLoopCall = true;
+        }
+    }
+    return true;
+}

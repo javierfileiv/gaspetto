@@ -133,6 +133,10 @@ void runSlotMonitor(uint8_t slotIndex);
 void runFrozenSlotMonitor(uint8_t slotIndex);
 void runPieceCalibrationScan();
 
+/* Walk a zone in slot order and stop at the first EMPTY; false on the first
+ * INVALID. Used by the "p" send test to read the board it transmits */
+bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall);
+
 /* The one piece decode: a raw reading against this slot's compiled row.
  * Every consumer (monitors, scan, radio send) goes through it */
 BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw);
@@ -143,17 +147,23 @@ extern bool gCalibrationRailsOn;
 extern bool gRunTestRequested;
 extern bool gLedMenuActive;
 extern bool gRadioMenuActive;
+/* Set by setup() once the radio answered: the send test and the stream
+ * report a dead radio rather than a silent car */
+extern bool gRadioOk;
 
-/* main.cpp: deep sleep (STOP) test driven by the "b" shell key */
+/* health.cpp: the periodic cycle run by the "s" key */
+void runHealthCycle();
+
+/* power.cpp: deep sleep (STOP) test driven by the "b" shell key */
 void runDeepSleepTest();
 
-/* main.cpp: scan -> build -> transmit test driven by the "p" shell key */
+/* radio.cpp: scan -> build -> transmit test driven by the "p" shell key */
 void runSendPiecesTest();
 
-/* main.cpp: listen to the car stream on _box_, the "e" shell key */
+/* radio.cpp: listen to the car stream on _box_, the "e" shell key */
 void runCarStreamTest();
 
-/* main.cpp: radio menu driven by the "t" shell key */
+/* radio.cpp: radio menu driven by the "t" shell key */
 void startRadioMenu();
 void runRadioMenuKey(char key);
 
