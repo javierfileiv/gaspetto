@@ -105,7 +105,7 @@ const char *labelName(int index);
 /* Measures every piece once in one slot, then one piece across the board to
  * get each slot's gain, and derives the per-slot rows from the two. No
  * keypress during the campaign: the reading says when a piece is in */
-extern bool gJigActive;
+extern bool jig_active;
 
 void startJigMode();
 void stopJigMode();
@@ -119,15 +119,15 @@ void dumpJigCaptures();
 /* ========================================== */
 /* scan.cpp - calibration scan and slot monitor */
 /* ========================================== */
-extern bool gMonitorActive;
-extern bool gMonitorExit;
+extern bool monitor_active;
+extern bool monitor_exit;
 
-/* Frozen slot monitor state: the shell raises gFreezeMeasure on SPACE
- * (unless a window is already running) and gFreezeExit on any other key */
-extern bool gFreezeActive;
-extern bool gFreezeMeasure;
-extern bool gFreezeMeasuring;
-extern bool gFreezeExit;
+/* Frozen slot monitor state: the shell raises freeze_measure on SPACE
+ * (unless a window is already running) and freeze_exit on any other key */
+extern bool freeze_active;
+extern bool freeze_measure;
+extern bool freeze_measuring;
+extern bool freeze_exit;
 
 void runSlotMonitor(uint8_t slotIndex);
 void runFrozenSlotMonitor(uint8_t slotIndex);
@@ -142,14 +142,14 @@ bool scanZone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &s
 BoxPieceId pieceForRaw(uint8_t slotIndex, int16_t raw);
 
 /* Mode state, defined by main.cpp and read by nearly every module */
-extern TestMode gMode;
-extern bool gCalibrationRailsOn;
-extern bool gRunTestRequested;
-extern bool gLedMenuActive;
-extern bool gRadioMenuActive;
+extern TestMode test_mode;
+extern bool calibration_rails_on;
+extern bool run_test_requested;
+extern bool led_menu_active;
+extern bool radio_menu_active;
 /* Set by setup() once the radio answered: the send test and the stream
  * report a dead radio rather than a silent car */
-extern bool gRadioOk;
+extern bool radio_ok;
 
 /* health.cpp: the periodic cycle run by the "s" key */
 void runHealthCycle();
@@ -179,8 +179,8 @@ void printUsbHelp();
 extern TwoWire &i2c1;
 extern RF24 radio;
 extern AdsTestEntry kAdsTests[kAdsCount];
-extern CalibrationStats gCalibrationStats[kCalibrationSlotCount];
-extern uint32_t gCalibrationScanCounter;
+extern CalibrationStats calibration_stats[kCalibrationSlotCount];
+extern uint32_t calibration_scan_counter;
 
 void probeI2CDevices();
 void reportProbeChanges();

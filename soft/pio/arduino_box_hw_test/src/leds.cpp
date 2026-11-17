@@ -4,14 +4,14 @@
 
 #include <FastLED.h>
 
-static CRGB gLeds[kApaPixelCount];
+static CRGB led_pixels[kApaPixelCount];
 
 /* Prepare the data pin and send one dark frame. Call it AFTER the 5V
  * rail is up and settled: the APA106 ignores every frame sent while
  * unpowered */
 void ledsBegin()
 {
-    FastLED.addLeds<APA106, PIN_LED_DATA, RGB>(gLeds, kApaPixelCount);
+    FastLED.addLeds<APA106, PIN_LED_DATA, RGB>(led_pixels, kApaPixelCount);
     FastLED.setBrightness(kApaIntensity);
     FastLED.show();
 }
@@ -19,7 +19,7 @@ void ledsBegin()
 /* Same color on every pixel of the chain */
 static void ledsFill(uint8_t r, uint8_t g, uint8_t b)
 {
-    fill_solid(gLeds, kApaPixelCount, CRGB(r, g, b));
+    fill_solid(led_pixels, kApaPixelCount, CRGB(r, g, b));
 }
 
 /* Point one pixel; arguments in RGB, same as the eye sees them */
@@ -29,7 +29,7 @@ static void ledsSetPixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
     {
         return; /* an out-of-range index is dropped, the buffer cannot overflow */
     }
-    gLeds[index] = CRGB(r, g, b);
+    led_pixels[index] = CRGB(r, g, b);
 }
 
 static void ledsShow()
@@ -53,7 +53,7 @@ constexpr uint16_t kHoldMs         = 2500; /* final state held before blackout *
 constexpr uint16_t kChannelHoldMs  = 2500; /* pure channel check, per color */
 constexpr uint16_t kWalkStepMs     = 800;  /* one lit pixel in the walk */
 
-bool gLedMenuActive = false;
+bool led_menu_active = false;
 
 /* Announces one intended pixel write; an index past the chain length is
  * logged as skipped so an incomplete board still shows the full walk */
@@ -263,7 +263,7 @@ void startLedTestMenu()
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
     delay(250);
     Serial.println("   5V LED rail ON for the menu duration");
-    gLedMenuActive = true;
+    led_menu_active = true;
     printLedTestMenu();
 }
 
@@ -274,7 +274,7 @@ static void stopLedTestMenu()
 {
     blackoutLeds();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-    gLedMenuActive = false;
+    led_menu_active = false;
     Serial.println("   [led menu closed, 5V rail OFF]");
 }
 
@@ -324,7 +324,7 @@ void runLedTestKey(char key)
         Serial.println("   [led menu] 1-4 = LEDs, 5-9 = animations, 0 = all, q = quit");
         return;
     }
-    if (gLedMenuActive)
+    if (led_menu_active)
     {
         printLedTestMenu(); /* the tests are chatty: reprint the prompt after them */
     }

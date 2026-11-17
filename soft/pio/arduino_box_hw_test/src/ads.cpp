@@ -96,20 +96,20 @@ AdsTestEntry kAdsTests[] = {
 static_assert(sizeof(kAdsTests) / sizeof(kAdsTests[0]) == kAdsCount,
               "probe table must list all five ADS modules");
 
-CalibrationStats gCalibrationStats[kCalibrationSlotCount] = {};
+CalibrationStats calibration_stats[kCalibrationSlotCount] = {};
 /* Change report history for the health cycle: the five ADS slots plus
  * the nRF24 chip state. Filled at the end of each health run and
  * compared against the previous run */
-static bool gLastProbeState[kAdsCount + 1] = {};
-static bool gProbeStateValid               = false;
+static bool last_probe_state[kAdsCount + 1] = {};
+static bool probe_state_valid               = false;
 
 void resetCalibrationStats()
 {
     for (uint8_t i = 0; i < kCalibrationSlotCount; ++i)
     {
-        gCalibrationStats[i] = CalibrationStats{};
+        calibration_stats[i] = CalibrationStats{};
     }
-    gCalibrationScanCounter = 0;
+    calibration_scan_counter = 0;
 }
 
 /* Quiet variant of the probe used by the verbose one: same device list,
@@ -125,12 +125,12 @@ void reportProbeChanges()
     }
     current[kAdsCount] = radio.isChipConnected();
 
-    if (gProbeStateValid)
+    if (probe_state_valid)
     {
         bool unchanged = true;
         for (uint8_t i = 0; i <= kAdsCount; ++i)
         {
-            if (current[i] == gLastProbeState[i])
+            if (current[i] == last_probe_state[i])
             {
                 continue;
             }
@@ -147,7 +147,7 @@ void reportProbeChanges()
                 Serial.print("nRF24L01+");
             }
             Serial.print(": ");
-            Serial.print(gLastProbeState[i] ? "ok" : "miss");
+            Serial.print(last_probe_state[i] ? "ok" : "miss");
             Serial.print(" -> ");
             Serial.println(current[i] ? "ok" : "miss");
         }
@@ -163,9 +163,9 @@ void reportProbeChanges()
 
     for (uint8_t i = 0; i <= kAdsCount; ++i)
     {
-        gLastProbeState[i] = current[i];
+        last_probe_state[i] = current[i];
     }
-    gProbeStateValid = true;
+    probe_state_valid = true;
 }
 
 bool isI2c3Entry(const AdsTestEntry *entry)
@@ -378,7 +378,7 @@ bool readAdsSingleEndedMean(const AdsTestEntry *entry, uint8_t channel, int16_t 
 
 void updateCalibrationStats(uint8_t slotIndex, int16_t raw)
 {
-    CalibrationStats &stats = gCalibrationStats[slotIndex];
+    CalibrationStats &stats = calibration_stats[slotIndex];
     if (!stats.initialized)
     {
         stats.initialized = true;

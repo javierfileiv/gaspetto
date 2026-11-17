@@ -175,7 +175,7 @@ void runHealthCycle()
     }
     delayWithUsb(DELAY);
 
-    if (gMode != TestMode::Health)
+    if (test_mode != TestMode::Health)
     {
         /* Mode changed while waiting: leave the rails exactly as the new
          * mode set them. The sensor rail needs no care here - it went down

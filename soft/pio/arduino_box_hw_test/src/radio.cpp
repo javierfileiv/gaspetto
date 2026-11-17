@@ -42,12 +42,12 @@ void runSendPiecesTest()
 
     Serial.println("\n--- SEND PIECES: scan -> build -> radio ---");
 
-    if (!gRadioOk)
+    if (!radio_ok)
     {
         Serial.println("[send] radio is not up: re-probe with 's' in health mode");
         return;
     }
-    if (gMode != TestMode::Calibration)
+    if (test_mode != TestMode::Calibration)
     {
         Serial.println("[send] calibration mode required ('c' to switch)");
         return;
@@ -164,13 +164,13 @@ static void printRadioMenu()
 void startRadioMenu()
 {
     Serial.println("--- RADIO MENU ---");
-    gRadioMenuActive = true;
+    radio_menu_active = true;
     printRadioMenu();
 }
 
 static void stopRadioMenu()
 {
-    gRadioMenuActive = false;
+    radio_menu_active = false;
     Serial.println("   [radio menu closed]");
 }
 
@@ -221,7 +221,7 @@ void runRadioMenuKey(char key)
         CommandPacket packet = {};
         bool sent            = false;
 
-        if (!gRadioOk)
+        if (!radio_ok)
         {
             Serial.println("[radio] radio is not up: re-probe with 's' in health mode");
             break;
@@ -245,7 +245,7 @@ void runRadioMenuKey(char key)
         return;
     }
 
-    if (gRadioMenuActive)
+    if (radio_menu_active)
     {
         printRadioMenu(); /* the entries are chatty: reprint the prompt after them */
     }
@@ -262,7 +262,7 @@ void runCarStreamTest()
     /* Without this guard a dead radio looks exactly like a silent car:
      * both print "quiet, packets=0" until someone notices the car was
      * reporting FAILED all along */
-    if (!gRadioOk)
+    if (!radio_ok)
     {
         Serial.println("\n[stream] radio is not up: re-probe with 's' in health mode");
         return;
@@ -273,11 +273,11 @@ void runCarStreamTest()
      * sender's without opening either firmware's menu */
     printRadioAddress("   listening pipe1 = ", gbox_pipe_name);
 
-    gMonitorActive = true;
-    gMonitorExit   = false;
+    monitor_active = true;
+    monitor_exit   = false;
     radio.startListening();
 
-    while (!gMonitorExit)
+    while (!monitor_exit)
     {
         uint8_t pipe = 0;
 
@@ -365,7 +365,7 @@ void runCarStreamTest()
         delayWithUsb(20);
     }
 
-    gMonitorActive = false;
+    monitor_active = false;
     radio.stopListening();
 
     Serial.print("--- CAR STREAM stopped, packets=");

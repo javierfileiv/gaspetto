@@ -14,11 +14,11 @@ RF24 radio(NRF24_CE, NRF24_CSN);
 
 /* Set by setup() once the chip answered: without it the send test would
  * report a missing car instead of a missing radio */
-bool gRadioOk = false;
+bool radio_ok = false;
 
 /* Radio menu (key "t"), same shape as the LED menu: the shell routes
  * every key here while it is open */
-bool gRadioMenuActive = false;
+bool radio_menu_active = false;
 
 /* I2C1 uses the global Wire instance */
 TwoWire &i2c1 = Wire;
@@ -26,11 +26,11 @@ TwoWire &i2c1 = Wire;
 constexpr uint16_t kCalibrationScanPeriodMs = 1000;
 
 #ifdef TEST_ADS1115
-TestMode gMode           = TestMode::Health;
-bool gCalibrationRailsOn = false;
+TestMode test_mode        = TestMode::Health;
+bool calibration_rails_on = false;
 /* One test run is pending, set by 's' from any mode. False at boot: the
  * board waits for a key instead of running the health cycle on its own */
-bool gRunTestRequested = false;
+bool run_test_requested = false;
 #endif /* TEST_ADS1115 */
 
 /* ========================================== */
@@ -88,7 +88,7 @@ void setup()
          * logs ('e' opens that listening, nothing is drained outside it) */
         radio.openReadingPipe(1, gbox_pipe_name);
         radio.printDetails(); /* Print chip info to Serial */
-        gRadioOk = true;
+        radio_ok = true;
     }
     else
     {
@@ -107,7 +107,7 @@ void setup()
     /* Turn ON 3V3_SWITCHED FIRST so ADS1115 modules are powered */
     Serial.println("\n4. Turning ON 3V3_SWITCHED to power ADS1115 modules...");
     digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW); /* Turn ON Q2 */
-    gCalibrationRailsOn = true;                /* the lease must not drop it from here */
+    calibration_rails_on = true;               /* the lease must not drop it from here */
     delay(kRailSettleDelayMs);                 /* Wait for modules to initialize */
     Serial.println("   [OK] 3V3_SWITCHED activated - ADS1115 modules should be powered");
 
@@ -121,7 +121,7 @@ void setup()
     Serial.println("   hw-test: runtime modes build");
     printUsbHelp();
     Serial.print("   mode: ");
-    Serial.println(gMode == TestMode::Calibration ? "calibration" : "health");
+    Serial.println(test_mode == TestMode::Calibration ? "calibration" : "health");
 
     /* Give both rails back before waiting for a key: the boot raised them
      * for the APA106 first frames and for an ADS probe that no longer runs
@@ -130,7 +130,7 @@ void setup()
      * first reading - the offset the pulse exists to avoid */
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
-    gCalibrationRailsOn = false;
+    calibration_rails_on = false;
 
     Serial.println("   waiting for a key ('?' for help)");
 }
@@ -142,13 +142,13 @@ void loop()
 {
     handleUsbCommands();
 
-    if (gMode == TestMode::Calibration)
+    if (test_mode == TestMode::Calibration)
     {
         /* No rail re-arm here: readAdsSingleEndedMean raises the sensor rail
          * for each reading and drops it again, so re-latching it would bring
          * back the warm board this change exists to avoid */
 
-        if (gJigActive)
+        if (jig_active)
         {
             /* One reading per pass, and a reading raises and drops the rail
              * itself, so a pass costs the settle time: the detector sees the
@@ -168,14 +168,14 @@ void loop()
         }
 
 #ifdef TEST_ADS1115
-        if (gRunTestRequested)
+        if (run_test_requested)
         {
-            gRunTestRequested = false;
+            run_test_requested = false;
             runPieceCalibrationScan();
         }
 #endif
 
-        if (gMode != TestMode::Calibration)
+        if (test_mode != TestMode::Calibration)
         {
             return; /* mode changed while waiting: skip the rest delay */
         }
@@ -185,9 +185,9 @@ void loop()
     }
 
 #ifdef TEST_ADS1115
-    if (gRunTestRequested)
+    if (run_test_requested)
     {
-        gRunTestRequested = false;
+        run_test_requested = false;
         runHealthCycle();
     }
 #endif

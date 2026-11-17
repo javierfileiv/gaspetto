@@ -32,28 +32,28 @@ void printUsbHelp()
  * line end (the same convention the import parser follows) */
 void enterMode(TestMode mode)
 {
-    if (gMode == mode)
+    if (test_mode == mode)
     {
-        gRunTestRequested = true; /* already active: re-run this mode test */
+        run_test_requested = true; /* already active: re-run this mode test */
         Serial.println("\n-> test already active, running it ('?' status)");
         return;
     }
 
-    gMode = mode;
+    test_mode = mode;
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-    if (gMode == TestMode::Calibration)
+    if (test_mode == TestMode::Calibration)
     {
         resetCalibrationStats();
         /* The sensor rail goes up per reading now, so entering the mode only
          * takes it down: holding it up for the whole session is what warmed
          * the board and shifted every reading by ~370 counts */
-        gCalibrationRailsOn = false;
+        calibration_rails_on = false;
         Serial.println("\n-> mode: calibration ('s' scan, 't' gaps, '?' status)");
     }
     else
     {
-        gCalibrationRailsOn = false;
+        calibration_rails_on = false;
         Serial.println("\n-> mode: health ('?' for status)");
     }
 }
@@ -91,9 +91,9 @@ void handleUsbCommands()
         echoTypedKey(incoming);
 
         /* While the slot monitor runs, any key is a stop request */
-        if (gMonitorActive)
+        if (monitor_active)
         {
-            gMonitorExit  = true;
+            monitor_exit  = true;
             pendingSlot   = 0;
             digitsStarted = false;
             /* Drop the rest of the burst: this stop key cuts a command typed
@@ -119,18 +119,18 @@ void handleUsbCommands()
          * while a window already runs: one key, one measure), trailing
          * newlines are harmless, any other key quits with the same burst
          * drain as the live monitor */
-        if (gFreezeActive)
+        if (freeze_active)
         {
             if (incoming == ' ')
             {
-                if (!gFreezeMeasuring)
+                if (!freeze_measuring)
                 {
-                    gFreezeMeasure = true;
+                    freeze_measure = true;
                 }
             }
             else if (incoming != '\r' && incoming != '\n')
             {
-                gFreezeExit = true;
+                freeze_exit = true;
                 int dropped = 0;
                 while (Serial.available() > 0)
                 {
@@ -146,14 +146,14 @@ void handleUsbCommands()
             }
             pendingSlot   = 0;
             digitsStarted = false;
-            if (gFreezeExit)
+            if (freeze_exit)
             {
                 break;
             }
             continue;
         }
 
-        if (gLedMenuActive)
+        if (led_menu_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
@@ -164,7 +164,7 @@ void handleUsbCommands()
             continue;
         }
 
-        if (gRadioMenuActive)
+        if (radio_menu_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
@@ -177,7 +177,7 @@ void handleUsbCommands()
 
         /* Jig mode intercepts its own keys, like the game does: the walk is
          * driven by the polling loop and only the escape hatches are here */
-        if (gJigActive)
+        if (jig_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
@@ -242,15 +242,15 @@ void handleUsbCommands()
             enterMode(TestMode::Calibration);
             break;
         case 's':
-            gRunTestRequested = true;
+            run_test_requested = true;
             break;
         case '?':
             Serial.print("mode: ");
-            Serial.println(gMode == TestMode::Health ? "health" : "calibration");
+            Serial.println(test_mode == TestMode::Health ? "health" : "calibration");
             printUsbHelp();
             break;
         case 'l':
-            if (gLedMenuActive)
+            if (led_menu_active)
             {
                 break; /* unreachable: the menu intercepts before the switch */
             }
@@ -258,7 +258,7 @@ void handleUsbCommands()
             break;
 
         case 't':
-            if (gRadioMenuActive)
+            if (radio_menu_active)
             {
                 break; /* unreachable: the menu intercepts before the switch */
             }
@@ -275,7 +275,7 @@ void handleUsbCommands()
             runCarStreamTest();
             break;
         case 'j':
-            if (gJigActive)
+            if (jig_active)
             {
                 stopJigMode();
                 break;
@@ -283,7 +283,7 @@ void handleUsbCommands()
             startJigMode();
             break;
         case 'k':
-            if (gMode != TestMode::Calibration)
+            if (test_mode != TestMode::Calibration)
             {
                 Serial.println("forgetting a slot works in calibration mode ('c' to switch)");
                 break;
@@ -296,7 +296,7 @@ void handleUsbCommands()
             forgetJigSlot(static_cast<uint8_t>(pendingSlot - 1));
             break;
         case 'm':
-            if (gMode != TestMode::Calibration)
+            if (test_mode != TestMode::Calibration)
             {
                 Serial.println("slot monitor works in calibration mode ('c' to switch)");
                 break;
@@ -309,7 +309,7 @@ void handleUsbCommands()
             runSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
             break;
         case 'x':
-            if (gMode != TestMode::Calibration)
+            if (test_mode != TestMode::Calibration)
             {
                 Serial.println("frozen monitor works in calibration mode ('c' to switch)");
                 break;

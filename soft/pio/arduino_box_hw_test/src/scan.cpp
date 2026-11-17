@@ -5,7 +5,7 @@
 
 #include <Adafruit_ADS1X15.h>
 
-uint32_t gCalibrationScanCounter = 0;
+uint32_t calibration_scan_counter = 0;
 
 const char *labelName(int index)
 {
@@ -37,9 +37,9 @@ const char *labelName(int index)
  * counts of noise; pairing only the last two passes is what a re-seat or a
  * cover move actually shifts. resetCalibrationStats() zeroes the counter on
  * a mode entry, which also drops this baseline */
-static uint16_t gScanPrevMean[kCalibrationSlotCount];
-static bool gScanPrevValid[kCalibrationSlotCount];
-static bool gScanHasPrev = false;
+static uint16_t scan_prev_mean[kCalibrationSlotCount];
+static bool scan_prev_valid[kCalibrationSlotCount];
+static bool scan_has_prev = false;
 
 /* Delta past which the comparison flags a slot: the readings gigue is 0-16
  * counts on I2C3 and around 100 on I2C1, so this catches real movement (a
@@ -47,16 +47,16 @@ static bool gScanHasPrev = false;
 static constexpr uint32_t kScanDeltaAlert = 150;
 
 /* Continuous slot monitor ('m'): while active, usb keys only stop it */
-bool gMonitorActive = false;
-bool gMonitorExit   = false;
+bool monitor_active = false;
+bool monitor_exit   = false;
 
 /* Frozen slot monitor ('x'): only the SPACE-opened windows sample, so an
  * orientation sweep logs one clean line per pose, unpolluted by the
  * rotations happening between windows */
-bool gFreezeActive    = false;
-bool gFreezeMeasure   = false;
-bool gFreezeMeasuring = false;
-bool gFreezeExit      = false;
+bool freeze_active    = false;
+bool freeze_measure   = false;
+bool freeze_measuring = false;
+bool freeze_exit      = false;
 
 /* Length of one frozen-monitor measurement window */
 constexpr uint32_t kFreezeWindowMs = 3000;
@@ -84,9 +84,9 @@ void runSlotMonitor(uint8_t slotIndex)
     uint32_t count  = 0;
     uint64_t sum    = 0;
 
-    gMonitorActive = true;
-    gMonitorExit   = false;
-    while (!gMonitorExit)
+    monitor_active = true;
+    monitor_exit   = false;
+    while (!monitor_exit)
     {
         int16_t rawMean = 0;
         bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
@@ -159,11 +159,11 @@ void runSlotMonitor(uint8_t slotIndex)
             Serial.println("---- max=----");
         }
 
-        /* The parser only sets gMonitorExit here, so the sampling
+        /* The parser only sets monitor_exit here, so the sampling
          * period doubles as the usb response time */
         delayWithUsb(200);
     }
-    gMonitorActive = false;
+    monitor_active = false;
 
     Serial.println("--- MONITOR stopped ---");
     if (count > 0)
@@ -197,26 +197,26 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
     Serial.print(" (");
     Serial.print(entry.busName);
     Serial.println("), SPACE = measure, any other key to quit ---");
-    gFreezeActive    = true;
-    gFreezeMeasure   = false;
-    gFreezeMeasuring = false;
-    gFreezeExit      = false;
-    while (!gFreezeExit)
+    freeze_active    = true;
+    freeze_measure   = false;
+    freeze_measuring = false;
+    freeze_exit      = false;
+    while (!freeze_exit)
     {
         delayWithUsb(50);
-        if (!gFreezeMeasure)
+        if (!freeze_measure)
         {
             continue;
         }
-        gFreezeMeasure   = false;
-        gFreezeMeasuring = true;
+        freeze_measure   = false;
+        freeze_measuring = true;
 
         uint16_t minRaw        = 0xFFFF;
         uint16_t maxRaw        = 0;
         uint32_t count         = 0;
         uint64_t sum           = 0;
         const uint32_t startMs = millis();
-        while (millis() - startMs < kFreezeWindowMs && !gFreezeExit)
+        while (millis() - startMs < kFreezeWindowMs && !freeze_exit)
         {
             int16_t rawMean = 0;
             bool readOk     = readAdsSingleEndedMean(&entry, channel, rawMean);
@@ -241,7 +241,7 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
             }
             delayWithUsb(20);
         }
-        gFreezeMeasuring = false;
+        freeze_measuring = false;
 
         Serial.print("   slot ");
         Serial.print(static_cast<int>(slotIndex) + 1);
@@ -264,7 +264,7 @@ void runFrozenSlotMonitor(uint8_t slotIndex)
         Serial.print("  ");
         Serial.println(pieceLabelForRaw(slotIndex, static_cast<int16_t>(mean)));
     }
-    gFreezeActive = false;
+    freeze_active = false;
     Serial.println("--- FROZEN MONITOR stopped ---");
 }
 
@@ -341,18 +341,18 @@ void runPieceCalibrationScan()
 
     /* resetCalibrationStats() zeroes the counter on a mode entry, so a zero
      * here means a fresh session and the stored pass belongs to before it */
-    if (gCalibrationScanCounter == 0)
+    if (calibration_scan_counter == 0)
     {
         for (uint8_t slotIndex = 0; slotIndex < kCalibrationSlotCount; ++slotIndex)
         {
-            gScanPrevValid[slotIndex] = false;
+            scan_prev_valid[slotIndex] = false;
         }
-        gScanHasPrev = false;
+        scan_has_prev = false;
     }
 
     Serial.println("\n--- PIECE THRESHOLD CALIBRATION ---");
     Serial.print("scan=");
-    Serial.println(++gCalibrationScanCounter);
+    Serial.println(++calibration_scan_counter);
     Serial.print("mean samples=");
     Serial.print(kAdsMeanSamples);
     /* Decoding compares against each slot's own row, printed on every slot
@@ -450,7 +450,7 @@ void runPieceCalibrationScan()
             updateCalibrationStats(slotIndex, rawMean);
             passMean[slotIndex]           = static_cast<uint16_t>(rawMean);
             passValid[slotIndex]          = true;
-            const CalibrationStats &stats = gCalibrationStats[slotIndex];
+            const CalibrationStats &stats = calibration_stats[slotIndex];
 
             Serial.print("mean=");
             Serial.print(rawMean);
@@ -471,14 +471,14 @@ void runPieceCalibrationScan()
      * what actually moved - a re-seated piece, a shifted cover - and a delta
      * past kScanDeltaAlert is flagged */
     Serial.print("--- PASS COMPARISON");
-    if (gScanHasPrev)
+    if (scan_has_prev)
     {
         Serial.print(" vs scan ");
-        Serial.print(gCalibrationScanCounter - 1);
+        Serial.print(calibration_scan_counter - 1);
     }
     Serial.println(" ---");
 
-    if (!gScanHasPrev)
+    if (!scan_has_prev)
     {
         Serial.println("   first pass of this session, baseline stored: rerun to compare");
     }
@@ -495,7 +495,7 @@ void runPieceCalibrationScan()
                 Serial.println("read FAIL, no comparison");
                 continue;
             }
-            if (!gScanPrevValid[slotIndex])
+            if (!scan_prev_valid[slotIndex])
             {
                 Serial.print(passMean[slotIndex]);
                 Serial.println(" (no previous pass)");
@@ -503,8 +503,8 @@ void runPieceCalibrationScan()
             }
 
             const int32_t delta = static_cast<int32_t>(passMean[slotIndex]) -
-                                  static_cast<int32_t>(gScanPrevMean[slotIndex]);
-            Serial.print(gScanPrevMean[slotIndex]);
+                                  static_cast<int32_t>(scan_prev_mean[slotIndex]);
+            Serial.print(scan_prev_mean[slotIndex]);
             Serial.print(" -> ");
             Serial.print(passMean[slotIndex]);
             Serial.print("  delta=");
@@ -529,11 +529,11 @@ void runPieceCalibrationScan()
     {
         if (passValid[slotIndex])
         {
-            gScanPrevMean[slotIndex]  = passMean[slotIndex];
-            gScanPrevValid[slotIndex] = true;
+            scan_prev_mean[slotIndex]  = passMean[slotIndex];
+            scan_prev_valid[slotIndex] = true;
         }
     }
-    gScanHasPrev = true;
+    scan_has_prev = true;
 }
 
 /* ========================================== */

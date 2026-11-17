@@ -201,23 +201,23 @@ struct JigTypeStats
     bool rotationMatters;
 };
 
-bool gJigActive = false;
+bool jig_active = false;
 
-static JigCapture sCaptures[kJigMaxCaptures] = {};
-static uint16_t sCaptureCount                = 0;
-static bool sRefKnown[kJigSlotCount]         = {};
-static uint16_t sRefValue[kJigSlotCount]     = {};
+static JigCapture captures[kJigMaxCaptures] = {};
+static uint16_t capture_count               = 0;
+static bool ref_known[kJigSlotCount]        = {};
+static uint16_t ref_value[kJigSlotCount]    = {};
 
 /* Arm state of the detector: a capture drops the arm, and the reading has to
  * move away from the value just recorded before another one is accepted,
  * which covers both lifting the piece and turning it in place */
-static bool sHasCaptured      = false;
-static int16_t sCapturedValue = 0;
-static uint8_t sCapturedSlot  = 0;
+static bool has_captured      = false;
+static int16_t captured_value = 0;
+static uint8_t captured_slot  = 0;
 
 /* Force-capture request from the shell, consumed by the next poll: a piece
  * too weak to cross the presence threshold still has to be recordable */
-static bool sCaptureNow = false;
+static bool capture_now = false;
 
 /* Current plateau window: the last few readings, with the oldest dropped as
  * new ones arrive. A plain accumulator was the first design and it never
@@ -225,9 +225,9 @@ static bool sCaptureNow = false;
  * extreme stayed in it forever and the capture could not happen again. A
  * window keeps only recent readings, so a piece that drifts while settling
  * locks as soon as it holds still */
-static int16_t sWindow[kJigStableCount] = {};
-static uint8_t sWindowCount             = 0;
-static uint8_t sWindowNext              = 0;
+static int16_t window[kJigStableCount] = {};
+static uint8_t window_count            = 0;
+static uint8_t window_next             = 0;
 
 /* Defined further down: the flash journal needs the store, and the store
  * reports to the journal after every change, so the two refer to each other */
@@ -237,13 +237,13 @@ static void jigStoreLoad();
 static void jigStoreSave();
 
 /* Target on screen, so the prompt is printed only when it changes */
-static bool sTargetPrinted    = false;
-static JigTarget sShownTarget = {};
+static bool target_printed    = false;
+static JigTarget shown_target = {};
 
-static bool sAnalysisDone = false;
+static bool analysis_done = false;
 
 /* Consecutive refused idle readings, only to explain the wait */
-static uint8_t sIdleRejects = 0;
+static uint8_t idle_rejects = 0;
 
 /* Two idle measurements of the same slot taken minutes apart should agree to
  * a few tens of counts: the rail wanders by that much, not by hundreds. A
@@ -254,13 +254,13 @@ constexpr uint8_t kJigMaxIdlePerSlot = 12;
 
 /* Consecutive polls where the reading had not moved away from the previous
  * capture: a centred magnet never does, so the guard gives way after a few */
-static uint8_t sUnchangedPolls = 0;
+static uint8_t unchanged_polls = 0;
 
 /* Last census piece measured, so 'n' redoes that one and not the piece the
  * prompt has already moved on to */
-static bool sLastCensusValid    = false;
-static uint8_t sLastCensusType  = 0;
-static uint8_t sLastCensusPiece = 0;
+static bool last_census_valid    = false;
+static uint8_t last_census_type  = 0;
+static uint8_t last_census_piece = 0;
 
 /* ========================================== */
 /* Capture store */
@@ -277,11 +277,11 @@ static const JigCapture *jigFind(JigKind kind, uint8_t type, uint8_t piece, uint
                                  uint8_t slot)
 {
     /* Newest wins: a re-placed piece replaces the capture it supersedes */
-    for (int32_t index = static_cast<int32_t>(sCaptureCount) - 1; index >= 0; --index)
+    for (int32_t index = static_cast<int32_t>(capture_count) - 1; index >= 0; --index)
     {
-        if (jigSameKey(sCaptures[index], kind, type, piece, orient, slot))
+        if (jigSameKey(captures[index], kind, type, piece, orient, slot))
         {
-            return &sCaptures[index];
+            return &captures[index];
         }
     }
     return nullptr;
@@ -290,13 +290,13 @@ static const JigCapture *jigFind(JigKind kind, uint8_t type, uint8_t piece, uint
 static void jigRecord(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot,
                       int16_t mean, uint16_t ref)
 {
-    if (sCaptureCount >= kJigMaxCaptures)
+    if (capture_count >= kJigMaxCaptures)
     {
         Serial.println("   [store full, clear with 'X']");
         return;
     }
 
-    JigCapture &capture = sCaptures[sCaptureCount++];
+    JigCapture &capture = captures[capture_count++];
     capture.kind        = kind;
     capture.type        = type;
     capture.piece       = piece;
@@ -307,8 +307,8 @@ static void jigRecord(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient,
 
     if (kind == JigKind::Idle)
     {
-        sRefKnown[slot] = true;
-        sRefValue[slot] = static_cast<uint16_t>(mean);
+        ref_known[slot] = true;
+        ref_value[slot] = static_cast<uint16_t>(mean);
     }
 
     jigStoreMaybeSave();
@@ -323,14 +323,14 @@ struct JigSkip
     uint8_t slot;
 };
 
-static JigSkip sSkips[kJigMaxSkips] = {};
-static uint8_t sSkipCount           = 0;
+static JigSkip skips[kJigMaxSkips] = {};
+static uint8_t skip_count          = 0;
 
 static bool jigIsSkipped(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot)
 {
-    for (uint8_t index = 0; index < sSkipCount; ++index)
+    for (uint8_t index = 0; index < skip_count; ++index)
     {
-        const JigSkip &skip = sSkips[index];
+        const JigSkip &skip = skips[index];
         if (skip.kind == kind && skip.type == type && skip.piece == piece &&
             skip.orient == orient && skip.slot == slot)
         {
@@ -342,13 +342,13 @@ static bool jigIsSkipped(JigKind kind, uint8_t type, uint8_t piece, uint8_t orie
 
 static void jigSkipAdd(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient, uint8_t slot)
 {
-    if (sSkipCount >= kJigMaxSkips)
+    if (skip_count >= kJigMaxSkips)
     {
         Serial.println("   [skip list full]");
         return;
     }
 
-    JigSkip &skip = sSkips[sSkipCount++];
+    JigSkip &skip = skips[skip_count++];
     skip.kind     = kind;
     skip.type     = type;
     skip.piece    = piece;
@@ -367,7 +367,7 @@ static bool jigMissing(JigKind kind, uint8_t type, uint8_t piece, uint8_t orient
 
 static uint16_t jigRefFor(uint8_t slot)
 {
-    return sRefKnown[slot] ? sRefValue[slot] : 0;
+    return ref_known[slot] ? ref_value[slot] : 0;
 }
 
 static int32_t jigDeviation(const JigCapture *capture)
@@ -405,9 +405,9 @@ constexpr uint8_t kJigSaveEvery       = 4;
 
 static_assert(kJigStoreTotal <= E2END + 1, "the journal must fit the emulated EEPROM");
 
-static uint8_t sUnsaved   = 0;
-static bool sStoreReady   = false;
-static bool sStoreLoading = false;
+static uint8_t unsaved    = 0;
+static bool store_ready   = false;
+static bool store_loading = false;
 
 static void jigStoreWriteU8(uint16_t position, uint8_t value)
 {
@@ -453,7 +453,7 @@ static void jigStoreWriteRecord(uint16_t index, uint8_t kind, uint8_t type, uint
 
 static void jigStoreSave()
 {
-    if (sStoreLoading)
+    if (store_loading)
     {
         return;
     }
@@ -463,19 +463,19 @@ static void jigStoreSave()
     jigStoreWriteU8(0, kJigStoreMagicA);
     jigStoreWriteU8(1, kJigStoreMagicB);
     jigStoreWriteU8(2, kJigStoreVersion);
-    jigStoreWriteU16(3, static_cast<uint16_t>(sCaptureCount + sSkipCount));
+    jigStoreWriteU16(3, static_cast<uint16_t>(capture_count + skip_count));
 
-    for (uint16_t captureIndex = 0; captureIndex < sCaptureCount && index < kJigStoreCapacity;
+    for (uint16_t captureIndex = 0; captureIndex < capture_count && index < kJigStoreCapacity;
          ++captureIndex)
     {
-        const JigCapture &capture = sCaptures[captureIndex];
+        const JigCapture &capture = captures[captureIndex];
         jigStoreWriteRecord(index++, static_cast<uint8_t>(capture.kind), capture.type,
                             capture.piece, capture.orient, capture.slot, 0, capture.mean,
                             capture.ref);
     }
-    for (uint8_t skipIndex = 0; skipIndex < sSkipCount && index < kJigStoreCapacity; ++skipIndex)
+    for (uint8_t skipIndex = 0; skipIndex < skip_count && index < kJigStoreCapacity; ++skipIndex)
     {
-        const JigSkip &skip = sSkips[skipIndex];
+        const JigSkip &skip = skips[skipIndex];
         jigStoreWriteRecord(index++, kJigStoreKindSkip, skip.type, skip.piece, skip.orient,
                             skip.slot, static_cast<uint8_t>(skip.kind), 0, 0);
     }
@@ -489,25 +489,25 @@ static void jigStoreSave()
 
     eeprom_buffer_flush();
 
-    sUnsaved    = 0;
-    sStoreReady = true;
+    unsaved     = 0;
+    store_ready = true;
 
     Serial.print("   [flash ");
-    Serial.print(sCaptureCount);
+    Serial.print(capture_count);
     Serial.println(" captures]");
 }
 
 static void jigStoreMaybeSave()
 {
-    if (sStoreLoading)
+    if (store_loading)
     {
         return;
     }
-    if (sUnsaved < 0xFF)
+    if (unsaved < 0xFF)
     {
-        ++sUnsaved;
+        ++unsaved;
     }
-    if (sUnsaved >= kJigSaveEvery)
+    if (unsaved >= kJigSaveEvery)
     {
         jigStoreSave();
     }
@@ -515,11 +515,11 @@ static void jigStoreMaybeSave()
 
 static void jigStoreLoad()
 {
-    if (sStoreReady)
+    if (store_ready)
     {
         return;
     }
-    sStoreReady = true;
+    store_ready = true;
 
     eeprom_buffer_fill();
 
@@ -535,7 +535,7 @@ static void jigStoreLoad()
         return;
     }
 
-    sStoreLoading = true;
+    store_loading = true;
     for (uint16_t index = 0; index < stored; ++index)
     {
         const uint16_t base = static_cast<uint16_t>(kJigStoreHeader + index * kJigStoreRecordSize);
@@ -559,14 +559,14 @@ static void jigStoreLoad()
                       jigStoreReadU16(static_cast<uint16_t>(base + 8)));
         }
     }
-    sStoreLoading = false;
+    store_loading = false;
 
     jigRebuildRefs();
 
     Serial.print("   resumed ");
-    Serial.print(sCaptureCount);
+    Serial.print(capture_count);
     Serial.print(" captures and ");
-    Serial.print(sSkipCount);
+    Serial.print(skip_count);
     Serial.println(" write-offs from flash");
 }
 
@@ -758,33 +758,33 @@ static bool jigReadSlot(uint8_t slot, int16_t &mean)
 
 static void jigPlateauReset()
 {
-    sWindowCount = 0;
-    sWindowNext  = 0;
+    window_count = 0;
+    window_next  = 0;
 }
 
 static void jigPlateauAdd(int16_t mean)
 {
-    sWindow[sWindowNext] = mean;
-    sWindowNext          = static_cast<uint8_t>((sWindowNext + 1) % kJigStableCount);
-    if (sWindowCount < kJigStableCount)
+    window[window_next] = mean;
+    window_next         = static_cast<uint8_t>((window_next + 1) % kJigStableCount);
+    if (window_count < kJigStableCount)
     {
-        ++sWindowCount;
+        ++window_count;
     }
 }
 
 static bool jigPlateauStable()
 {
-    if (sWindowCount < kJigStableCount)
+    if (window_count < kJigStableCount)
     {
         return false;
     }
 
-    int16_t lowest  = sWindow[0];
-    int16_t highest = sWindow[0];
+    int16_t lowest  = window[0];
+    int16_t highest = window[0];
     for (uint8_t index = 1; index < kJigStableCount; ++index)
     {
-        lowest  = sWindow[index] < lowest ? sWindow[index] : lowest;
-        highest = sWindow[index] > highest ? sWindow[index] : highest;
+        lowest  = window[index] < lowest ? window[index] : lowest;
+        highest = window[index] > highest ? window[index] : highest;
     }
     return static_cast<uint16_t>(highest - lowest) <= kJigStableSpan;
 }
@@ -792,11 +792,11 @@ static bool jigPlateauStable()
 static int16_t jigPlateauMean()
 {
     int32_t sum = 0;
-    for (uint8_t index = 0; index < sWindowCount; ++index)
+    for (uint8_t index = 0; index < window_count; ++index)
     {
-        sum += sWindow[index];
+        sum += window[index];
     }
-    return static_cast<int16_t>(sum / static_cast<int32_t>(sWindowCount));
+    return static_cast<int16_t>(sum / static_cast<int32_t>(window_count));
 }
 
 /* ========================================== */
@@ -1244,11 +1244,11 @@ static void jigPrintOrder(const JigTypeStats *stats)
  * gain pass that is still perfectly valid */
 static bool jigGainPiece(uint8_t &piece)
 {
-    for (uint16_t index = 0; index < sCaptureCount; ++index)
+    for (uint16_t index = 0; index < capture_count; ++index)
     {
-        if (sCaptures[index].kind == JigKind::Gain)
+        if (captures[index].kind == JigKind::Gain)
         {
-            piece = sCaptures[index].piece;
+            piece = captures[index].piece;
             return true;
         }
     }
@@ -1608,9 +1608,9 @@ static void jigPrintIdleHistory()
         int32_t sorted[kJigMaxIdlePerSlot] = {};
         uint8_t count                      = 0;
 
-        for (uint16_t index = 0; index < sCaptureCount && count < kJigMaxIdlePerSlot; ++index)
+        for (uint16_t index = 0; index < capture_count && count < kJigMaxIdlePerSlot; ++index)
         {
-            const JigCapture &capture = sCaptures[index];
+            const JigCapture &capture = captures[index];
             if (capture.kind == JigKind::Idle && capture.slot == slot)
             {
                 values[count] = capture.mean;
@@ -1670,14 +1670,14 @@ static void jigAnalyse()
     if (!jigOrderOk(stats))
     {
         jigPrintOrder(stats);
-        sAnalysisDone = true;
+        analysis_done = true;
         printJigHelp();
         return;
     }
 
     jigEmitRows(stats);
 
-    sAnalysisDone = true;
+    analysis_done = true;
     Serial.println("\n   'j' reprints, 'd' dumps the captures, 'X' clears and restarts");
     printJigHelp();
 }
@@ -1705,12 +1705,12 @@ void printJigHelp()
 void dumpJigCaptures()
 {
     Serial.print("\n--- JIG CAPTURES (");
-    Serial.print(sCaptureCount);
+    Serial.print(capture_count);
     Serial.println(") ---");
 
-    for (uint16_t index = 0; index < sCaptureCount; ++index)
+    for (uint16_t index = 0; index < capture_count; ++index)
     {
-        const JigCapture &capture = sCaptures[index];
+        const JigCapture &capture = captures[index];
         switch (capture.kind)
         {
         case JigKind::Idle:
@@ -1749,7 +1749,7 @@ void dumpJigCaptures()
 
 void startJigMode()
 {
-    if (gMode != TestMode::Calibration)
+    if (test_mode != TestMode::Calibration)
     {
         Serial.println("jig mode works in calibration mode ('c' to switch)");
         return;
@@ -1759,22 +1759,22 @@ void startJigMode()
      * so the walk resumes on the pose it stopped at */
     jigStoreLoad();
 
-    if (sAnalysisDone)
+    if (analysis_done)
     {
         jigAnalyse();
         return;
     }
 
-    gJigActive     = true;
-    sTargetPrinted = false;
-    sHasCaptured   = false;
+    jig_active     = true;
+    target_printed = false;
+    has_captured   = false;
     jigPlateauReset();
 
     Serial.println("\n--- JIG MODE ---");
-    if (sCaptureCount > 0)
+    if (capture_count > 0)
     {
         Serial.print("   resuming: ");
-        Serial.print(sCaptureCount);
+        Serial.print(capture_count);
         Serial.println(" captures in RAM");
     }
     Serial.println("   no keypress needed: place a piece and wait for the capture");
@@ -1784,34 +1784,34 @@ void startJigMode()
     if (!jigNextTarget(target))
     {
         jigAnalyse();
-        gJigActive = false;
+        jig_active = false;
     }
 }
 
 void stopJigMode()
 {
-    if (!gJigActive)
+    if (!jig_active)
     {
         return;
     }
-    gJigActive = false;
+    jig_active = false;
     jigStoreSave();
     Serial.print("\n--- JIG MODE stopped, ");
-    Serial.print(sCaptureCount);
+    Serial.print(capture_count);
     Serial.println(" captures kept ---");
     jigPrintProgress();
 }
 
 void clearJigCaptures()
 {
-    sCaptureCount = 0;
-    sSkipCount    = 0;
-    sAnalysisDone = false;
-    sHasCaptured  = false;
+    capture_count = 0;
+    skip_count    = 0;
+    analysis_done = false;
+    has_captured  = false;
     for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
     {
-        sRefKnown[slot] = false;
-        sRefValue[slot] = 0;
+        ref_known[slot] = false;
+        ref_value[slot] = 0;
     }
     jigStoreSave();
     Serial.println("   jig captures cleared");
@@ -1824,25 +1824,25 @@ void forgetJigSlot(uint8_t slot)
     /* Compact the store in place: the order only matters for the dump, and
      * the lookups take the newest match, so keeping the relative order of
      * what survives is enough */
-    for (uint16_t index = 0; index < sCaptureCount; ++index)
+    for (uint16_t index = 0; index < capture_count; ++index)
     {
-        if (sCaptures[index].slot != slot)
+        if (captures[index].slot != slot)
         {
-            sCaptures[kept++] = sCaptures[index];
+            captures[kept++] = captures[index];
         }
     }
 
     Serial.print("   slot ");
     Serial.print(static_cast<int>(slot) + 1);
     Serial.print(": ");
-    Serial.print(sCaptureCount - kept);
+    Serial.print(capture_count - kept);
     Serial.println(" captures forgotten, the plan will ask for them again");
 
-    sCaptureCount   = kept;
-    sRefKnown[slot] = false;
-    sRefValue[slot] = 0;
-    sAnalysisDone   = false;
-    sHasCaptured    = false;
+    capture_count   = kept;
+    ref_known[slot] = false;
+    ref_value[slot] = 0;
+    analysis_done   = false;
+    has_captured    = false;
     jigStoreSave();
 }
 
@@ -1850,32 +1850,32 @@ void forgetJigSlot(uint8_t slot)
  * four of its orientations at once, a single pose only itself */
 static void jigSkipShown()
 {
-    if (!sTargetPrinted)
+    if (!target_printed)
     {
         Serial.println("   no pose on screen to write off");
         return;
     }
 
-    if (sShownTarget.kind == JigKind::Census)
+    if (shown_target.kind == JigKind::Census)
     {
         for (uint8_t orient = 0; orient < kJigOrientCount; ++orient)
         {
-            jigSkipAdd(JigKind::Census, sShownTarget.type, sShownTarget.piece, orient,
-                       sShownTarget.slot);
+            jigSkipAdd(JigKind::Census, shown_target.type, shown_target.piece, orient,
+                       shown_target.slot);
         }
         Serial.print("   piece ");
-        Serial.print(static_cast<int>(sShownTarget.piece) + 1);
+        Serial.print(static_cast<int>(shown_target.piece) + 1);
         Serial.print(" written off: ");
-        Serial.println(kJigTypeHints[sShownTarget.type]);
+        Serial.println(kJigTypeHints[shown_target.type]);
     }
     else
     {
-        jigSkipAdd(sShownTarget.kind, sShownTarget.type, sShownTarget.piece, sShownTarget.orient,
-                   sShownTarget.slot);
+        jigSkipAdd(shown_target.kind, shown_target.type, shown_target.piece, shown_target.orient,
+                   shown_target.slot);
         Serial.println("   pose written off");
     }
 
-    sTargetPrinted = false;
+    target_printed = false;
     jigPlateauReset();
 }
 
@@ -1886,17 +1886,17 @@ static void jigRebuildRefs()
 {
     for (uint8_t slot = 0; slot < kJigSlotCount; ++slot)
     {
-        sRefKnown[slot] = false;
-        sRefValue[slot] = 0;
+        ref_known[slot] = false;
+        ref_value[slot] = 0;
     }
 
-    for (uint16_t index = 0; index < sCaptureCount; ++index)
+    for (uint16_t index = 0; index < capture_count; ++index)
     {
-        const JigCapture &capture = sCaptures[index];
+        const JigCapture &capture = captures[index];
         if (capture.kind == JigKind::Idle)
         {
-            sRefKnown[capture.slot] = true;
-            sRefValue[capture.slot] = static_cast<uint16_t>(capture.mean);
+            ref_known[capture.slot] = true;
+            ref_value[capture.slot] = static_cast<uint16_t>(capture.mean);
         }
     }
 }
@@ -1909,30 +1909,30 @@ static void jigRebuildRefs()
 static void jigRestartPiece(uint8_t type, uint8_t piece)
 {
     uint16_t kept = 0;
-    for (uint16_t index = 0; index < sCaptureCount; ++index)
+    for (uint16_t index = 0; index < capture_count; ++index)
     {
-        const JigCapture &capture = sCaptures[index];
+        const JigCapture &capture = captures[index];
         if (capture.kind == JigKind::Census && capture.type == type && capture.piece == piece)
         {
             continue;
         }
-        sCaptures[kept++] = capture;
+        captures[kept++] = capture;
     }
-    const uint16_t dropped = sCaptureCount - kept;
-    sCaptureCount          = kept;
+    const uint16_t dropped = capture_count - kept;
+    capture_count          = kept;
 
     /* A write-off goes with it, otherwise the piece would never come back */
     uint8_t keptSkips = 0;
-    for (uint8_t index = 0; index < sSkipCount; ++index)
+    for (uint8_t index = 0; index < skip_count; ++index)
     {
-        const JigSkip &skip = sSkips[index];
+        const JigSkip &skip = skips[index];
         if (skip.kind == JigKind::Census && skip.type == type && skip.piece == piece)
         {
             continue;
         }
-        sSkips[keptSkips++] = skip;
+        skips[keptSkips++] = skip;
     }
-    sSkipCount = keptSkips;
+    skip_count = keptSkips;
 
     jigRebuildRefs();
 
@@ -1944,10 +1944,10 @@ static void jigRestartPiece(uint8_t type, uint8_t piece)
     Serial.print(dropped);
     Serial.println(" poses dropped");
 
-    sAnalysisDone    = false;
-    sHasCaptured     = false;
-    sTargetPrinted   = false;
-    sLastCensusValid = false;
+    analysis_done     = false;
+    has_captured      = false;
+    target_printed    = false;
+    last_census_valid = false;
     jigStoreSave();
     jigPlateauReset();
 }
@@ -1957,13 +1957,13 @@ static void jigRestartPiece(uint8_t type, uint8_t piece)
  * orientation was captured badly */
 static void jigUndoLast()
 {
-    if (sCaptureCount == 0)
+    if (capture_count == 0)
     {
         Serial.println("   nothing recorded yet");
         return;
     }
 
-    const JigCapture last = sCaptures[--sCaptureCount];
+    const JigCapture last = captures[--capture_count];
 
     Serial.print("   undone: ");
     switch (last.kind)
@@ -1989,13 +1989,13 @@ static void jigUndoLast()
 
     if (last.kind == JigKind::Census)
     {
-        sLastCensusValid = false;
+        last_census_valid = false;
     }
     jigRebuildRefs();
 
-    sAnalysisDone  = false;
-    sHasCaptured   = false;
-    sTargetPrinted = false;
+    analysis_done  = false;
+    has_captured   = false;
+    target_printed = false;
     jigStoreSave();
     jigPlateauReset();
 }
@@ -2005,20 +2005,20 @@ void runJigKey(char key)
     switch (key)
     {
     case ' ':
-        sCaptureNow = true;
+        capture_now = true;
         Serial.println("   [capture on the next settled reading]");
         break;
     case 'd':
         dumpJigCaptures();
         break;
     case 'n':
-        if (sLastCensusValid)
+        if (last_census_valid)
         {
-            jigRestartPiece(sLastCensusType, sLastCensusPiece);
+            jigRestartPiece(last_census_type, last_census_piece);
         }
-        else if (sTargetPrinted && sShownTarget.kind == JigKind::Census)
+        else if (target_printed && shown_target.kind == JigKind::Census)
         {
-            jigRestartPiece(sShownTarget.type, sShownTarget.piece);
+            jigRestartPiece(shown_target.type, shown_target.piece);
         }
         else
         {
@@ -2056,33 +2056,33 @@ void pollJig()
     JigTarget target;
     if (!jigNextTarget(target))
     {
-        if (!sAnalysisDone)
+        if (!analysis_done)
         {
             jigAnalyse();
         }
-        gJigActive = false;
+        jig_active = false;
         return;
     }
 
     /* The prompt follows the target: printed once, then left alone while the
      * operator handles the piece */
-    if (!sTargetPrinted || target.kind != sShownTarget.kind || target.type != sShownTarget.type ||
-        target.piece != sShownTarget.piece || target.orient != sShownTarget.orient ||
-        target.slot != sShownTarget.slot)
+    if (!target_printed || target.kind != shown_target.kind || target.type != shown_target.type ||
+        target.piece != shown_target.piece || target.orient != shown_target.orient ||
+        target.slot != shown_target.slot)
     {
         /* A capture taken in another slot says nothing about the plateau in
          * this one, so the comparison value is dropped on a slot change;
          * inside a slot it survives, which is what keeps a placement that has
          * not moved from being recorded twice */
-        if (!sHasCaptured || sCapturedSlot != target.slot)
+        if (!has_captured || captured_slot != target.slot)
         {
-            sHasCaptured = false;
+            has_captured = false;
         }
         jigPrintTarget(target);
-        sShownTarget    = target;
-        sTargetPrinted  = true;
-        sIdleRejects    = 0;
-        sUnchangedPolls = 0;
+        shown_target    = target;
+        target_printed  = true;
+        idle_rejects    = 0;
+        unchanged_polls = 0;
         jigPlateauReset();
     }
 
@@ -2099,19 +2099,19 @@ void pollJig()
          * taken against, so a piece still sitting there would poison the
          * whole slot. The reading has to land where an idle can: near the
          * level this slot last showed, or near the reference slot's own */
-        const uint16_t expected = sRefKnown[target.slot] ? sRefValue[target.slot] :
+        const uint16_t expected = ref_known[target.slot] ? ref_value[target.slot] :
                                                            jigRefFor(kJigReferenceSlot);
-        if (!sCaptureNow && expected != 0 &&
+        if (!capture_now && expected != 0 &&
             jigGap(mean, expected) > static_cast<int32_t>(kJigIdlePlausible))
         {
             jigPlateauReset();
             /* Silence would look like a hang: say what is refused and how to
              * override it, once every few seconds */
-            if (sIdleRejects < 0xFF)
+            if (idle_rejects < 0xFF)
             {
-                ++sIdleRejects;
+                ++idle_rejects;
             }
-            if (sIdleRejects == kJigIdleRejectHint)
+            if (idle_rejects == kJigIdleRejectHint)
             {
                 Serial.print("   idle reads ");
                 Serial.print(mean);
@@ -2121,7 +2121,7 @@ void pollJig()
             }
             return; /* probably a piece still in the slot: wait for it to go */
         }
-        sIdleRejects = 0;
+        idle_rejects = 0;
 
         /* An idle level is the reference every other capture is taken
          * against, so it is recorded from a settled plateau and never from a
@@ -2139,12 +2139,12 @@ void pollJig()
         Serial.print("   idle measured: ");
         Serial.println(value);
 
-        sHasCaptured    = true;
-        sCapturedValue  = value;
-        sCapturedSlot   = target.slot;
-        sUnchangedPolls = 0;
-        sCaptureNow     = false;
-        sTargetPrinted  = false;
+        has_captured    = true;
+        captured_value  = value;
+        captured_slot   = target.slot;
+        unchanged_polls = 0;
+        capture_now     = false;
+        target_printed  = false;
         jigPlateauReset();
         return;
     }
@@ -2156,7 +2156,7 @@ void pollJig()
         return;
     }
 
-    if (!sCaptureNow)
+    if (!capture_now)
     {
         /* A piece has to be present... */
         if (jigGap(mean, ref) < static_cast<int32_t>(kJigPresentDelta))
@@ -2168,19 +2168,19 @@ void pollJig()
          * a plateau that has not changed is the one already recorded. A
          * centred magnet never moves, so after a few refusals the capture is
          * taken anyway and the prompt says the value did not change */
-        if (sHasCaptured && sCapturedSlot == target.slot &&
-            jigGap(mean, sCapturedValue) < static_cast<int32_t>(kJigRearmDelta))
+        if (has_captured && captured_slot == target.slot &&
+            jigGap(mean, captured_value) < static_cast<int32_t>(kJigRearmDelta))
         {
-            if (sUnchangedPolls < 0xFF)
+            if (unchanged_polls < 0xFF)
             {
-                ++sUnchangedPolls;
+                ++unchanged_polls;
             }
-            if (sUnchangedPolls < kJigStuckPolls)
+            if (unchanged_polls < kJigStuckPolls)
             {
                 jigPlateauReset();
                 return;
             }
-            if (sUnchangedPolls == kJigStuckPolls)
+            if (unchanged_polls == kJigStuckPolls)
             {
                 Serial.print("   reading did not move by ");
                 Serial.print(kJigRearmDelta);
@@ -2189,7 +2189,7 @@ void pollJig()
         }
         else
         {
-            sUnchangedPolls = 0;
+            unchanged_polls = 0;
         }
     }
 
@@ -2213,18 +2213,18 @@ void pollJig()
     }
     Serial.println(captured);
 
-    sHasCaptured    = true;
-    sCapturedValue  = value;
-    sCapturedSlot   = target.slot;
-    sUnchangedPolls = 0;
-    sCaptureNow     = false;
-    sTargetPrinted  = false;
+    has_captured    = true;
+    captured_value  = value;
+    captured_slot   = target.slot;
+    unchanged_polls = 0;
+    capture_now     = false;
+    target_printed  = false;
     jigPlateauReset();
 
     if (target.kind == JigKind::Census)
     {
-        sLastCensusValid = true;
-        sLastCensusType  = target.type;
-        sLastCensusPiece = target.piece;
+        last_census_valid = true;
+        last_census_type  = target.type;
+        last_census_piece = target.piece;
     }
 }

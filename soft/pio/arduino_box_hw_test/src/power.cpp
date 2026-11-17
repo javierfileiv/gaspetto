@@ -14,13 +14,13 @@
  * needs no counter, the flag is the state */
 bool sensorRailAcquire()
 {
-    if (gCalibrationRailsOn)
+    if (calibration_rails_on)
     {
         return false;
     }
     digitalWrite(PIN_MOSFET_3V3_SENSORS, LOW);
     delay(kRailSettleDelayMs);
-    gCalibrationRailsOn = true;
+    calibration_rails_on = true;
     return true;
 }
 
@@ -31,7 +31,7 @@ void sensorRailRelease(bool acquired)
         return;
     }
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
-    gCalibrationRailsOn = false;
+    calibration_rails_on = false;
 }
 #endif /* TEST_ADS1115 */
 
@@ -41,11 +41,11 @@ void sensorRailRelease(bool acquired)
 
 /* Set by the wake ISR: proves the EXTI path ran, not just "some pending
  * interrupt happened to restart the chip" */
-static volatile bool gWakeButtonFired = false;
+static volatile bool wake_button_fired = false;
 
 static void wakeButtonIsr()
 {
-    gWakeButtonFired = true;
+    wake_button_fired = true;
 }
 
 /* STOP-mode test: the sequence production GBox will run under
@@ -71,10 +71,10 @@ void runDeepSleepTest()
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     /* Drop the latch too: the wake handler restores the rail from it, and
      * after a sleep the readings must start from a cold board again */
-    gCalibrationRailsOn = false;
+    calibration_rails_on = false;
 
     pinMode(PIN_WAKE_BUTTON, INPUT_PULLUP);
-    gWakeButtonFired = false;
+    wake_button_fired = false;
     /* Interrupt mode (not event) is mandatory: from STOP only an EXTI
      * interrupt restarts the core, and PB9 to GND gives the FALLING edge */
     attachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON), wakeButtonIsr, FALLING);
@@ -85,7 +85,7 @@ void runDeepSleepTest()
      * Disconnected/Connected pair in the terminal. */
     for (;;)
     {
-        gWakeButtonFired = false;
+        wake_button_fired = false;
         digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
         digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
 
@@ -195,8 +195,8 @@ void runDeepSleepTest()
     detachInterrupt(digitalPinToInterrupt(PIN_WAKE_BUTTON));
 
     const uint32_t awakeMs = millis() - sleepEntryMs; /* sleep time not counted */
-    Serial.println(gWakeButtonFired ? "[stop] woke up by the wake button (EXTI fired)" :
-                                      "[stop] woke up, but the button ISR did NOT run (?)");
+    Serial.println(wake_button_fired ? "[stop] woke up by the wake button (EXTI fired)" :
+                                       "[stop] woke up, but the button ISR did NOT run (?)");
     Serial.print("[stop] awake ms since sleep entry: ");
     Serial.print(awakeMs);
     Serial.println(" (millis does not count the sleeping time)");
