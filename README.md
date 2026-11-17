@@ -64,7 +64,8 @@ goes quiet to save power until the next button press.
 - `soft/pio`: PlatformIO firmware projects
 	- `GCar_pio`, `GBox_pio`: robot and box firmware
 	- `NrfLink_pio`: radio link test tool for Arduino Uno + NRF24L01 — sends motor
-	commands to the car over the radio
+	commands to the car over the radio, and can put the car in its DFU
+	bootloader
 	- hardware test apps
 - `tools`: helper scripts used locally and in CI
 - `.github/workflows`: CI workflows
@@ -111,6 +112,25 @@ Run from repository root.
 	```bash
 	./tools/coverage-gaspetto-utest
 	```
+
+## Flashing the robot over DFU
+
+`GCar_pio` uploads through the STM32 ROM bootloader, and the request that
+switches the board into it travels over the nRF24 link: the car has no USB
+command channel, so nothing can be typed on a serial port to wake the
+bootloader.
+
+- `pio run -e gcar -t upload` runs the whole sequence itself: it opens
+  NrfLink's serial port, waits for the Uno to boot, writes `f`, waits for the
+  `0483:df11` device, then calls `dfu-util`
+- `f` typed in NrfLink does the same by hand and works from any mode: the car
+  stops its motors and re-enumerates about a second later
+- `GCAR_NRF_PORT=/dev/ttyUSBx` overrides the default NrfLink port when the
+  board is not the usual CH340
+
+A failed request costs nothing: the bootloader ROM is not installed, so a
+RESET returns to the application, and BOOT0 plus RESET is always available as
+a last resort.
 
 ## Tuning
 
