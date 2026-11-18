@@ -22,6 +22,7 @@ void shell_print_usb_help()
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
     Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
     Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
+    Serial.println("           r = ping the car: its build and the round-trip time");
     Serial.println(
         "           green = ACK, amber = empty board, red = refused, RF error = no answer");
     Serial.println("           t = radio menu: 1 probe, 2 addresses, 3 test send, q quits");
@@ -314,6 +315,9 @@ void shell_handle_usb_commands()
             break;
         case 'p':
             radio_run_send_pieces_test();
+            break;
+        case 'r':
+            radio_run_ping();
             break;
         case 'e':
             radio_run_car_stream_test();

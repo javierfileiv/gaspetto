@@ -155,6 +155,71 @@ bool radio_begin()
     return true;
 }
 
+/* Ask the car which build it runs. The write answers whether the radio chip
+ * heard us; the version answer, whether the application is alive. Both are
+ * useful apart: a hardware ACK with no answer means the car is stuck or runs
+ * a firmware without the handler */
+void radio_run_ping()
+{
+    constexpr uint32_t PING_TIMEOUT_MS = 1000;
+
+    VersionPacket request                 = {};
+    VersionPacket answer                  = {};
+    uint8_t buffer[sizeof(VersionPacket)] = {};
+    bool answered                         = false;
+
+    if (!radio_ok)
+    {
+        Serial.println("[ping] radio is not up: re-probe with 's' in health mode");
+        return;
+    }
+
+    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+
+    const uint32_t started = millis();
+    const bool sent        = radio_send(&request, sizeof(request));
+
+    if (!sent)
+    {
+        Serial.println("[ping] no ACK: the car is absent or not listening");
+        return;
+    }
+
+    while (millis() - started < PING_TIMEOUT_MS)
+    {
+        uint8_t pipe = 0;
+
+        if (radio.available(&pipe))
+        {
+            radio.read(buffer, sizeof(buffer));
+            if (buffer[0] == static_cast<uint8_t>(PacketTag::Version))
+            {
+                memcpy(&answer, buffer, sizeof(answer));
+                answered = true;
+                break;
+            }
+        }
+    }
+
+    const uint32_t elapsed = millis() - started;
+
+    if (!answered)
+    {
+        Serial.println("[ping] ACKed but no answer: the application is silent");
+        return;
+    }
+
+    Serial.print("[ping] build ");
+    Serial.print(static_cast<int>(answer.build));
+    Serial.print(" (");
+    Serial.print(answer.version);
+    Serial.print("), wire protocol v");
+    Serial.print(static_cast<int>(answer.wire));
+    Serial.print(", pong in ");
+    Serial.print(elapsed);
+    Serial.println(" ms");
+}
+
 /* ========================================== */
 /* Send the scanned board over the radio, key "p" */
 /* ========================================== */
