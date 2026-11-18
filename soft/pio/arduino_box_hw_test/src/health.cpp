@@ -142,6 +142,11 @@ void health_run_cycle()
 
     Serial.println("[health] cycle start ('c' = calibration, '?' = status)");
 
+    /* The stream and send tests tell the operator to re-probe with 's' in
+     * health mode, so this cycle is where the radio is brought up again */
+    Serial.println("-> RE-PROBING THE RADIO...");
+    radio_begin();
+
     Serial.println("-> TURNING ON 5V_SWITCHED (LED Cache)...");
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW); /* Turn ON Q1 */
 

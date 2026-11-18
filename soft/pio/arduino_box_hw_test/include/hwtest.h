@@ -148,6 +148,10 @@ void power_run_deep_sleep_test();
 /* radio.cpp: scan -> build -> transmit test driven by the "p" shell key */
 void radio_run_send_pieces_test();
 
+/* radio.cpp: bring the chip up and record the verdict; boot and the health
+ * cycle both call it */
+bool radio_begin();
+
 /* radio.cpp: listen to the car stream on _box_, the "e" shell key */
 void radio_run_car_stream_test();
 /* True while the car stream runs. The shell keeps its "any key stops"

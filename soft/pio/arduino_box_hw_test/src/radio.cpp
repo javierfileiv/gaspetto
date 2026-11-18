@@ -15,6 +15,40 @@
 bool car_stream_active         = false;
 bool car_stream_send_requested = false;
 
+/* Bring the chip up from scratch and put it in the production state. Called
+ * at boot and again by the health cycle: a failed probe at boot must not
+ * leave the bench unable to test the link without a reset, and the two
+ * paths must not set the chip differently */
+bool radio_begin()
+{
+    if (!radio.begin())
+    {
+        radio_ok = false;
+        Serial.println("   [ERROR] nRF24L01+ not found!");
+        Serial.println("   -> Check soldering on PA3, PA4, PA5, PA6, PA7.");
+        Serial.println("   -> Check if 3.3V is reaching the nRF board.");
+        Serial.println("   -> 'p' and 'e' stay disabled until it answers.");
+        return false;
+    }
+
+    Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
+    /* Same line as production RadioController::begin(): the bench must put the
+     * chip in the exact state the GBox will, or the link it validates is not
+     * the link production will run */
+    radio.setPALevel(PA_LEVEL);
+    radio.setDataRate(DATA_RATE);
+    radio.setAddressWidth(5);
+    radio.setPayloadSize(sizeof(CommandPacket));
+    radio.openWritingPipe(gcar_pipe_name); /* the GBox writes to the car */
+    /* The real box layout: pipe 0 carries the program burst to _car_, pipe 1
+     * listens on _box_ where the car answers with telemetry and logs ('e'
+     * opens that listening, nothing is drained outside it) */
+    radio.openReadingPipe(1, gbox_pipe_name);
+    radio.printDetails(); /* Print chip info to Serial */
+    radio_ok = true;
+    return true;
+}
+
 /* ========================================== */
 /* Send the scanned board over the radio, key "p" */
 /* ========================================== */
