@@ -19,6 +19,7 @@ enum class EventId : uint8_t {
     BUTTON_PRESSED, /**< Button press. */
     RADIO_TX, /**< Radio transmission. */
     DFU_REQUEST, /**< Enter the STM32 DFU bootloader. */
+    IRQ_TEST, /**< Report what the radio IRQ pin saw. */
 };
 
 /**
@@ -47,6 +48,8 @@ inline const char *eventIdToString(EventId id)
         return "RADIO_TX";
     case EventId::DFU_REQUEST:
         return "DFU_REQUEST";
+    case EventId::IRQ_TEST:
+        return "IRQ_TEST";
     default:
         return "UNKNOWN";
     }

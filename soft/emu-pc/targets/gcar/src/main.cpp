@@ -27,7 +27,6 @@
 extern Event getEmulatedEvent(void);
 #endif
 
-/* const int NRF_IRQ_PIN = PB0; */
 RF24 radio(NRF24_CE, NRF24_CSN);
 EventQueue eventQueue;
 IdleState idleState;
@@ -124,10 +123,6 @@ void setup()
     /* Set up telemetry callback to send IMU/PID data via radio */
     carMovementController.setTelemetryCallback(
             [](const TelemetryPacket &telemetry) { radioControllerCar.sendTelemetry(telemetry); });
-#ifdef NRF_IRQ
-    /* Set up ISR for NRF IRQ. */
-    attachInterrupt(digitalPinToInterrupt(NRF_IRQ_PIN), ISR, RISING);
-#endif /* NRF_IRQ */
 #else /* USE_RADIO_CONTROLLER */
     timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::ACTION, CommandId::MOTOR_FORWARD));
     timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::ACTION, CommandId::MOTOR_STOP));

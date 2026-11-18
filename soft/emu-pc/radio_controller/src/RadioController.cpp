@@ -11,6 +11,24 @@
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
 
+#if defined(NRF_IRQ_PIN)
+/* Written by the pin interrupt and read by processRadio(): the count is one
+ * per IRQ assertion, not one per packet, because the line stays low until
+ * RX_DR is cleared, so a burst already sitting in the FIFO produces a single
+ * falling edge */
+volatile uint32_t irq_edge_count = 0;
+volatile uint32_t irq_last_edge_ms = 0;
+
+/* Free function, not a method: attachInterrupt() takes a plain function
+ * pointer. It only records, because starting an SPI transfer inside an
+ * interrupt would stall the bus the main loop is also using */
+void radio_controller_count_irq_edge()
+{
+    ++irq_edge_count;
+    irq_last_edge_ms = millis();
+}
+#endif
+
 RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
                                  const uint8_t writing_addr[5], const uint8_t reading_addr[5])
         : gaspettoQueue(gaspettoQueue)
@@ -51,11 +69,19 @@ void RadioController::init()
     _radio.openReadingPipe(1, reading_addr);
     _radio.printDetails();
     _radio.printPrettyDetails();
-#if NFR_IRQ
-    /* Set up interrupt for RX. */
-    pinMode(NRF_IRQ, INPUT);
-    attachInterrupt(digitalPinToInterrupt(NRF_IRQ), ISR, FALLING);
-    radio.maskIRQ(0, 1, 1);
+#if defined(NRF_IRQ_PIN)
+    /* Attach before startListening(): a packet landing in between would have
+     * no interrupt to announce it. The pull-up is set first because
+     * attachInterrupt() keeps the pull it finds, and it holds an unwired pin
+     * high instead of letting it float into phantom edges */
+    irq_edge_count = 0;
+    irq_last_edge_ms = 0;
+    pinMode(NRF_IRQ_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(NRF_IRQ_PIN), radio_controller_count_irq_edge, FALLING);
+    _radio.clearStatusFlags();
+    /* Only RX_DR reaches the pin: with TX_DS unmasked, every log line this
+     * device sends would count as a received packet */
+    _radio.setStatusFlags(RF24_RX_DR);
 #endif
     _radio.powerUp();
     _radio.startListening();
@@ -99,6 +125,24 @@ void RadioController::processRadio()
             LOG(F(" "));
             LOG(commandIdToString(static_cast<CommandId>(eventPacket.payload)));
             LOGLN(F("."));
+
+            /* A diagnostic, not an application event: the car reports what its
+             * IRQ pin saw and the state machine never hears about it. The
+             * packet causing this report landed a moment ago, so a wired pin
+             * has already counted at least one falling edge */
+            if (static_cast<EventId>(eventPacket.eventId) == EventId::IRQ_TEST) {
+#if defined(NRF_IRQ_PIN)
+                LOG(F("[irq] A4 falling edges="));
+                LOG(static_cast<int>(irq_edge_count));
+                LOG(F(", last at "));
+                LOG(static_cast<int>(irq_last_edge_ms));
+                LOGLN(F(" ms"));
+#else
+                LOGLN(F("[irq] no IRQ pin on this target"));
+#endif
+                break;
+            }
+
             if (gaspettoQueue == nullptr) {
                 LOGLN(F("Radio RX: app queue unavailable."));
                 break;
