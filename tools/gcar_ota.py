@@ -239,16 +239,18 @@ def _write_image(fd, payload):
                 data = os.read(fd, 256)
             except BlockingIOError:
                 data = b""
-            if OTA_NAK in data:
-                return False
-
             granted += data.count(OTA_CREDIT) * OTA_CREDIT_BYTES
 
-            # Anything else is text from NrfLink: show it as it arrives
+            # Anything else is text from NrfLink: show it as it arrives. This
+            # runs before the refusal check, because the relay writes its
+            # reason just before the refusal byte and both come in one read
             text = data.replace(OTA_CREDIT, b"").replace(OTA_ACK, b"").replace(OTA_NAK, b"")
             if text:
                 sys.stdout.write(text.decode(errors="ignore"))
                 sys.stdout.flush()
+
+            if OTA_NAK in data:
+                return False
 
         budget = granted + OTA_WINDOW - sent
         if budget <= 0:
