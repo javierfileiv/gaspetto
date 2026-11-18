@@ -50,6 +50,10 @@ struct BoxTestRig {
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
+        /* work() reads the radio on every pass, so a silent receiver is the
+         * default here. A test that wants a packet declares its own
+         * expectation, and gmock gives it precedence over this one */
+        EXPECT_CALL(mockRf24, _available(_)).WillRepeatedly(Return(false));
         box.setLowPowerModeCallback([]() {});
         box.init(StateId::IDLE);
     }

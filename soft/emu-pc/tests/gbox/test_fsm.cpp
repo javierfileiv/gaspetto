@@ -68,6 +68,10 @@ struct BoxTestRig {
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
+        /* work() reads the radio on every pass, so a silent receiver is the
+         * default here. A test that wants a packet declares its own
+         * expectation, and gmock gives it precedence over this one */
+        EXPECT_CALL(mockRf24, _available(_)).WillRepeatedly(Return(false));
         box.setLowPowerModeCallback([]() {});
         box.init(StateId::IDLE);
     }
@@ -340,6 +344,27 @@ TEST(GBoxFsmTest, StuckAdsConversionTriggersTimeoutRecoveryAndBuildErrorWithoutR
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
+    rig.box.work();
+
+    EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
+}
+
+TEST(GBoxFsmTest, WorkReadsARadioPacketWithoutAnsweringTelemetry)
+{
+    BoxTestRig rig;
+    TelemetryPacket telemetry = {};
+
+    telemetry.tag = static_cast<uint8_t>(PacketTag::Telemetry);
+    rig.mockRf24.simulateReceivedPacket(1, &telemetry, sizeof(telemetry));
+
+    EXPECT_CALL(rig.mockRf24, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _read(_, sizeof(CommandPacket)));
+    /* Telemetry is watched, not acted on, so receiving it must not send
+     * anything back over the channel the car is already using */
+    EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
+    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
+
     rig.box.work();
 
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);

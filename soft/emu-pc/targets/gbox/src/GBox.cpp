@@ -216,6 +216,14 @@ int GBox::postEvent(Event evt)
 
 void GBox::work()
 {
+    /* The box is the receiver of the pair: telemetry, logs and version
+     * requests arrive on _box_ and are answered or printed here. Reading one
+     * packet per pass keeps the chip acknowledged without delaying the state
+     * machine, and it is also what makes the car's log writes cheap */
+    if (_ctx.radioController != nullptr) {
+        _ctx.radioController->processRadio();
+    }
+
     if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
 
