@@ -32,9 +32,6 @@ constexpr uint16_t CALIBRATION_SCAN_PERIOD_MS = 1000;
 #ifdef TEST_ADS1115
 TestMode test_mode        = TestMode::Health;
 bool calibration_rails_on = false;
-/* One test run is pending, set by 's' from any mode. False at boot: the
- * board waits for a key instead of running the health cycle on its own */
-bool run_test_requested = false;
 #endif /* TEST_ADS1115 */
 
 /* ========================================== */
@@ -112,7 +109,7 @@ void setup()
     digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
     calibration_rails_on = false;
 
-    Serial.println("   waiting for a key ('?' for help)");
+    shell_print_prompt();
 }
 
 /* ========================================== */
@@ -147,14 +144,6 @@ void loop()
             delay(100);
         }
 
-#ifdef TEST_ADS1115
-        if (run_test_requested)
-        {
-            run_test_requested = false;
-            scan_run_piece_calibration();
-        }
-#endif
-
         if (test_mode != TestMode::Calibration)
         {
             return; /* mode changed while waiting: skip the rest delay */
@@ -163,14 +152,6 @@ void loop()
         shell_delay_with_usb(CALIBRATION_SCAN_PERIOD_MS);
         return;
     }
-
-#ifdef TEST_ADS1115
-    if (run_test_requested)
-    {
-        run_test_requested = false;
-        health_run_cycle();
-    }
-#endif
 
     /* Quiet idle: heartbeat only, no probes, no tests between demands. */
     for (int i = 0; i < 2; i++)

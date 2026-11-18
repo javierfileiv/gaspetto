@@ -132,7 +132,6 @@ BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw);
 /* Mode state, defined by main.cpp and read by nearly every module */
 extern TestMode test_mode;
 extern bool calibration_rails_on;
-extern bool run_test_requested;
 extern bool led_menu_active;
 extern bool radio_menu_active;
 /* Set by setup() once the radio answered: the send test and the stream
@@ -185,6 +184,8 @@ void radio_run_menu_key(char key);
 /* ========================================== */
 void shell_enter_mode(TestMode mode);
 void shell_print_usb_help();
+/* Prompt of the context that will consume the next key */
+void shell_print_prompt();
 
 /* ========================================== */
 /* ads.cpp - I2C bus layer, ADS1115 reads, recovery and probe history */
