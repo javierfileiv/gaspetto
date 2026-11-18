@@ -34,6 +34,19 @@ struct __attribute__((packed)) TelemetryPacket {
 
 static_assert(sizeof(TelemetryPacket) == 32, "TelemetryPacket must be exactly 32 bytes");
 
+/* Device identity, asked on demand: the running firmware answers with the
+ * build it was compiled from, so a bench or a box can tell which image is
+ * really inside instead of reading a boot log that may already be gone. It
+ * fits one payload, so no session is needed */
+struct __attribute__((packed)) VersionPacket {
+    uint8_t tag; /* 1 - PacketTag::Version, or VersionRequest to ask */
+    uint8_t wire; /* 1 - kWireProtocolVersion of the sender */
+    uint16_t build; /* 2 - commit count the binary was compiled from */
+    char version[28]; /* 28 - short revision, "-dirty" included when it was */
+};
+
+static_assert(sizeof(VersionPacket) == 32, "VersionPacket must be exactly 32 bytes");
+
 /* ACK payload returned with every received command (if enabled). Helps debug link. */
 struct __attribute__((packed)) AckPayload {
     char text[12]; /* E.g. "ACK:f" or truncated command. */

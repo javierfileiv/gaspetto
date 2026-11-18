@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
 
@@ -129,6 +130,16 @@ void RadioController::processRadio()
         case PacketTag::Log:
             handleLogFragment(buffer);
             break;
+        case PacketTag::VersionRequest:
+            respondVersion();
+            break;
+        case PacketTag::Version: {
+            VersionPacket version;
+            std::memcpy(&version, buffer, sizeof(version));
+            LOG(F("Radio RX: Version build="));
+            LOGLN(static_cast<int>(version.build));
+            break;
+        }
         case PacketTag::Ota: {
             OtaPacket packet;
             std::memcpy(&packet, buffer, sizeof(packet));
@@ -178,6 +189,21 @@ void RadioController::processRadio()
         LOGLN(F("."));
         _radio.startListening();
     }
+}
+
+void RadioController::respondVersion()
+{
+    VersionPacket packet = {};
+
+    packet.tag = static_cast<uint8_t>(PacketTag::Version);
+    packet.wire = kWireProtocolVersion;
+    packet.build = static_cast<uint16_t>(FW_VERSION);
+    /* The revision is a short hash, "-dirty" included when the tree was not
+     * clean at build time. The field starts zeroed, so an over-long string is
+     * truncated instead of left unterminated */
+    std::strncpy(packet.version, FW_BUILD, sizeof(packet.version) - 1);
+
+    sendBuffer(&packet, sizeof(packet));
 }
 
 void RadioController::sendEvent(Event evt)

@@ -57,6 +57,8 @@ void runOtaSelfTest();
 void drainLogFragment(uint8_t pipe, const uint8_t *payload);
 void displayTelemetry(const TelemetryPacket &t);
 void displayCommandPacket(const CommandPacket &pkt);
+void displayVersion(const VersionPacket &version);
+void sendVersionRequest();
 
 void setup()
 {
@@ -231,6 +233,26 @@ void sendCommand(CommandId cmd)
  * spent on it and no program can produce it. The payload is written at the
  * full 32 byte width so the receiver never depends on the chip padding the
  * tail of a short write */
+void sendVersionRequest()
+{
+    VersionPacket request = {};
+
+    /* Car emulation transmits on _box_, so the request would never reach the
+     * car: the box mode owns the _car_ writing pipe */
+    if (gMode != kModeBox) {
+        setMode(kModeBox);
+    }
+
+    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+
+    radio.stopListening();
+    const bool sent = radio.write(&request, sizeof(request));
+    radio.startListening();
+
+    Serial.println(sent ? F("[version] request sent, waiting for the answer") :
+                          F("[version] request FAILED (no answer from the chip)"));
+}
+
 void sendDfuRequest()
 {
     uint8_t payload[sizeof(CommandPacket)] = { 0 };
@@ -373,6 +395,11 @@ void drainRadio()
          * of assuming the payload matches the mode */
         if (payload[0] == static_cast<uint8_t>(PacketTag::Log)) {
             drainLogFragment(pipe, payload);
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::Version)) {
+            VersionPacket version;
+
+            memcpy(&version, payload, sizeof(version));
+            displayVersion(version);
         } else if (gMode == kModeCar) {
             CommandPacket cmd;
 
@@ -768,6 +795,9 @@ void handleKey(char ch)
     case 'o':
         runOtaSelfTest();
         break;
+    case 'v':
+        sendVersionRequest();
+        break;
     case '?':
     case 'h':
     case 'H':
@@ -865,6 +895,7 @@ void printHelp()
     Serial.println("  2: box/sender - sends commands on _car_, reads telemetry on _box_");
     Serial.println("  ?: this help");
     Serial.println("  f: ask the car to enter its DFU bootloader (works in any mode)");
+    Serial.println("  v: ask the other device which build it runs");
     Serial.println("  o: send a dummy OTA image (framing check)");
     Serial.println("  reset: type the five letters in a row to reboot the MCU");
     Serial.println("\nMode 2 keys:");
@@ -885,6 +916,16 @@ float wrapAngle(float degrees)
         degrees += 360.0f;
     }
     return degrees;
+}
+
+void displayVersion(const VersionPacket &version)
+{
+    Serial.print(F("[version] build "));
+    Serial.print(static_cast<int>(version.build));
+    Serial.print(F(" ("));
+    Serial.print(version.version);
+    Serial.print(F("), wire protocol v"));
+    Serial.println(static_cast<int>(version.wire));
 }
 
 void displayTelemetry(const TelemetryPacket &t)

@@ -1,5 +1,7 @@
 /* USB key shell: the help text, character echo and the command
  * dispatcher with its dfu matcher and digit-prefix state */
+#include "FirmwareVersion.h"
+#include "WireVersion.h"
 #include "dfu_bootloader.h"
 #include "hwtest.h"
 
@@ -16,6 +18,7 @@ void shell_print_usb_help()
     Serial.println("   rows:  w = reprint analysis and pasteable table");
     Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
     Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
+    Serial.println("   build: v = show the build this bench was flashed from");
     Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
     Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
     Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
@@ -40,6 +43,18 @@ void shell_delay_with_usb(uint32_t totalMs)
         remaining -= slice;
         shell_handle_usb_commands();
     }
+}
+
+/* Identity of the firmware in flash: the shell runs on the board, so this is
+ * the build that is really there, not the one in the editor */
+static void shell_print_version()
+{
+    Serial.print("   hw-test build ");
+    Serial.print(FW_VERSION);
+    Serial.print(" (");
+    Serial.print(FW_BUILD);
+    Serial.print("), wire protocol v");
+    Serial.println(static_cast<int>(kWireProtocolVersion));
 }
 
 /* Mode switch for the h/c keys: both rails down, the calibration stats
@@ -276,6 +291,9 @@ void shell_handle_usb_commands()
             Serial.println(test_mode == TestMode::Health ? "health" : "calibration");
             shell_print_usb_help();
             break;
+        case 'v':
+            shell_print_version();
+            break;
         case 'l':
             if (led_menu_active)
             {
@@ -291,7 +309,6 @@ void shell_handle_usb_commands()
             }
             radio_start_menu();
             break;
-
         case 'b':
             power_run_deep_sleep_test();
             break;

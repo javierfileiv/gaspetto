@@ -54,6 +54,9 @@ private:
      * final piece arrives */
     void handleLogFragment(const uint8_t *buffer);
 
+    /* Answer a VersionRequest with this build's identity */
+    void respondVersion();
+
     RF24 &_radio;
     uint8_t writing_addr[5];
     uint8_t reading_addr[5];
