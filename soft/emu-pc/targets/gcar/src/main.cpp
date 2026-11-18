@@ -50,6 +50,17 @@ GCar gcar(context);
  * radio controller free of any knowledge of flash or of the car */
 void onOtaPacket(const OtaPacket &packet)
 {
+    /* An image transfer erases a staging sector for about two seconds, and the
+     * loop is blocked while it does: the PID stops but the motors keep their
+     * last duty, so a movement would carry on blind. Stopping here, before the
+     * erase, and dropping the queue keeps the car still for the whole
+     * transfer, which ends with a reset anyway */
+    if (static_cast<OtaKind>(packet.kind) == OtaKind::Begin) {
+        LOGLN(F("OTA: begin, stopping the car"));
+        gcar.stopBothMotors();
+        gcar.clearEventQueue();
+    }
+
     otaReceiver.handle(packet);
 }
 
