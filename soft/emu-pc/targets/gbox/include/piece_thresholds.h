@@ -13,60 +13,11 @@
  * Measured ascending order (by mean raw value):
  *   TURN_LEFT < BACKWARD < EMPTY < TURN_RIGHT < FORWARD < LOOP_CALL
  *
- * Thresholds placed at midpoints between adjacent classes.
- *
- * These global values are kept as a legacy fallback: the 12 calibrated
- * sensors idle anywhere between 12675 and 13616 counts, so no single
- * threshold can separate EMPTY from BACKWARD and TURN_RIGHT on every slot
- * at once. Decode reads the per-slot table below instead. */
-
-#ifndef GASPETTO_ADC_THRESHOLD_TURN_LEFT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_LEFT_START 8640
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_BACKWARD_START
-#define GASPETTO_ADC_THRESHOLD_BACKWARD_START 11470
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_EMPTY_START
-#define GASPETTO_ADC_THRESHOLD_EMPTY_START 13048
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START
-#define GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START 13679
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_FORWARD_START
-#define GASPETTO_ADC_THRESHOLD_FORWARD_START 14418
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_START
-#define GASPETTO_ADC_THRESHOLD_LOOP_START 15957
-#endif
-
-#ifndef GASPETTO_ADC_THRESHOLD_LOOP_END
-#define GASPETTO_ADC_THRESHOLD_LOOP_END 17551
-#endif
-
-#define GASPETTO_ADC_THRESHOLD_MAX 17551
-
-/* Thresholds must be strictly increasing in measured ascending order */
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START > 0,
-              "GASPETTO_ADC_THRESHOLD_TURN_LEFT_START must be > 0");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_LEFT_START < GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_BACKWARD_START < GASPETTO_ADC_THRESHOLD_EMPTY_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_EMPTY_START < GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START < GASPETTO_ADC_THRESHOLD_FORWARD_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_FORWARD_START < GASPETTO_ADC_THRESHOLD_LOOP_START,
-              "ADC thresholds must be strictly increasing");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_START <= GASPETTO_ADC_THRESHOLD_LOOP_END,
-              "GASPETTO_ADC_THRESHOLD_LOOP_START must be <= LOOP_END");
-static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= GASPETTO_ADC_THRESHOLD_MAX,
-              "GASPETTO_ADC_THRESHOLD_LOOP_END must be <= GASPETTO_ADC_THRESHOLD_MAX");
+ * The 12 calibrated sensors idle anywhere between 12675 and 13616 counts, so
+ * no single threshold can separate EMPTY from BACKWARD and TURN_RIGHT on
+ * every slot at once. Decode therefore reads the per-slot table below, and
+ * the band-to-piece mapping lives in piece_decode.h. BACKWARD has no band:
+ * no physical piece carries it, so it stays a command but is never decoded */
 
 /* Per-slot ADC thresholds, raw counts at GAIN_ONE, one row per slot and
  * columns in ascending raw order (GASPETTO_ADC_SLOT_COL_*). Each column is
@@ -79,14 +30,13 @@ static_assert(GASPETTO_ADC_THRESHOLD_LOOP_END <= GASPETTO_ADC_THRESHOLD_MAX,
  *   col 4: end of band 3, start of band 4 (the highest band)
  *   col 5: sentinel pinned to 0xFFFF in every generated row, named
  *          COL_TO_REMOVE: no piece plays above the highest band so nothing
- *          reaches this boundary, and the whole column gets dropped
- *          as soon as the production migration moves GBox.cpp onto
- *          this per-slot table
+ *          reaches this boundary. It stays only to close the top band until
+ *          the table is generated without it
  *
  * The band a piece name sits in is a convention, not physics: which pole a
  * magnet presents depends on how the piece was built, and the sensors cannot
- * tell a name. The constants below are therefore positional, and the bench
- * owns the band -> piece mapping in one place (kBandPieces in scan.cpp).
+ * tell a name. The constants below are therefore positional, and the
+ * band -> piece mapping lives in one place, BAND_TO_PIECE in piece_decode.h.
  * The column names keep the order the project used first, where TURN_LEFT
  * read the lowest: a batch mounted the other way round reverses the mapping,
  * not this header.

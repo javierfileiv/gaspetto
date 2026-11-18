@@ -50,7 +50,7 @@ add_test(NAME utest_car COMMAND utest_car)
 
 add_executable(
   utest_box main.cpp gbox/test_program_builder.cpp gbox/test_fsm.cpp gbox/test_button_interrupt.cpp
-            mocks/mock_RF24.cpp
+            gbox/test_piece_decode.cpp mocks/mock_RF24.cpp
 )
 target_include_directories(utest_box PRIVATE ./ mocks)
 target_link_libraries(

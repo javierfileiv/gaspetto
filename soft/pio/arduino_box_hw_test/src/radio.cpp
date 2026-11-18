@@ -276,7 +276,7 @@ static void radio_run_send_feedback(void (*animation)())
 
 /* Scan -> build -> transmit, the chain production GBox runs when it
  * validates a program, without GBox itself: the decode is the compiled
- * per-slot row (scan_piece_for_raw, the one walk), the build is the shared
+ * per-slot row (piece_decode, the one walk), the build is the shared
  * buildProgramFromPieces, only the transport is this bench. The verdict
  * mirrors the production LED semantics: green on ACK, amber on an empty
  * board, red on a refused build, RF error when the car does not answer */

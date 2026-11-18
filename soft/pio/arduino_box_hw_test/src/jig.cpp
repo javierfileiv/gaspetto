@@ -39,7 +39,7 @@ static const BoxPieceId JIG_TYPES[JIG_TYPE_COUNT] = {
  * bench firmware owns the mapping from a colour to the band the shared table
  * describes. The bands ascend with the raw reading, and this batch reads the
  * greens lowest and the blues highest, which is why the band order below is
- * not the historical one: BAND_PIECES in scan.cpp carries the same mapping */
+ * not the historical one: BAND_TO_PIECE in piece_decode.h carries the same */
 static const char *const JIG_TYPE_HINTS[JIG_TYPE_COUNT] = {
     "green 4mm",  /* FORWARD: band 0, the most negative */
     "blue 4mm",   /* TURN_LEFT: band 4, the most positive */
@@ -56,7 +56,7 @@ constexpr uint8_t JIG_CLASS_COUNT = 5;
  * has no piece and sits at the slot's own idle level. The bands ascend with
  * the raw reading, and this batch puts the greens at the bottom and the blues
  * at the top, so the order below is the reverse of the historical one and
- * matches BAND_PIECES in scan.cpp */
+ * matches BAND_TO_PIECE in piece_decode.h */
 static const uint8_t JIG_CLASS_TYPE[JIG_CLASS_COUNT] = {0, 2, 0xFF, 3, 1};
 
 /* Pieces per type, orientations per piece, slots to walk */
