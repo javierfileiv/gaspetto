@@ -54,6 +54,13 @@ public:
      * registers blocks the board on a status flag that never comes */
     void markReady()
     {
+        if (_radio != nullptr) {
+            /* sendPayload() transmits with the no-acknowledge command, and the
+             * chip only accepts it once EN_DYN_ACK is set; the library leaves
+             * the feature register clear, so without this call the payload is
+             * never loaded and the logs disappear without an error */
+            _radio->enableDynamicAck();
+        }
         _ready = true;
     }
 
@@ -123,13 +130,22 @@ private:
 
     void sendPayload(const uint8_t payload[kLogPayloadSize])
     {
+        /* A log line is best effort, so it leaves without acknowledgement.
+         * With auto-ack the chip retransmits fifteen times when nobody drains
+         * the log pipe, about 22 ms, and the caller stalls waiting for an
+         * answer that will not come: on the car that is several control
+         * cycles lost per line. The no-ack transmit goes out once, and the
+         * bounded wait only covers the airtime */
+        constexpr uint32_t kLogTxTimeoutMs = 2;
+
         _radio->stopListening();
         _radio->openWritingPipe(_logAddress);
         /* kLogPayloadSize, not sizeof(payload): the parameter is a pointer
          * inside this function, and sizeof would be 2 on AVR. The chip would
          * then transmit two bytes and pad the rest with zeros, which is what
          * made every log line arrive with its content blank */
-        _radio->write(payload, kLogPayloadSize);
+        _radio->startWrite(payload, kLogPayloadSize, true);
+        _radio->txStandBy(kLogTxTimeoutMs, true);
         _radio->openWritingPipe(_restoreAddress);
         _radio->startListening();
     }
