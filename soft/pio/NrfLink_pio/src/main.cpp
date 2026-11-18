@@ -687,6 +687,10 @@ void runOtaStream()
             delivered = sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk));
             if (!delivered) {
                 ++radioRetries;
+                /* The car reads one packet per loop, so a full FIFO needs a
+                 * few milliseconds to free a slot: burning the three attempts
+                 * at once would report a refusal it could have avoided */
+                delay(3);
             }
         }
 
@@ -712,6 +716,12 @@ void runOtaStream()
         streamCrc = crc32Update(streamCrc, chunk, take);
         ++seq;
         length -= take;
+
+        /* The car reads one packet per loop, and its FIFO only holds three:
+         * sending the next 28 bytes immediately would fill it and the packet
+         * after that would be refused. One millisecond keeps the pipe full
+         * without overrunning it */
+        delay(1);
 
         /* One credit per full group of packets. The PC may not send more than
          * its credits allow, which keeps this board's serial buffer from
@@ -767,7 +777,26 @@ void runOtaSelfTest()
 
     Serial.println(F("[ota] test image: Begin, two Data, End"));
     Serial.print(F("[ota] begin "));
-    Serial.println(sendOtaBegin(2 * sizeof(chunk), 0x12345678UL) ? F("ACK") : F("no ACK"));
+    const bool beginSent = sendOtaBegin(2 * sizeof(chunk), 0x12345678UL);
+    Serial.println(beginSent ? F("ACK") : F("no ACK"));
+
+    if (!beginSent) {
+        return;
+    }
+
+    /* The Begin makes the car erase its staging sector for about two seconds.
+     * Its RF FIFO only holds three packets and nobody drains it while the app
+     * is busy, so sending the rest now would have the End dropped without an
+     * acknowledgement. Wait for the application answer first, like the real
+     * relay does */
+    uint8_t error = 0;
+    const OtaWait begin = waitOtaResponse(kOtaBeginAck, kOtaBeginAckMs, error);
+    Serial.println(begin == OtaWait::Ok ? F("[ota] begin accepted") :
+                                          F("[ota] begin refused or silent"));
+
+    if (begin != OtaWait::Ok) {
+        return;
+    }
 
     for (uint16_t seq = 0; seq < 2; ++seq) {
         chunk[0] = static_cast<uint8_t>(seq);
@@ -776,6 +805,8 @@ void runOtaSelfTest()
         Serial.print(' ');
         Serial.println(sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk)) ? F("ACK") :
                                                                                  F("no ACK"));
+        /* Leave the car time to read the packet and program its 28 bytes */
+        delay(10);
     }
 
     Serial.print(F("[ota] end "));
