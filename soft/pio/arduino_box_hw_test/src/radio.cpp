@@ -147,12 +147,39 @@ bool radio_begin()
     radio.setPayloadSize(sizeof(CommandPacket));
     radio.openWritingPipe(gcar_pipe_name); /* the GBox writes to the car */
     /* The real box layout: pipe 0 carries the program burst to _car_, pipe 1
-     * listens on _box_ where the car answers with telemetry and logs ('e'
-     * opens that listening, nothing is drained outside it) */
+     * listens on _box_ where the car answers with telemetry and logs. The
+     * shell drains pipe 1 between keys: a full FIFO stops the chip from
+     * acknowledging, and the car then waits on every acknowledged send */
     radio.openReadingPipe(1, gbox_pipe_name);
     radio_print_registers();
     radio_ok = true;
     return true;
+}
+
+/* Keep the other side's pipe from filling. The chip only acknowledges a
+ * packet when the RX FIFO has room, and a bench that never reads makes the
+ * car's acknowledged sends wait for retries that will never succeed. Outside
+ * the 'e' stream nothing displays these packets, so they are read and
+ * dropped; the stream does its own reading */
+void radio_discard_incoming()
+{
+    uint8_t payload[sizeof(CommandPacket)];
+    uint8_t pipe = 0;
+
+    if (!radio_ok || car_stream_active)
+    {
+        return;
+    }
+
+    /* A send or the stream menu may have left the chip in standby. Listening
+     * is idempotent, and doing it every shell slice costs two register
+     * writes */
+    radio.startListening();
+
+    while (radio.available(&pipe))
+    {
+        radio.read(payload, sizeof(payload));
+    }
 }
 
 /* Ask the car which build it runs. The write answers whether the radio chip

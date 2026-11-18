@@ -166,6 +166,10 @@ bool radio_begin();
 /* radio.cpp: ping the car on the "r" shell key and report build and round trip */
 void radio_run_ping();
 
+/* radio.cpp: read and drop the other side's packets so its acknowledged sends
+ * keep being answered; the shell calls it between keys */
+void radio_discard_incoming();
+
 /* radio.cpp: listen to the car stream on _box_, the "e" shell key */
 void radio_run_car_stream_test();
 /* True while the car stream runs. The shell keeps its "any key stops"

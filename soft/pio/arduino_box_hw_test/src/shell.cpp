@@ -69,6 +69,7 @@ void shell_delay_with_usb(uint32_t totalMs)
         const uint32_t slice = remaining > SLICE_MS ? SLICE_MS : remaining;
         delay(slice);
         remaining -= slice;
+        radio_discard_incoming();
         shell_handle_usb_commands();
     }
 }
