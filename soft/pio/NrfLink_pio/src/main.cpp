@@ -51,6 +51,7 @@ void setMode(uint8_t mode);
 void sendTelemetry();
 void sendCarLog();
 void sendDfuRequest();
+void sendIrqTest();
 void drainRadio();
 void runOtaStream();
 void runOtaSelfTest();
@@ -292,6 +293,33 @@ void sendDfuRequest()
 
     Serial.print(sent ? F("DFU request ACKed by the car") : F("DFU request FAILED (no ACK)"));
     Serial.println(F(", the board should re-enumerate in about a second"));
+}
+
+/* Ask the car what its IRQ pin saw. The request is a real reception, so a
+ * wired pin has already counted at least one falling edge when the car
+ * answers. A car that ACKs but reports zero has the pin unconnected, which
+ * the radio acknowledgement alone cannot tell: the chip answered either way */
+void sendIrqTest()
+{
+    uint8_t payload[sizeof(CommandPacket)] = { 0 };
+    bool sent;
+
+    payload[0] = static_cast<uint8_t>(PacketTag::Event);
+    payload[1] = static_cast<uint8_t>(EventId::IRQ_TEST);
+    payload[2] = static_cast<uint8_t>(CommandId::NONE);
+
+    /* Same reason as the DFU request: the _car_ writing pipe belongs to the
+     * box mode, and the car logs come back on _box_ which that mode reads */
+    if (gMode != kModeBox) {
+        setMode(kModeBox);
+    }
+
+    radio.stopListening();
+    sent = radio.write(payload, sizeof(payload));
+    radio.startListening();
+
+    Serial.print(sent ? F("IRQ test ACKed by the car") : F("IRQ test FAILED (no ACK)"));
+    Serial.println(F(", its A4 report follows"));
 }
 
 void addCommandToProgram(CommandId cmd)
@@ -841,6 +869,9 @@ void handleKey(char ch)
          * switching to the box mode is part of sending it */
         sendDfuRequest();
         break;
+    case 'i':
+        sendIrqTest();
+        break;
     case 'o':
         runOtaSelfTest();
         break;
@@ -944,6 +975,7 @@ void printHelp()
     Serial.println("  2: box/sender - sends commands on _car_, reads telemetry on _box_");
     Serial.println("  ?: this help");
     Serial.println("  f: ask the car to enter its DFU bootloader (works in any mode)");
+    Serial.println("  i: ask the car what its IRQ pin saw on A4 (works in any mode)");
     Serial.println("  v: ping the other device: its build and the round-trip time");
     Serial.println("  o: send a dummy OTA image (framing check)");
     Serial.println("  reset: type the five letters in a row to reboot the MCU");
