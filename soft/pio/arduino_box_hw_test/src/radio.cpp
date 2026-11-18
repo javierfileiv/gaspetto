@@ -97,6 +97,30 @@ static void radio_print_registers()
     Serial.println();
 }
 
+/* RF24's write() waits for a status flag with no timeout, so a chip that
+ * stops answering over SPI freezes the whole bench: no prompt, no loop. The
+ * non-blocking pair bounds that wait, and a dead radio reports a failure */
+static bool radio_send(const void *data, uint8_t length)
+{
+    constexpr uint32_t TX_TIMEOUT_MS = 50;
+
+    radio.stopListening();
+    radio.startWrite(data, length, false);
+
+    /* startWrite is a 32-byte burst: if it did not reach the FIFO, txStandBy
+     * sees an empty queue and reports success, and the bench would wait for an
+     * answer to a packet that never left. Check the queue was really loaded */
+    if ((radio.registerRead(nRF24L01::FIFO_STATUS) & (1U << nRF24L01::TX_EMPTY)) != 0U)
+    {
+        radio.startListening();
+        return false;
+    }
+
+    const bool sent = radio.txStandBy(TX_TIMEOUT_MS, true);
+    radio.startListening();
+    return sent;
+}
+
 /* Bring the chip up from scratch and put it in the production state. Called
  * at boot and again by the health cycle: a failed probe at boot must not
  * leave the bench unable to test the link without a reset, and the two
@@ -233,8 +257,7 @@ void radio_run_send_pieces_test()
      * stopListening() states the intent before the burst. The car's ACK
      * comes back over the auto-ack channel and write() reports it, which
      * is the delivery proof the link validation needs */
-    radio.stopListening();
-    const bool sent = radio.write(&packet, sizeof(packet));
+    const bool sent = radio_send(&packet, sizeof(packet));
     Serial.print("[send] radio.write ");
     Serial.print(sizeof(packet));
     Serial.print(" bytes -> ");
@@ -350,8 +373,7 @@ void radio_run_menu_key(char key)
 
         packet.count       = 1;
         packet.commands[0] = static_cast<uint8_t>(CommandId::MOTOR_STOP);
-        radio.stopListening();
-        sent = radio.write(&packet, sizeof(packet));
+        sent               = radio_send(&packet, sizeof(packet));
         Serial.print("[radio] test program (MOTOR_STOP) -> ");
         Serial.println(sent ? "ACK (car answered)" : "NO ACK (car absent or not listening)");
         break;

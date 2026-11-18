@@ -10,7 +10,11 @@
 #include <config_radio.h>
 
 /* Initialize radio object */
-BenchRadio radio(NRF24_CE, NRF24_CSN);
+/* 1 MHz, not the library's 10 MHz default: on this prototype the register
+ * reads passed at 10 MHz while the 32-byte FIFO bursts failed about half the
+ * time, so a ping was sent once every two tries. The link is reliable here at
+ * 1 MHz, and 32 bytes over a slower bus costs nothing this bench waits on */
+BenchRadio radio(NRF24_CE, NRF24_CSN, 1000000UL);
 
 /* Set by setup() once the chip answered: without it the send test would
  * report a missing car instead of a missing radio */
