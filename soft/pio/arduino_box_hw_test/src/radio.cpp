@@ -158,6 +158,10 @@ bool radio_begin()
      * shell drains pipe 1 between keys: a full FIFO stops the chip from
      * acknowledging, and the car then waits on every acknowledged send */
     radio.openReadingPipe(1, gbox_pipe_name);
+    /* stopConstCarrier() powers the chip down per the datasheet, so bring it
+     * back up explicitly and leave it listening: the probe must end in the
+     * state the bench runs in, not in one the first idle slice repairs */
+    radio.startListening();
     radio_print_registers();
     radio_ok = true;
     return true;
