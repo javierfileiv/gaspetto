@@ -2,6 +2,7 @@
  * decoding */
 #include "hwtest.h"
 #include "i2c3_bitbang.h"
+#include "piece_decode.h"
 
 #include <Adafruit_ADS1X15.h>
 
@@ -268,66 +269,10 @@ void scan_run_frozen_slot_monitor(uint8_t slotIndex)
     Serial.println("--- FROZEN MONITOR stopped ---");
 }
 
-/* Decode one raw reading with this slot's row of the per-slot threshold
- * table. The columns are ascending piece starts, so the first column below
- * which nothing matches means the slot is not calibrated: it decodes
- * INVALID rather than guessing with the global fallbacks. This is the only
- * decode in the firmware: the monitors, the scan and the radio send all go
- * through it, so a label printed here and a piece sent over the air can
- * never come from two different walks */
-/* Which piece each band carries. The bands ascend with the raw reading, so
- * this array is the single place where a name is bound to a physical family.
- * This batch was mounted with the opposite pole throughout, which puts the
- * greens at the bottom and the blues at the top; the operator asked for the
- * greens to be FORWARD and the reds LOOP_CALL, so the mapping follows the
- * measurement instead of asking twenty magnets to be flipped. Rebuilding the
- * pieces the other way round flips this array, nothing else */
-static const BoxPieceId BAND_PIECES[5] = {
-    BoxPieceId::FORWARD,    /* band 0: green 4 mm, the most negative */
-    BoxPieceId::TURN_RIGHT, /* band 1: yellow 2 mm */
-    BoxPieceId::EMPTY,      /* band 2: the slot's own idle level */
-    BoxPieceId::LOOP_CALL,  /* band 3: red 2 mm */
-    BoxPieceId::TURN_LEFT,  /* band 4: blue 4 mm, the most positive */
-};
-
-BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw)
-{
-    if (raw < 0)
-    {
-        return BoxPieceId::INVALID;
-    }
-    const uint16_t *t = GASPETTO_ADC_SLOT_THRESHOLDS[slotIndex];
-    if (t[GASPETTO_ADC_SLOT_COL_TURN_LEFT] == 0 || raw < t[GASPETTO_ADC_SLOT_COL_TURN_LEFT])
-    {
-        return BoxPieceId::INVALID;
-    }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_LOOP_START])
-    {
-        return BAND_PIECES[0];
-    }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_EMPTY])
-    {
-        return BAND_PIECES[1];
-    }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_TURN_RIGHT])
-    {
-        return BAND_PIECES[2];
-    }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_FORWARD])
-    {
-        return BAND_PIECES[3];
-    }
-    if (raw < t[GASPETTO_ADC_SLOT_COL_TO_REMOVE])
-    {
-        return BAND_PIECES[4];
-    }
-    return BoxPieceId::INVALID;
-}
-
 /* What the scan prints: the enum above under its label */
 static const char *scan_piece_label_for_raw(uint8_t slotIndex, int16_t raw)
 {
-    return scan_label_name(static_cast<int>(scan_piece_for_raw(slotIndex, raw)));
+    return scan_label_name(static_cast<int>(piece_decode(slotIndex, raw)));
 }
 
 void scan_run_piece_calibration()
@@ -565,7 +510,7 @@ static bool scan_one_slot(uint8_t slot, BoxBoardPieces &board)
         return false;
     }
 
-    const BoxPieceId piece = scan_piece_for_raw(slot, rawMean);
+    const BoxPieceId piece = piece_decode(slot, rawMean);
     Serial.print(": raw=");
     Serial.print(rawMean);
     Serial.print("  ");

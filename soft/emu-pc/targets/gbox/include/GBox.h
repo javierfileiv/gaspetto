@@ -21,13 +21,6 @@ extern std::atomic<bool> lowPowerMode;
 
 constexpr uint8_t BOX_MAX_STATES = static_cast<uint8_t>(StateId::MAX_STATE_ID);
 
-struct AdcDecodeEntry {
-    uint16_t minValue;
-    uint16_t maxValue;
-    BoxPieceId piece;
-    const char *label;
-};
-
 struct SlotReading {
     uint16_t rawValue;
     BoxPieceId piece;
@@ -106,8 +99,6 @@ private:
     void setLedRailEnabled(bool enabled);
     void showHealthStatus(bool ok);
     void blackoutLeds();
-    uint16_t rawValueForPiece(BoxPieceId piece) const;
-    BoxPieceId decodePiece(uint16_t rawValue) const;
     const char *pieceToString(BoxPieceId piece) const;
 
     Context &_ctx;

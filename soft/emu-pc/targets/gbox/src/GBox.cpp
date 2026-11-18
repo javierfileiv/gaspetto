@@ -7,7 +7,7 @@
 #include "Events.h"
 #include "PieceProgram.h"
 #include "RadioController.h"
-#include "piece_thresholds.h"
+#include "piece_decode.h"
 #include "pin_definitions.h"
 
 #include <Adafruit_ADS1X15.h>
@@ -52,29 +52,6 @@ static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLES must be >= 1");
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
               "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
-
-/* Decode table ordered by measured ascending raw value:
- *   TURN_LEFT (8640) < BACKWARD (11470) < EMPTY (13048) <
- *   TURN_RIGHT (13679) < FORWARD (14418) < LOOP_CALL (15957) */
-constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
-                    BoxPieceId::TURN_LEFT, "TURN_LEFT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_EMPTY_START - 1),
-                    BoxPieceId::BACKWARD, "BACKWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_EMPTY_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
-                    BoxPieceId::EMPTY, "EMPTY" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
-                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
-                    BoxPieceId::FORWARD, "FORWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
-                    BoxPieceId::LOOP_CALL, "LOOP_CALL" },
-};
 
 constexpr uint8_t kChannelsPerAds = 4;
 constexpr uint32_t kI2cClockHz = GASPETTO_I2C_CLOCK_HZ;
@@ -387,8 +364,9 @@ void GBox::showHealthStatus(bool ok)
 void GBox::injectBoardPieces(const BoxBoardPieces &boardPieces)
 {
     for (std::size_t index = 0; index < BOX_TOTAL_SLOTS; ++index) {
-        Adafruit_ADS1115::setRawValue(index,
-                                      static_cast<int16_t>(rawValueForPiece(boardPieces[index])));
+        Adafruit_ADS1115::setRawValue(
+                index, static_cast<int16_t>(piece_raw_for_slot(static_cast<uint8_t>(index),
+                                                               boardPieces[index])));
     }
     LOGLN("GBox: board pieces injected.");
 }
@@ -696,7 +674,9 @@ void GBox::scanSlots()
             }
 
             lastScan[slot].rawValue = readOk ? rawU16 : 0;
-            lastScan[slot].piece = readOk ? decodePiece(rawU16) : BoxPieceId::INVALID;
+            lastScan[slot].piece = readOk ? piece_decode(static_cast<uint8_t>(slot),
+                                                         static_cast<int16_t>(rawU16)) :
+                                            BoxPieceId::INVALID;
 
             LOG("Scan slot ");
             LOG(static_cast<int>(slot) + 1);
@@ -777,28 +757,6 @@ void GBox::prepareForStop()
     setLedRailEnabled(false);
     setSensorRailEnabled(false);
     LOGLN("GBox: STOP mode armed.");
-}
-
-uint16_t GBox::rawValueForPiece(BoxPieceId piece) const
-{
-    for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
-        if (entry.piece == piece) {
-            return static_cast<uint16_t>((entry.minValue + entry.maxValue) / 2U);
-        }
-    }
-
-    return 0;
-}
-
-BoxPieceId GBox::decodePiece(uint16_t rawValue) const
-{
-    for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
-        if (rawValue >= entry.minValue && rawValue <= entry.maxValue) {
-            return entry.piece;
-        }
-    }
-
-    return BoxPieceId::INVALID;
 }
 
 const char *GBox::pieceToString(BoxPieceId piece) const

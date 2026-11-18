@@ -125,10 +125,6 @@ void scan_run_piece_calibration();
  * INVALID. Used by the "p" send test to read the board it transmits */
 bool scan_zone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall);
 
-/* The one piece decode: a raw reading against this slot's compiled row.
- * Every consumer (monitors, scan, radio send) goes through it */
-BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw);
-
 /* Mode state, defined by main.cpp and read by nearly every module */
 extern TestMode test_mode;
 extern bool calibration_rails_on;
