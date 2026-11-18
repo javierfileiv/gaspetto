@@ -75,7 +75,7 @@ void setup()
         delay(10);
     }
 #endif
-    Serial.println("NrfLink - Gaspetto radio link tool");
+    Serial.println(F("NrfLink - Gaspetto radio link tool"));
     if (!radio.begin()) {
         Serial.println(F("radio hardware is not responding!!"));
         while (1) {
@@ -149,11 +149,11 @@ void setMode(uint8_t mode)
 
     /* Both addresses on one line: this is the half of the link the bench
      * prints too, and matching the two lines is the whole diagnosis */
-    Serial.print("[mode] ");
+    Serial.print(F("[mode] "));
     Serial.print(gMode == kModeCar ? "1 = car emulation" : "2 = box/sender");
-    Serial.print(", tx ");
+    Serial.print(F(", tx "));
     printAddress(gMode == kModeCar ? gbox_pipe_name : gcar_pipe_name);
-    Serial.print(", rx(pipe1) ");
+    Serial.print(F(", rx(pipe1) "));
     printAddress(gMode == kModeCar ? gcar_pipe_name : gbox_pipe_name);
     Serial.println();
 }
@@ -183,7 +183,7 @@ void sendTelemetry()
     sent = radio.write(&t, sizeof(t));
     radio.startListening();
 
-    Serial.print("[tx] telemetry #");
+    Serial.print(F("[tx] telemetry #"));
     Serial.print(gTelemetryTick);
     Serial.println(sent ? " sent" : " FAILED (no acknowledge)");
     ++gTelemetryTick;
@@ -213,7 +213,7 @@ void displayCommandPacket(const CommandPacket &pkt)
 {
     uint8_t i;
 
-    Serial.print("[rx] CommandPacket count=");
+    Serial.print(F("[rx] CommandPacket count="));
     Serial.print(pkt.count);
     for (i = 0; i < pkt.count && i < BOX_MAX_PAYLOAD_COMMANDS; ++i) {
         Serial.print(' ');
@@ -326,13 +326,13 @@ void addCommandToProgram(CommandId cmd)
 {
     if (currentProgram.count < BOX_MAX_PAYLOAD_COMMANDS) {
         currentProgram.commands[currentProgram.count++] = static_cast<uint8_t>(cmd);
-        Serial.print("Added to program: ");
+        Serial.print(F("Added to program: "));
         Serial.print(commandIdToString(cmd));
-        Serial.print(" (count: ");
+        Serial.print(F(" (count: "));
         Serial.print(currentProgram.count);
-        Serial.println(")");
+        Serial.println(F(")"));
     } else {
-        Serial.println("Program is full!");
+        Serial.println(F("Program is full!"));
     }
 }
 
@@ -341,7 +341,7 @@ void sendProgram()
     bool sent;
 
     if (currentProgram.count == 0) {
-        Serial.println("Program is empty!");
+        Serial.println(F("Program is empty!"));
         return;
     }
 
@@ -351,7 +351,7 @@ void sendProgram()
 
     Serial.print(sent ? "Sent program with " : "FAILED to send program with ");
     Serial.print(currentProgram.count);
-    Serial.println(" commands");
+    Serial.println(F(" commands"));
 
     currentProgram = {}; /* Reset program. */
 }
@@ -359,7 +359,7 @@ void sendProgram()
 void clearProgram()
 {
     currentProgram = {};
-    Serial.println("Program cleared");
+    Serial.println(F("Program cleared"));
 }
 
 /* The word "reset" typed in a row reboots the board. The watchdog is the
@@ -376,7 +376,7 @@ bool consumeResetWord(char ch)
     if (ch == kResetWord[seen]) {
         ++seen;
         if (seen == sizeof(kResetWord) - 1U) {
-            Serial.println("Resetting the board...");
+            Serial.println(F("Resetting the board..."));
             Serial.flush();
             wdt_enable(WDTO_15MS);
             while (true) {
@@ -457,7 +457,7 @@ void drainRadio()
             memcpy(&tlm, payload, sizeof(tlm));
             displayTelemetry(tlm);
         } else {
-            Serial.print("[rx] ignored packet, tag=0x");
+            Serial.print(F("[rx] ignored packet, tag=0x"));
             Serial.println(payload[0], HEX);
         }
     }
@@ -968,22 +968,22 @@ void loop()
 
 void printHelp()
 {
-    Serial.println("\n=== NrfLink - Gaspetto radio link tool ===");
-    Serial.println("Modes:");
-    Serial.println("  1: car emulation (default) - reads the program the Box sends");
-    Serial.println("     on _car_ and answers with telemetry and logs on _box_");
-    Serial.println("  2: box/sender - sends commands on _car_, reads telemetry on _box_");
-    Serial.println("  ?: this help");
-    Serial.println("  f: ask the car to enter its DFU bootloader (works in any mode)");
-    Serial.println("  i: ask the car what its IRQ pin saw on A4 (works in any mode)");
-    Serial.println("  v: ping the other device: its build and the round-trip time");
-    Serial.println("  o: send a dummy OTA image (framing check)");
-    Serial.println("  reset: type the five letters in a row to reboot the MCU");
-    Serial.println("\nMode 2 keys:");
-    Serial.println("  w/s/a/d/x: send a single command");
-    Serial.println("  W/S/A/D/X: add to the program queue");
-    Serial.println("  *: send the queue, -: clear the queue");
-    Serial.println("========================================\n");
+    Serial.println(F("\n=== NrfLink - Gaspetto radio link tool ==="));
+    Serial.println(F("Modes:"));
+    Serial.println(F("  1: car emulation (default) - reads the program the Box sends"));
+    Serial.println(F("     on _car_ and answers with telemetry and logs on _box_"));
+    Serial.println(F("  2: box/sender - sends commands on _car_, reads telemetry on _box_"));
+    Serial.println(F("  ?: this help"));
+    Serial.println(F("  f: ask the car to enter its DFU bootloader (works in any mode)"));
+    Serial.println(F("  i: ask the car what its IRQ pin saw on A4 (works in any mode)"));
+    Serial.println(F("  v: ping the other device: its build and the round-trip time"));
+    Serial.println(F("  o: send a dummy OTA image (framing check)"));
+    Serial.println(F("  reset: type the five letters in a row to reboot the MCU"));
+    Serial.println(F("\nMode 2 keys:"));
+    Serial.println(F("  w/s/a/d/x: send a single command"));
+    Serial.println(F("  W/S/A/D/X: add to the program queue"));
+    Serial.println(F("  *: send the queue, -: clear the queue"));
+    Serial.println(F("========================================\n"));
 }
 
 /* The packet carries an absolute target and the raw yaw, so the difference
