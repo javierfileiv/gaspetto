@@ -237,10 +237,11 @@ void sendCommand(CommandId cmd)
     Serial.println(commandIdToString(cmd));
 }
 
-/* The car takes a tagged event as a device command: no motor command byte is
- * spent on it and no program can produce it. The payload is written at the
- * full 32 byte width so the receiver never depends on the chip padding the
- * tail of a short write */
+/* The version request doubles as a ping: the answer proves the other
+ * application is running, and the delay is the round trip */
+uint32_t ping_sent_ms = 0;
+bool ping_pending = false;
+
 void sendVersionRequest()
 {
     VersionPacket request = {};
@@ -257,10 +258,19 @@ void sendVersionRequest()
     const bool sent = radio.write(&request, sizeof(request));
     radio.startListening();
 
-    Serial.println(sent ? F("[version] request sent, waiting for the answer") :
-                          F("[version] request FAILED (no answer from the chip)"));
+    if (sent) {
+        ping_sent_ms = millis();
+        ping_pending = true;
+    }
+
+    Serial.println(sent ? F("[version] ping sent, waiting for the answer") :
+                          F("[version] ping FAILED (no answer from the chip)"));
 }
 
+/* The car takes a tagged event as a device command: no motor command byte is
+ * spent on it and no program can produce it. The payload is written at the
+ * full 32 byte width so the receiver never depends on the chip padding the
+ * tail of a short write */
 void sendDfuRequest()
 {
     uint8_t payload[sizeof(CommandPacket)] = { 0 };
@@ -934,7 +944,7 @@ void printHelp()
     Serial.println("  2: box/sender - sends commands on _car_, reads telemetry on _box_");
     Serial.println("  ?: this help");
     Serial.println("  f: ask the car to enter its DFU bootloader (works in any mode)");
-    Serial.println("  v: ask the other device which build it runs");
+    Serial.println("  v: ping the other device: its build and the round-trip time");
     Serial.println("  o: send a dummy OTA image (framing check)");
     Serial.println("  reset: type the five letters in a row to reboot the MCU");
     Serial.println("\nMode 2 keys:");
@@ -964,7 +974,14 @@ void displayVersion(const VersionPacket &version)
     Serial.print(F(" ("));
     Serial.print(version.version);
     Serial.print(F("), wire protocol v"));
-    Serial.println(static_cast<int>(version.wire));
+    Serial.print(static_cast<int>(version.wire));
+    if (ping_pending) {
+        Serial.print(F(", pong in "));
+        Serial.print(millis() - ping_sent_ms);
+        Serial.print(F(" ms"));
+        ping_pending = false;
+    }
+    Serial.println();
 }
 
 void displayTelemetry(const TelemetryPacket &t)
