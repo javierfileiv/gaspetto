@@ -62,6 +62,12 @@ void sendVersionRequest();
 
 void setup()
 {
+    /* A watchdog reset leaves the WDT armed with its 15 ms timeout, so the
+     * board resets again before setup() can do anything: the reset word would
+     * turn into a reset loop. Clear the flag and stop the timer first */
+    MCUSR = 0;
+    wdt_disable();
+
     Serial.begin(115200);
 #ifdef ARDUINO
     while (!Serial) {
@@ -91,8 +97,10 @@ void setup()
 
     setMode(kModeCar);
 
-    radio.printDetails();
-    radio.printPrettyDetails();
+    /* printDetails() and printPrettyDetails() format through printf, which
+     * needs printf_begin() and a stdout binding this tool never sets: their
+     * output went nowhere and the call was the last thing before the reset.
+     * setMode() already prints the addresses and the [mode] line */
     printHelp();
 }
 
