@@ -15,6 +15,88 @@
 bool car_stream_active         = false;
 bool car_stream_send_requested = false;
 
+BenchRadio::BenchRadio(rf24_gpio_pin_t cePin, rf24_gpio_pin_t csnPin, uint32_t spiSpeed)
+    : RF24(cePin, csnPin, spiSpeed)
+{
+}
+
+uint8_t BenchRadio::registerRead(uint8_t reg)
+{
+    return read_register(reg);
+}
+
+void BenchRadio::registerRead(uint8_t reg, uint8_t *buffer, uint8_t length)
+{
+    read_register(reg, buffer, length);
+}
+
+/* printDetails() formats through printf and sprintfPrettyDetails() through
+ * tabs and long lines, which the terminal wraps into a staircase. These are
+ * the registers that decide whether a packet can be received at all, printed
+ * compactly with Serial */
+static void radio_print_registers()
+{
+    const uint8_t config  = radio.registerRead(nRF24L01::CONFIG);
+    const uint8_t enabled = radio.registerRead(nRF24L01::EN_RXADDR);
+    const uint8_t fifo    = radio.registerRead(nRF24L01::FIFO_STATUS);
+    const uint8_t channel = radio.registerRead(nRF24L01::RF_CH);
+    const uint8_t setup   = radio.registerRead(nRF24L01::RF_SETUP);
+    uint8_t rx0[5]        = {};
+    uint8_t rx1[5]        = {};
+    uint8_t tx[5]         = {};
+
+    radio.registerRead(nRF24L01::RX_ADDR_P0, rx0, sizeof(rx0));
+    radio.registerRead(nRF24L01::RX_ADDR_P1, rx1, sizeof(rx1));
+    radio.registerRead(nRF24L01::TX_ADDR, tx, sizeof(tx));
+
+    Serial.print("   CONFIG=0x");
+    Serial.print(config, HEX);
+    Serial.print(" PWR_UP=");
+    Serial.print((config >> 1) & 1U);
+    Serial.print(" PRIM_RX=");
+    Serial.print(config & 1U);
+    Serial.print(" EN_RXADDR=0x");
+    Serial.print(enabled, HEX);
+    Serial.print(" FIFO=0x");
+    Serial.print(fifo, HEX);
+    Serial.print(" RF_CH=");
+    Serial.print(channel);
+    Serial.print(" RF_SETUP=0x");
+    Serial.println(setup, HEX);
+
+    Serial.print("   RX0=");
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        if (rx0[i] < 0x10U)
+        {
+            Serial.print('0');
+        }
+        Serial.print(rx0[i], HEX);
+        Serial.print(' ');
+    }
+    Serial.print(" RX1=");
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        if (rx1[i] < 0x10U)
+        {
+            Serial.print('0');
+        }
+        Serial.print(rx1[i], HEX);
+        Serial.print(' ');
+    }
+    Serial.print(" TX=");
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        if (tx[i] < 0x10U)
+        {
+            Serial.print('0');
+        }
+        Serial.print(tx[i], HEX);
+        Serial.print(' ');
+    }
+    Serial.println();
+}
+
 /* Bring the chip up from scratch and put it in the production state. Called
  * at boot and again by the health cycle: a failed probe at boot must not
  * leave the bench unable to test the link without a reset, and the two
@@ -44,7 +126,7 @@ bool radio_begin()
      * listens on _box_ where the car answers with telemetry and logs ('e'
      * opens that listening, nothing is drained outside it) */
     radio.openReadingPipe(1, gbox_pipe_name);
-    radio.printDetails(); /* Print chip info to Serial */
+    radio_print_registers();
     radio_ok = true;
     return true;
 }
@@ -319,6 +401,7 @@ void radio_run_car_stream_test()
     car_stream_active         = true;
     car_stream_send_requested = false;
     radio.startListening();
+    radio_print_registers();
 
     while (!monitor_exit)
     {

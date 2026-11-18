@@ -10,7 +10,7 @@
 #include <config_radio.h>
 
 /* Initialize radio object */
-RF24 radio(NRF24_CE, NRF24_CSN);
+BenchRadio radio(NRF24_CE, NRF24_CSN);
 
 /* Set by setup() once the chip answered: without it the send test would
  * report a missing car instead of a missing radio */

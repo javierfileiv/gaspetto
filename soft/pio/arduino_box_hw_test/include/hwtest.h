@@ -148,6 +148,18 @@ void power_run_deep_sleep_test();
 /* radio.cpp: scan -> build -> transmit test driven by the "p" shell key */
 void radio_run_send_pieces_test();
 
+/* RF24 keeps read_register() protected, and the chip's real addresses are the
+ * only way to tell a bad configuration from a deaf module. Deriving exposes
+ * the read without touching the library */
+class BenchRadio : public RF24
+{
+public:
+    BenchRadio(rf24_gpio_pin_t cePin, rf24_gpio_pin_t csnPin, uint32_t spiSpeed = RF24_SPI_SPEED);
+
+    uint8_t registerRead(uint8_t reg);
+    void registerRead(uint8_t reg, uint8_t *buffer, uint8_t length);
+};
+
 /* radio.cpp: bring the chip up and record the verdict; boot and the health
  * cycle both call it */
 bool radio_begin();
@@ -175,7 +187,7 @@ void shell_print_usb_help();
 /* ads.cpp - I2C bus layer, ADS1115 reads, recovery and probe history */
 /* ========================================== */
 extern TwoWire &i2c1;
-extern RF24 radio;
+extern BenchRadio radio;
 extern AdsTestEntry ADS_TESTS[ADS_COUNT];
 extern CalibrationStats calibration_stats[CALIBRATION_SLOT_COUNT];
 extern uint32_t calibration_scan_counter;
