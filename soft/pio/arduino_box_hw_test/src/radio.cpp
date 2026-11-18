@@ -138,6 +138,13 @@ bool radio_begin()
     }
 
     Serial.println("   [SUCCESS] nRF24L01+ detected! SPI is working.");
+    /* RF_SETUP can come back from a test with CONT_WAVE and PLL_LOCK set, and
+     * the module keeps them across MCU resets because its 3.3 V never drops.
+     * In that mode the chip answers SPI and transmits a carrier instead of
+     * packets, so the link goes silent with no other symptom. The library
+     * keeps write_register() private, but this is exactly the call it offers
+     * to leave that mode */
+    radio.stopConstCarrier();
     /* Same line as production RadioController::begin(): the bench must put the
      * chip in the exact state the GBox will, or the link it validates is not
      * the link production will run */

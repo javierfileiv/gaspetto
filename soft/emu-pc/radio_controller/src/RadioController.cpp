@@ -60,6 +60,14 @@ void RadioController::init()
         LOGLN(F("radio hardware is not responding!!"));
         return;
     }
+#ifdef ARDUINO
+    /* A module can come back from a test with the continuous-carrier bits set,
+     * and it keeps RF_SETUP across MCU resets because its supply never drops.
+     * In that mode the chip answers SPI and transmits a carrier instead of
+     * packets, so the link is silent with no other symptom: leave the mode
+     * explicitly before trusting the radio */
+    _radio.stopConstCarrier();
+#endif
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
     _radio.setAddressWidth(5);
