@@ -129,9 +129,19 @@ void handleUsbMaintenanceCommands()
                 } else if (commandEqualsIgnoreCase(command, "ver") ||
                            commandEqualsIgnoreCase(command, "version")) {
                     printFirmwareVersion();
+                } else if (commandEqualsIgnoreCase(command, "car")) {
+                    /* Same version request the NrfLink sends: the car answers
+                     * on _box_ and RadioController prints it when it arrives */
+                    VersionPacket request = {};
+
+                    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+                    const bool sent = radioController.sendBuffer(&request, sizeof(request));
+
+                    LOGLN(sent ? "car version request ACKed, the answer follows" :
+                                 "car version request FAILED (no ACK)");
                 } else if (commandEqualsIgnoreCase(command, "help") ||
                            commandEqualsIgnoreCase(command, "?")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, ?");
+                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, ?");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -236,7 +246,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help, ver, ?");
+    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, ?");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
