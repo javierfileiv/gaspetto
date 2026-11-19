@@ -5,6 +5,7 @@
 #include "FirmwareVersion.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
+#include "radio_send.h"
 
 #include <cstring>
 
@@ -288,10 +289,7 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
      * and the send was reported refused while the car had answered */
     constexpr uint32_t TX_TIMEOUT_MS = 10;
 
-    _radio.stopListening();
-    _radio.startWrite(data, len, false);
-    const bool result = _radio.txStandBy(TX_TIMEOUT_MS, true);
-    _radio.startListening();
+    const bool result = radio_send(_radio, data, len, TX_TIMEOUT_MS);
 
     if (!result) {
         /* An image transfer fails and retries by design, and a log line would

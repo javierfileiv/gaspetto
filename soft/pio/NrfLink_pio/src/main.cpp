@@ -7,6 +7,7 @@
 #include "RF24.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
+#include "radio_send.h"
 
 #include <Arduino.h>
 #include <avr/wdt.h>
@@ -23,6 +24,11 @@ constexpr uint8_t kModeBox = 2;
 /* One telemetry packet per second in car mode, so the link can be watched
  * without touching the keyboard */
 constexpr uint32_t kTelemetryPeriodMs = 1000;
+
+/* The chip retransmits twice before it gives up, so this bounds the wait
+ * after MAX_RT rather than the whole exchange; the verdict still comes from
+ * txStandBy, unlike radio.write() which returns before the ACK */
+constexpr uint32_t kTxTimeoutMs = 10;
 
 RF24 radio(NRF24_CE, NRF24_CSN);
 
@@ -179,9 +185,7 @@ void sendTelemetry()
     t.kd = 0.05f;
     t.pwmFreq = 1000.0f;
 
-    radio.stopListening();
-    sent = radio.write(&t, sizeof(t));
-    radio.startListening();
+    sent = radio_send(radio, &t, sizeof(t), kTxTimeoutMs);
 
     Serial.print(F("[tx] telemetry #"));
     Serial.print(gTelemetryTick);
@@ -230,9 +234,7 @@ void sendCommand(CommandId cmd)
     pkt.count = 1;
     pkt.commands[0] = static_cast<uint8_t>(cmd);
 
-    radio.stopListening();
-    sent = radio.write(&pkt, sizeof(pkt));
-    radio.startListening();
+    sent = radio_send(radio, &pkt, sizeof(pkt), kTxTimeoutMs);
 
     Serial.print(sent ? "Sent command: " : "FAILED to send: ");
     Serial.println(commandIdToString(cmd));
@@ -255,9 +257,7 @@ void sendVersionRequest()
 
     request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
 
-    radio.stopListening();
-    const bool sent = radio.write(&request, sizeof(request));
-    radio.startListening();
+    const bool sent = radio_send(radio, &request, sizeof(request), kTxTimeoutMs);
 
     if (sent) {
         ping_sent_ms = millis();
@@ -287,9 +287,7 @@ void sendDfuRequest()
         setMode(kModeBox);
     }
 
-    radio.stopListening();
-    sent = radio.write(payload, sizeof(payload));
-    radio.startListening();
+    sent = radio_send(radio, payload, sizeof(payload), kTxTimeoutMs);
 
     Serial.print(sent ? F("DFU request ACKed by the car") : F("DFU request FAILED (no ACK)"));
     Serial.println(F(", the board should re-enumerate in about a second"));
@@ -314,9 +312,7 @@ void sendIrqTest()
         setMode(kModeBox);
     }
 
-    radio.stopListening();
-    sent = radio.write(payload, sizeof(payload));
-    radio.startListening();
+    sent = radio_send(radio, payload, sizeof(payload), kTxTimeoutMs);
 
     Serial.print(sent ? F("IRQ test ACKed by the car") : F("IRQ test FAILED (no ACK)"));
     Serial.println(F(", its A4 report follows"));
@@ -345,9 +341,7 @@ void sendProgram()
         return;
     }
 
-    radio.stopListening();
-    sent = radio.write(&currentProgram, sizeof(currentProgram));
-    radio.startListening();
+    sent = radio_send(radio, &currentProgram, sizeof(currentProgram), kTxTimeoutMs);
 
     Serial.print(sent ? "Sent program with " : "FAILED to send program with ");
     Serial.print(currentProgram.count);
@@ -543,10 +537,7 @@ bool sendOtaPacket(OtaKind kind, uint16_t seq, const uint8_t *data, uint8_t leng
         memcpy(packet.data, data, length);
     }
 
-    radio.stopListening();
-    const bool sent = radio.write(&packet, sizeof(packet));
-    radio.startListening();
-    return sent;
+    return radio_send(radio, &packet, sizeof(packet), kTxTimeoutMs);
 }
 
 bool sendOtaBegin(uint32_t length, uint32_t crc)
