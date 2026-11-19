@@ -450,13 +450,13 @@ void GBox::runScanAnimation()
             led_strip_fill(0, 0, 0);
             led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
             led_strip_show();
-            delayMs(500);
+            delayMs(120);
         }
         for (int i = 1; i >= 0; --i) {
             led_strip_fill(0, 0, 0);
             led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
             led_strip_show();
-            delayMs(500);
+            delayMs(120);
         }
     }
     blackoutLeds();
@@ -733,21 +733,27 @@ bool GBox::sendProgram(const CommandPacket &packet)
 
 void GBox::serviceProgramAnimation()
 {
+    constexpr uint32_t kStepMs = 250;
+    constexpr uint8_t kSteps = 20; /* one breath every five seconds */
+
     if (!programRunning_) {
         return;
     }
 
     const uint32_t now = millis();
-    if ((now - programAnimMs_) < 400U) {
+    if ((now - programAnimMs_) < kStepMs) {
         return;
     }
     programAnimMs_ = now;
 
-    /* Yellow chaser, one pixel at a time: the car is driving the program */
-    led_strip_fill(0, 0, 0);
-    led_strip_set(programAnimStep_, 255, 180, 0);
+    /* Yellow breathing on all three pixels, five seconds per cycle and
+     * repeated until the car reports the end: the program is being driven */
+    const uint8_t step = programAnimStep_;
+    const uint8_t level = (step < (kSteps / 2)) ? step : static_cast<uint8_t>(kSteps - step);
+
+    led_strip_fill(static_cast<uint8_t>(level * 18U), static_cast<uint8_t>(level * 13U), 0);
     led_strip_show();
-    programAnimStep_ = static_cast<uint8_t>((programAnimStep_ + 1U) % LED_STRIP_COUNT);
+    programAnimStep_ = static_cast<uint8_t>((step + 1U) % kSteps);
 }
 
 void GBox::prepareForStop()
