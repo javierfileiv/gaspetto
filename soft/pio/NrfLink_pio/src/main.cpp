@@ -440,6 +440,8 @@ void drainRadio()
 
             memcpy(&version, payload, sizeof(version));
             displayVersion(version);
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::ProgramDone)) {
+            Serial.println(F("[program] done: the car finished the batch"));
         } else if (gMode == kModeCar) {
             CommandPacket cmd;
 

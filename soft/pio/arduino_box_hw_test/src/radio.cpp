@@ -569,6 +569,10 @@ void radio_run_car_stream_test()
                 lastHeartbeatMs = millis();
                 break;
             }
+            case PacketTag::ProgramDone:
+                Serial.println("   [DONE] the car finished the command batch");
+                lastHeartbeatMs = millis();
+                break;
             case PacketTag::Log: {
                 const uint8_t flags   = buffer[1];
                 const uint8_t dataLen = flags & 0x7FU;
