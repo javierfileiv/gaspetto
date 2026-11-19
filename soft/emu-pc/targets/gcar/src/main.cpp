@@ -127,6 +127,7 @@ void setup()
     gcar.setDfuCallback(enterDfu);
     gcar.setProgramDoneCallback(onProgramDone);
     radioControllerCar.setOtaHandler(onOtaPacket);
+    radioControllerCar.setLogPeerPrefix("[BOX] ");
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
 

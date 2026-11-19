@@ -41,6 +41,10 @@ public:
      * program notice; null ignores it */
     void setProgramDoneHandler(ProgramDoneHandler handler);
 
+    /** setLogPeerPrefix(): Name the device whose log lines arrive on the
+     * radio, so they can be told apart from this device's own lines */
+    void setLogPeerPrefix(const char *prefix);
+
     /**
      * sendTelemetry(): Send telemetry packet via radio
      * @param telemetry: The telemetry data to send
@@ -69,6 +73,7 @@ private:
     EventQueue *gaspettoQueue;
     OtaHandler otaHandler = nullptr;
     ProgramDoneHandler programDoneHandler = nullptr;
+    const char *logPeerPrefix = nullptr;
     bool otaWarningShown = false;
     uint8_t logLine[64];
     uint8_t logLineLen;
