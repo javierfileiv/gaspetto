@@ -29,6 +29,16 @@ extern Event getEmulatedEvent(void);
 #endif
 
 RF24 radio(NRF24_CE, NRF24_CSN);
+
+#ifdef ARDUINO
+/* Counted in the button interrupt and printed by the loop: Serial is far too
+ * slow and blocking to be called from an ISR, but the count still says
+ * whether the pin produced an edge nobody asked for */
+volatile uint32_t button_edges = 0;
+volatile uint32_t button_edge_ms = 0;
+volatile uint8_t button_edge_level = 0;
+volatile bool button_press_seen = false;
+#endif
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
@@ -168,11 +178,21 @@ void handleUsbMaintenanceCommands()
 void ISR()
 {
 #ifdef ARDUINO
-    Event evt(EventId::BUTTON_PRESSED);
+    /* Record the edge and the level it left behind, then let the loop print
+     * it: a press holds the line low, a rail transient is gone by the time
+     * the interrupt runs */
+    ++button_edges;
+    button_edge_ms = millis();
+    button_edge_level = (digitalRead(PIN_WAKE_BUTTON) == HIGH) ? 1 : 0;
+    /* A real press holds the line low; the spike a rail switch couples into
+     * it is gone by the time the interrupt runs, so it reads high here */
+    if (button_edge_level == 0) {
+        button_press_seen = true;
+    }
 #else
     Event evt = getEmulatedEvent();
-#endif
     gbox.debounceAndEnqueue(evt, millis());
+#endif
 }
 
 void enter_low_power_mode()
@@ -225,6 +245,29 @@ void setup()
 
 void loop()
 {
+#ifdef ARDUINO
+    static uint32_t printed_edges = 0;
+    const uint32_t edges = button_edges;
+
+    if (edges != printed_edges) {
+        printed_edges = edges;
+        LOG(F("button edge #"));
+        LOG(edges);
+        LOG(F(" at "));
+        LOG(static_cast<uint32_t>(button_edge_ms));
+        LOG(F(" ms, pin "));
+        LOGLN(button_edge_level != 0 ? F("HIGH") : F("LOW"));
+    }
+
+    /* Queue from the loop, not from the interrupt, but keep the press seen
+     * by the ISR: a real press during a scan or a verdict animation is then
+     * still accepted once the loop comes back */
+    if (button_press_seen) {
+        button_press_seen = false;
+        Event evt(EventId::BUTTON_PRESSED);
+        gbox.debounceAndEnqueue(evt, millis());
+    }
+#endif
     handleUsbMaintenanceCommands();
     gbox.work();
 }
