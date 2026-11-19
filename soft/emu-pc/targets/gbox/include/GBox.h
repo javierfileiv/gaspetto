@@ -76,6 +76,7 @@ public:
     void runEmptyBoardAnimation();
     void runRfErrorAnimation();
     void runProgramDoneAnimation();
+    void noteTelemetry();
     void scanSlots();
     bool buildProgram(CommandPacket &packet, bool &isEmpty);
     bool sendProgram(const CommandPacket &packet);
@@ -105,6 +106,8 @@ private:
     /* True from the moment the program is acknowledged to the car's
      * ProgramDone notice: the yellow chaser runs meanwhile */
     bool programRunning_;
+    uint32_t programStartMs_;
+    uint32_t lastTelemetryMs_;
     uint32_t programAnimMs_;
     uint8_t programAnimStep_;
     unsigned long lastDebounceTime_;

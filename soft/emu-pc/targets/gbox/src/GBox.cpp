@@ -166,6 +166,8 @@ GBox::GBox(Context &ctx)
         , lastScan{}
         , initialized_(false)
         , programRunning_(false)
+        , programStartMs_(0)
+        , lastTelemetryMs_(0)
         , programAnimMs_(0)
         , programAnimStep_(0)
         , lastDebounceTime_(0)
@@ -531,6 +533,11 @@ void GBox::runRfErrorAnimation()
     delayMs(3000);
 }
 
+void GBox::noteTelemetry()
+{
+    lastTelemetryMs_ = millis();
+}
+
 void GBox::runProgramDoneAnimation()
 {
     programRunning_ = false;
@@ -726,6 +733,7 @@ bool GBox::sendProgram(const CommandPacket &packet)
     const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 
     programRunning_ = sent;
+    programStartMs_ = millis();
     programAnimMs_ = millis();
     programAnimStep_ = 0;
     return sent;
@@ -740,7 +748,22 @@ void GBox::serviceProgramAnimation()
         return;
     }
 
+    /* The car sends telemetry only while it drives: two seconds without one
+     * means the movement is over, even when the end notice was lost */
+    constexpr uint32_t kSilenceTimeoutMs = 2000;
     const uint32_t now = millis();
+    uint32_t lastActivity = programStartMs_;
+
+    if (lastTelemetryMs_ > lastActivity) {
+        lastActivity = lastTelemetryMs_;
+    }
+
+    if ((now - lastActivity) > kSilenceTimeoutMs) {
+        programRunning_ = false;
+        blackoutLeds();
+        return;
+    }
+
     if ((now - programAnimMs_) < kStepMs) {
         return;
     }

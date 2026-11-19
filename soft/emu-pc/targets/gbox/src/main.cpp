@@ -174,6 +174,13 @@ void handleUsbMaintenanceCommands()
 }
 #endif
 
+/* The car sends telemetry only while it drives: the box uses the arrival
+ * times as a fallback when the end notice is lost */
+void onTelemetry()
+{
+    gbox.noteTelemetry();
+}
+
 /* The car reports the end of a command batch on the radio; the box animates
  * it here, where the state machine and the LEDs live */
 void onProgramDone()
@@ -239,6 +246,7 @@ void setup()
     gbox.initHardware();
     gbox.runHealthCheck();
     radioController.setProgramDoneHandler(onProgramDone);
+    radioController.setTelemetryHandler(onTelemetry);
     radioController.setLogPeerPrefix("[CAR] ");
 
     printFirmwareVersion();
