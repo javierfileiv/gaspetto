@@ -71,6 +71,7 @@ void handleUsbMaintenanceCommands()
 {
     static char commandBuffer[kUsbCommandBufferSize] = {};
     static std::size_t commandLength = 0;
+    static bool lastWasCarriageReturn = false;
 
     while (Serial.available() > 0) {
         const int rawValue = Serial.read();
@@ -80,6 +81,12 @@ void handleUsbMaintenanceCommands()
 
         const char currentChar = static_cast<char>(rawValue);
         if (currentChar == '\r' || currentChar == '\n') {
+            /* Echo the line end once: a terminal sends CR, LF or both */
+            if (!(currentChar == '\n' && lastWasCarriageReturn)) {
+                Serial.println();
+            }
+            lastWasCarriageReturn = (currentChar == '\r');
+
             commandBuffer[commandLength] = '\0';
 
             std::size_t start = 0;
@@ -111,6 +118,15 @@ void handleUsbMaintenanceCommands()
             commandBuffer[0] = '\0';
             continue;
         }
+        lastWasCarriageReturn = false;
+
+        if (currentChar == '\b' || currentChar == 0x7F) {
+            if (commandLength > 0) {
+                --commandLength;
+                Serial.print("\b \b");
+            }
+            continue;
+        }
 
         if (commandLength + 1 >= kUsbCommandBufferSize) {
             commandLength = 0;
@@ -119,6 +135,11 @@ void handleUsbMaintenanceCommands()
             continue;
         }
 
+        /* Echo what is typed: the port has no local echo, and without it the
+         * operator cannot tell a dead keyboard from a dead command */
+        if (currentChar >= ' ' && currentChar <= '~') {
+            Serial.print(currentChar);
+        }
         commandBuffer[commandLength++] = currentChar;
     }
 }
