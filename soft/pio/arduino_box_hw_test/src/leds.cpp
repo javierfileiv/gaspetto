@@ -1,40 +1,16 @@
 /* APA106 status LEDs: the setters, canned animations and the interactive
- * test menu, on top of the FastLED APA106 controller */
+ * test menu, on top of the shared FastLED APA106 strip */
 #include "hwtest.h"
+#include "led_strip.h"
 
-#include <FastLED.h>
-
-static CRGB led_pixels[APA_PIXEL_COUNT];
+static_assert(LED_STRIP_COUNT == LED_STRIP_COUNT, "bench chain length must match the shared strip");
 
 /* Prepare the data pin and send one dark frame. Call it AFTER the 5V
  * rail is up and settled: the APA106 ignores every frame sent while
  * unpowered */
 void leds_begin()
 {
-    FastLED.addLeds<APA106, PIN_LED_DATA, RGB>(led_pixels, APA_PIXEL_COUNT);
-    FastLED.setBrightness(APA_INTENSITY);
-    FastLED.show();
-}
-
-/* Same color on every pixel of the chain */
-static void leds_fill(uint8_t r, uint8_t g, uint8_t b)
-{
-    fill_solid(led_pixels, APA_PIXEL_COUNT, CRGB(r, g, b));
-}
-
-/* Point one pixel; arguments in RGB, same as the eye sees them */
-static void leds_set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
-{
-    if (index >= APA_PIXEL_COUNT)
-    {
-        return; /* an out-of-range index is dropped, the buffer cannot overflow */
-    }
-    led_pixels[index] = CRGB(r, g, b);
-}
-
-static void leds_show()
-{
-    FastLED.show();
+    led_strip_begin();
 }
 
 constexpr uint8_t LED_STATE = 0;
@@ -61,7 +37,7 @@ static void leds_log_pixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     Serial.print("[led] LED");
     Serial.print(led);
-    if (led >= APA_PIXEL_COUNT)
+    if (led >= LED_STRIP_COUNT)
     {
         Serial.println(" skipped (out of range)");
         return;
@@ -78,16 +54,16 @@ static void leds_log_pixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 void leds_blackout()
 {
     Serial.println("[led] blackout");
-    leds_fill(0, 0, 0);
-    leds_show();
+    led_strip_fill(0, 0, 0);
+    led_strip_show();
 }
 
 void leds_set_one(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     leds_log_pixel(led, r, g, b);
-    leds_fill(0, 0, 0);
-    leds_set_pixel(led, r, g, b);
-    leds_show();
+    led_strip_fill(0, 0, 0);
+    led_strip_set(led, r, g, b);
+    led_strip_show();
 }
 
 void leds_set_two(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
@@ -95,10 +71,10 @@ void leds_set_two(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB
 {
     leds_log_pixel(ledA, rA, gA, bA);
     leds_log_pixel(ledB, rB, gB, bB);
-    leds_fill(0, 0, 0);
-    leds_set_pixel(ledA, rA, gA, bA);
-    leds_set_pixel(ledB, rB, gB, bB);
-    leds_show();
+    led_strip_fill(0, 0, 0);
+    led_strip_set(ledA, rA, gA, bA);
+    led_strip_set(ledB, rB, gB, bB);
+    led_strip_show();
 }
 
 /* One white pixel at a time: the position check after a fresh solder
@@ -107,14 +83,14 @@ void leds_set_two(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB
 void leds_run_walk_test()
 {
     Serial.println("[led] walk test: one white pixel at a time");
-    for (uint16_t i = 0; i < APA_PIXEL_COUNT; ++i)
+    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i)
     {
         Serial.print("[led] walk: pixel ");
         Serial.print(i);
         Serial.println(" alone (white)");
-        leds_fill(0, 0, 0);
-        leds_set_pixel(i, 255, 255, 255);
-        leds_show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(i, 255, 255, 255);
+        led_strip_show();
         delay(WALK_STEP_MS);
     }
     leds_blackout();
@@ -144,12 +120,12 @@ void leds_run_success_animation_test()
 {
     /* Mirrors GBox success: green cascade then hold all green */
     Serial.println("[led] success test: green cascade");
-    leds_fill(0, 0, 0);
+    led_strip_fill(0, 0, 0);
     for (int i = 0; i < 3; ++i)
     {
         leds_log_pixel(static_cast<uint8_t>(i), 0, 100, 0);
-        leds_set_pixel(static_cast<uint16_t>(i), 0, 100, 0);
-        leds_show();
+        led_strip_set(static_cast<uint16_t>(i), 0, 100, 0);
+        led_strip_show();
         delay(CASCADE_STEP_MS);
     }
     delay(HOLD_MS);

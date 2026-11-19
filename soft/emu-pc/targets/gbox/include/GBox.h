@@ -11,10 +11,6 @@
 #include <array>
 #include <atomic>
 
-#ifdef ARDUINO
-#include <Adafruit_NeoPixel.h>
-#endif
-
 #ifndef ARDUINO
 extern std::atomic<bool> lowPowerMode;
 #endif
@@ -103,9 +99,6 @@ private:
 
     Context &_ctx;
     std::array<SlotReading, BOX_TOTAL_SLOTS> lastScan;
-#ifdef ARDUINO
-    Adafruit_NeoPixel leds_;
-#endif
     bool initialized_;
     unsigned long lastDebounceTime_;
     bool isScanning_;

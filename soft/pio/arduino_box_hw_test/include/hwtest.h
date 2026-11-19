@@ -210,8 +210,8 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 /* ========================================== */
 /* leds.cpp - APA106 status LEDs and animations */
 /* ========================================== */
-/* The chain is driven by the FastLED library (dedicated APA106
- * controller, RGB wire order measured on this batch) */
+/* The chain is driven by the shared led_strip module, which wraps FastLED
+ * with the APA106 controller and the RGB wire order measured on this batch */
 
 /* Pixels on the chain: each APA106 regenerates the signal for the next
  * one, so a pixel soldered later lights as soon as it is wired after the
@@ -220,13 +220,6 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 #define APA_LED_COUNT 3
 #endif
 constexpr uint16_t APA_PIXEL_COUNT = APA_LED_COUNT;
-
-/* Global output level handed to FastLED (255 = full); override with
- * -D APA_LED_INTENSITY=n when full scale is too harsh on the bench */
-#ifndef APA_LED_INTENSITY
-#define APA_LED_INTENSITY 80
-#endif
-constexpr uint8_t APA_INTENSITY = APA_LED_INTENSITY;
 
 /* Prepare the data pin and send one dark frame; call it AFTER the 5V
  * rail is up and settled (the APA106 ignores frames while unpowered) */
