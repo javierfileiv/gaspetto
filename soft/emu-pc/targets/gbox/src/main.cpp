@@ -238,6 +238,7 @@ void setup()
     gbox.initHardware();
     gbox.runHealthCheck();
     radioController.setProgramDoneHandler(onProgramDone);
+    radioController.setLogPeerPrefix("[CAR] ");
 
     printFirmwareVersion();
     /* Initialize the GBox state machine. */

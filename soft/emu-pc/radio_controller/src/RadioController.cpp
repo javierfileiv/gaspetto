@@ -331,6 +331,11 @@ void RadioController::setProgramDoneHandler(ProgramDoneHandler handler)
     programDoneHandler = handler;
 }
 
+void RadioController::setLogPeerPrefix(const char *prefix)
+{
+    logPeerPrefix = prefix;
+}
+
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 {
     /* One address for everything this device sends: sendBuffer() switches
@@ -399,6 +404,12 @@ void RadioController::handleLogFragment(const uint8_t *buffer)
 
     if (hasMore) {
         return;
+    }
+
+    /* Name the sender once the line is complete: the receiver's own log
+     * lines have no prefix, and the two must not be confused in one stream */
+    if (logPeerPrefix != nullptr) {
+        LOG(logPeerPrefix);
     }
 
     for (uint8_t i = 0; i < logLineLen; ++i) {
