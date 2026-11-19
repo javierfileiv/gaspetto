@@ -72,13 +72,29 @@ void enterDfu()
 }
 
 /* The box animates the real end of a program, not its transmission: say so
- * once the queue has drained and the motors have stopped */
+ * once the queue has drained and the motors have stopped. The box must not
+ * miss it, or its yellow breath would never stop, so a send the radio could
+ * not get acknowledged is retried. Ten tries span at most about half a
+ * second, long enough for a burst of interference or a box still busy with
+ * its send animation, and short enough that the next program is not delayed */
 void onProgramDone()
 {
+    constexpr uint8_t kAttempts = 10;
+    constexpr uint32_t kRetryGapMs = 40;
     uint8_t payload[sizeof(CommandPacket)] = {};
 
     payload[0] = static_cast<uint8_t>(PacketTag::ProgramDone);
-    radioControllerCar.sendBuffer(payload, sizeof(payload));
+
+    for (uint8_t attempt = 0; attempt < kAttempts; ++attempt) {
+        if (radioControllerCar.sendBuffer(payload, sizeof(payload))) {
+            LOG(F("ProgramDone acknowledged on try "));
+            LOGLN(static_cast<int>(attempt + 1));
+            return;
+        }
+        delay(kRetryGapMs);
+    }
+
+    LOGLN(F("ProgramDone never acknowledged"));
 }
 
 void ISR(void)
