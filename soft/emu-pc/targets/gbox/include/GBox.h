@@ -79,6 +79,12 @@ public:
     void scanSlots();
     bool buildProgram(CommandPacket &packet, bool &isEmpty);
     bool sendProgram(const CommandPacket &packet);
+
+    /* True from the send of a program until the car reports its end */
+    bool isProgramRunning() const
+    {
+        return programRunning_;
+    }
     bool sendClearQueueCommand();
     bool isCurrentlyScanning() const;
     void startScanning();

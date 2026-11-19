@@ -682,6 +682,11 @@ void GBox::scanSlots()
                 LOG(negativeCount);
                 LOGLN(" => INVALID");
             }
+
+            /* A program already running keeps its breath: the slot reads block
+             * the loop, and freezing the strip for the whole scan would look
+             * like the car stopped */
+            serviceProgramAnimation();
         }
     }
 }
@@ -721,11 +726,18 @@ bool GBox::sendProgram(const CommandPacket &packet)
     LOG(packet.count);
     LOGLN(" commands.");
 
+    const bool wasRunning = programRunning_;
     const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 
-    programRunning_ = sent;
-    programAnimMs_ = millis();
-    programAnimStep_ = 0;
+    /* The car appends a program sent while another runs, so the breath must not
+     * jump back to black for it. A failed send does not cancel the run either:
+     * the car is still driving the previous program */
+    if (sent && !wasRunning) {
+        programAnimMs_ = millis();
+        programAnimStep_ = 0;
+    }
+
+    programRunning_ = sent || wasRunning;
     return sent;
 }
 

@@ -7,10 +7,17 @@ void ProcessingState::enter()
     GBox *box = static_cast<GBox *>(active_object_);
     CommandPacket packet{};
     bool isEmpty = false;
+    const bool appending = box->isProgramRunning();
 
     box->restoreFromStop();
     box->setSensorRailEnabled(true);
-    box->runScanAnimation();
+
+    /* The scan animation belongs to a fresh program. When one is already
+     * running, the yellow breath keeps the strip instead: the new program is
+     * only added to the car's queue, and the car keeps working */
+    if (!appending) {
+        box->runScanAnimation();
+    }
     box->scanSlots();
 
     const bool programReady = box->buildProgram(packet, isEmpty);
@@ -27,9 +34,9 @@ void ProcessingState::enter()
     }
 
     const bool radioOk = box->sendProgram(packet);
-    if (radioOk) {
+    if (radioOk && !appending) {
         box->runSuccessAnimation();
-    } else {
+    } else if (!radioOk) {
         box->runRfErrorAnimation();
     }
 
