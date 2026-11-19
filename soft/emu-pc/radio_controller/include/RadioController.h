@@ -50,6 +50,15 @@ public:
      * radio, so they can be told apart from this device's own lines */
     void setLogPeerPrefix(const char *prefix);
 
+    /** setQuiet(): Leave RX mode and refuse every send, so this device does
+     * not disturb another link on the bench; false listens again */
+    void setQuiet(bool quiet);
+
+    bool isQuiet() const
+    {
+        return radioQuiet;
+    }
+
     /**
      * sendTelemetry(): Send telemetry packet via radio
      * @param telemetry: The telemetry data to send
@@ -80,6 +89,7 @@ private:
     ProgramDoneHandler programDoneHandler = nullptr;
     const char *logPeerPrefix = nullptr;
     bool otaWarningShown = false;
+    bool radioQuiet = false;
     void (*telemetryHandler)(void) = nullptr;
     uint8_t logLine[64];
     uint8_t logLineLen;

@@ -139,9 +139,17 @@ void handleUsbMaintenanceCommands()
 
                     LOGLN(sent ? "car version request ACKed, the answer follows" :
                                  "car version request FAILED (no ACK)");
+                } else if (commandEqualsIgnoreCase(command, "idle")) {
+                    /* Toggle, because the shell must stay reachable while the
+                     * radio is off: a second idle brings the link back */
+                    const bool quiet = !radioController.isQuiet();
+
+                    radioController.setQuiet(quiet);
+                    LOGLN(quiet ? "Radio idle: nothing is sent or received, type idle again to resume" :
+                                  "Radio idle: off, listening again");
                 } else if (commandEqualsIgnoreCase(command, "help") ||
                            commandEqualsIgnoreCase(command, "?")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, ?");
+                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, idle, ?");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -246,7 +254,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, ?");
+    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, idle, ?");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");

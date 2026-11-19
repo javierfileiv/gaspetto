@@ -110,6 +110,11 @@ void RadioController::processRadio()
     uint8_t buffer[sizeof(CommandPacket)];
     uint8_t pipe;
 
+    /* Quiet: the chip is out of RX mode and nothing must be read from it */
+    if (radioQuiet) {
+        return;
+    }
+
     /* RX processing. */
     if (_radio.available(&pipe)) {
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
@@ -304,6 +309,14 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
      * and the send was reported refused while the car had answered */
     constexpr uint32_t TX_TIMEOUT_MS = 10;
 
+    /* Quiet: a program or a log must not go out while the radio is handed to
+     * another link. Refusing here also keeps the chip from loading a payload
+     * it cannot transmit */
+    if (radioQuiet) {
+        LOGLN(F("RadioController: radio is idle, send refused"));
+        return false;
+    }
+
     const bool result = radio_send(_radio, data, len, TX_TIMEOUT_MS);
 
     if (!result) {
@@ -341,6 +354,23 @@ void RadioController::setProgramDoneHandler(ProgramDoneHandler handler)
 void RadioController::setLogPeerPrefix(const char *prefix)
 {
     logPeerPrefix = prefix;
+}
+
+void RadioController::setQuiet(bool quiet)
+{
+    if (quiet == radioQuiet) {
+        return;
+    }
+    radioQuiet = quiet;
+
+    /* RX is where the chip answers a packet with its acknowledge: leaving that
+     * mode is what makes it silent, and sendBuffer() refuses the other
+     * direction while the flag is set */
+    if (radioQuiet) {
+        _radio.stopListening();
+    } else {
+        _radio.startListening();
+    }
 }
 
 void RadioController::setTelemetryHandler(void (*handler)(void))

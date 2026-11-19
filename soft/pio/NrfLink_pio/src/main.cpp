@@ -16,10 +16,13 @@
 /* Mode 1 emulates the car: it listens for the program the Box sends on
  * _car_ and answers with telemetry on _box_, where the box listens. Mode 2
  * emulates the box: it sends commands on _car_ and listens for telemetry
- * on _box_. The car is the default because the bench test drives the box
- * side. */
+ * on _box_. Mode 3 is quiet: the chip leaves RX, nothing is transmitted and
+ * the log lines stay on the console, so the tool can sit between two real
+ * devices without disturbing their link. The car is the default because the
+ * bench test drives the box side. */
 constexpr uint8_t kModeCar = 1;
 constexpr uint8_t kModeBox = 2;
+constexpr uint8_t kModeQuiet = 3;
 
 /* One telemetry packet per second in car mode, so the link can be watched
  * without touching the keyboard */
@@ -137,6 +140,19 @@ static void printAddress(const uint8_t *addr)
 void setMode(uint8_t mode)
 {
     gMode = mode;
+
+    if (gMode == kModeQuiet) {
+        /* Leaving RX mode stops the chip from hearing a packet and from
+         * answering its acknowledge; the sends are guarded in drainRadio()
+         * and the loop, and the log transport falls back to the console so
+         * the operator keeps the lines without a byte on the air */
+        Log::setMuted(true);
+        radio.stopListening();
+        Serial.println(F("[mode] 3 = quiet, radio idle, console only"));
+        return;
+    }
+
+    Log::setMuted(false);
 
     if (gMode == kModeCar) {
         radio.openWritingPipe(gbox_pipe_name); /* pipe 0 = _box_, telemetry rides it */
@@ -416,6 +432,10 @@ void drainLogFragment(uint8_t pipe, const uint8_t *payload)
 void drainRadio()
 {
     uint8_t pipe;
+
+    if (gMode == kModeQuiet) {
+        return;
+    }
 
     while (radio.available(&pipe)) {
         uint8_t payload[sizeof(CommandPacket)] = { 0 };
@@ -857,6 +877,9 @@ void handleKey(char ch)
     case '2':
         setMode(kModeBox);
         break;
+    case '3':
+        setMode(kModeQuiet);
+        break;
     case 'f':
         /* A device command, not a motor one: it works from any mode and
          * switching to the box mode is part of sending it */
@@ -968,6 +991,7 @@ void printHelp()
     Serial.println(F("  1: car emulation (default) - reads the program the Box sends"));
     Serial.println(F("     on _car_ and answers with telemetry and logs on _box_"));
     Serial.println(F("  2: box/sender - sends commands on _car_, reads telemetry on _box_"));
+    Serial.println(F("  3: quiet - radio idle, nothing sent or received, console only"));
     Serial.println(F("  ?: this help"));
     Serial.println(F("  f: ask the car to enter its DFU bootloader (works in any mode)"));
     Serial.println(F("  i: ask the car what its IRQ pin saw on A4 (works in any mode)"));

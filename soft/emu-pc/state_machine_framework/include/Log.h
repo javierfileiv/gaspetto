@@ -43,6 +43,7 @@ public:
             : _radio(nullptr)
             , _lineLen(0)
             , _ready(false)
+            , _muted(false)
             , _queueHead(0)
             , _queueTail(0)
             , _queueCount(0)
@@ -64,6 +65,14 @@ public:
     /* A fragment can only be framed and transmitted once the chip answered
      * begin(): before that the SPI clock may still be off, and touching the
      * registers blocks the board on a status flag that never comes */
+    /* Muted: every line goes to the wired console instead of the air. The
+     * bench tool uses it for its quiet mode, where the link must not even
+     * acknowledge a packet */
+    void setMuted(bool muted)
+    {
+        _muted = muted;
+    }
+
     void markReady()
     {
         if (_radio != nullptr) {
@@ -81,7 +90,7 @@ public:
         /* Boot lines cannot ride a radio that is not up yet, so they go to
          * the wired console instead of being dropped: losing the first lines
          * after a reset is exactly when they matter most */
-        if (!_ready) {
+        if (!_ready || _muted) {
             Serial.write(b);
             return 1;
         }
@@ -107,7 +116,7 @@ public:
      * drain. Called by the main loop, never by the caller of LOG */
     void service()
     {
-        if (!_ready || _radio == nullptr || _queueCount == 0) {
+        if (_muted || !_ready || _radio == nullptr || _queueCount == 0) {
             return;
         }
 
@@ -126,7 +135,7 @@ public:
      * are exactly the ones that explain the reset */
     void flushPending()
     {
-        if (_radio == nullptr) {
+        if (_muted || _radio == nullptr) {
             return;
         }
 
@@ -212,6 +221,7 @@ private:
     char _line[32];
     uint8_t _lineLen;
     bool _ready;
+    bool _muted;
     uint8_t _logAddress[5];
     uint8_t _restoreAddress[5];
     uint8_t _queue[kLogQueueFragments][kLogPayloadSize];
@@ -239,6 +249,11 @@ inline void markNrf24Ready()
     output().markReady();
 }
 
+inline void setMuted(bool muted)
+{
+    output().setMuted(muted);
+}
+
 /* Called by the main loop: sends at most one queued fragment per period */
 inline void service()
 {
@@ -255,6 +270,11 @@ inline void flushPending()
 inline Print &output()
 {
     return Serial;
+}
+
+inline void setMuted(bool muted)
+{
+    (void)muted;
 }
 
 inline void service()
@@ -320,6 +340,11 @@ public:
 #endif
     }
 
+    static void setMuted(bool muted)
+    {
+        (void)muted;
+    }
+
     static void service()
     {
     }
@@ -340,6 +365,12 @@ public:
         gaspetto_log::markNrf24Ready();
     }
 #endif
+
+    /* Muted: lines stay on the wired console and the radio is not touched */
+    static void setMuted(bool muted)
+    {
+        gaspetto_log::setMuted(muted);
+    }
 
     /* The transport queues its fragments; the main loop drains them */
     static void service()
