@@ -103,6 +103,13 @@ public:
      */
     void setDfuCallback(void (*callback)(void));
 
+    /** setProgramDoneCallback(): Install the function that reports the end of
+     * a command batch
+     * @callback: called once the queue has drained and the car is back in
+     * IDLE; null keeps the report silent
+     */
+    void setProgramDoneCallback(void (*callback)(void));
+
     /**
      * transitionTo(): Transition to a new state (expose base class method).
      * @param newStateId Target state.
@@ -119,4 +126,8 @@ private:
 private:
     Context &_ctx;
     void (*dfuCallback_)(void) = nullptr;
+    void (*programDoneCallback_)(void) = nullptr;
+    /* A batch is in flight once the queue held at least one command; the end
+     * is the queue draining with the car back in IDLE */
+    bool commandsQueued_ = false;
 };

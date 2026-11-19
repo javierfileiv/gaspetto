@@ -63,6 +63,16 @@ void onOtaPacket(const OtaPacket &packet)
     otaReceiver.handle(packet);
 }
 
+/* The box animates the real end of a program, not its transmission: say so
+ * once the queue has drained and the motors have stopped */
+void onProgramDone()
+{
+    uint8_t payload[sizeof(CommandPacket)] = {};
+
+    payload[0] = static_cast<uint8_t>(PacketTag::ProgramDone);
+    radioControllerCar.sendBuffer(payload, sizeof(payload));
+}
+
 void ISR(void)
 {
 #ifndef ARDUINO
@@ -107,6 +117,7 @@ void setup()
     /* The radio delivers a DFU request as an event: the jump itself is a
      * target concern, so main wires it and the state machine stays generic */
     gcar.setDfuCallback(enterDfuBootloader);
+    gcar.setProgramDoneCallback(onProgramDone);
     radioControllerCar.setOtaHandler(onOtaPacket);
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);

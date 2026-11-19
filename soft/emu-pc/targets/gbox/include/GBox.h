@@ -75,6 +75,7 @@ public:
     void runBuildErrorAnimation();
     void runEmptyBoardAnimation();
     void runRfErrorAnimation();
+    void runProgramDoneAnimation();
     void scanSlots();
     bool buildProgram(CommandPacket &packet, bool &isEmpty);
     bool sendProgram(const CommandPacket &packet);

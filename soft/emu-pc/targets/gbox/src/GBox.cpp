@@ -517,6 +517,32 @@ void GBox::runRfErrorAnimation()
     delayMs(3000);
 }
 
+void GBox::runProgramDoneAnimation()
+{
+    setLedRailEnabled(true);
+    delayMs(50);
+
+    /* Two green pulses, then hold: the car finished the batch it was given.
+     * Unlike the acknowledgement, this is the real end of the program */
+    for (int pulse = 0; pulse < 2; ++pulse) {
+        led_strip_fill(0, 0, 0);
+        for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+            led_strip_set(i, 0, 100, 0);
+        }
+        led_strip_show();
+        delayMs(300);
+        blackoutLeds();
+        delayMs(150);
+    }
+    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+        led_strip_set(i, 0, 100, 0);
+    }
+    led_strip_show();
+    delayMs(1500);
+    blackoutLeds();
+    setLedRailEnabled(false);
+}
+
 void GBox::scanSlots()
 {
     for (const AdsDeviceConfig &device : kAdsDevices) {
