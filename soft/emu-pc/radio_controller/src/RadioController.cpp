@@ -303,7 +303,11 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
         /* An image transfer fails and retries by design, and a log line would
          * take two more packets on the channel that is already the bottleneck,
          * which is what turned one lost answer into a storm of losses */
-        if (static_cast<const uint8_t *>(data)[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+        /* Telemetry is periodic best effort, and a log line per lost sample
+         * would add traffic to the channel that just lost one */
+        const uint8_t tag = static_cast<const uint8_t *>(data)[0];
+        if (tag != static_cast<uint8_t>(PacketTag::Ota) &&
+            tag != static_cast<uint8_t>(PacketTag::Telemetry)) {
             LOGLN(F("RadioController::sendBuffer failed"));
         }
     }
@@ -336,11 +340,7 @@ bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
     TelemetryPacket packet = telemetry;
     packet.tag = static_cast<uint8_t>(PacketTag::Telemetry);
 
-    const bool result = sendBuffer(&packet, sizeof(packet));
-    if (!result) {
-        LOGLN(F("Telemetry send failed"));
-    }
-    return result;
+    return sendBuffer(&packet, sizeof(packet));
 }
 
 void RadioController::decodeCommandPacket(const CommandPacket &packet)
