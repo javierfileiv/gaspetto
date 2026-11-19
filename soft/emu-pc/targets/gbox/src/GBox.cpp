@@ -467,15 +467,15 @@ void GBox::runScanAnimation()
 void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
-    /* Cascade green: LED0 → LED1 → LED2, then hold all solid green. */
-    led_strip_fill(0, 0, 0);
-    for (int i = 0; i < 3; ++i) {
-        led_strip_set(static_cast<uint16_t>(i), 0, 100, 0);
-        led_strip_show();
-        delayMs(150);
+    /* The radio acknowledged the send, not the program: a short green flash is
+     * enough here, and the yellow breath takes over at once while the car
+     * drives. Holding green for seconds hid that breath behind a program
+     * shorter than the hold, and the real verdict is the car's end notice */
+    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+        led_strip_set(i, 0, 100, 0);
     }
-    /* Long enough to read the colour, short enough that the button still works */
-    delayMs(3000);
+    led_strip_show();
+    delayMs(150);
 }
 
 void GBox::runBuildErrorAnimation()
