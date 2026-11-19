@@ -48,6 +48,12 @@ public:
     virtual bool available(uint8_t *pipe_num);
     virtual void read(void *buf, uint8_t len);
     virtual bool write(const void *buf, uint8_t len);
+    /* The bounded send used by RadioController::sendBuffer: startWrite only
+     * loads the payload, txStandBy waits for the acknowledgement */
+    virtual bool startWrite(const void *buf, uint8_t len, const bool multicast);
+    virtual bool txStandBy(uint32_t timeout, bool startTx = 0);
+    virtual void flush_tx(void);
+    virtual void setRetries(uint8_t delay, uint8_t count);
     virtual void setAddressWidth(uint8_t a_width);
     virtual bool isChipConnected(void);
     /* PC emulation specific methods */

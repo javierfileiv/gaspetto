@@ -71,6 +71,10 @@ void RadioController::init()
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
     _radio.setAddressWidth(5);
+    /* Three retransmissions instead of the library's fifteen: a packet the
+     * other side never acknowledges must not cost 22 ms, and the bounded send
+     * in sendBuffer needs MAX_RT to arrive well inside its timeout */
+    _radio.setRetries(2, 3);
     /* Support both EventPacket (2 bytes) and CommandPacket (32 bytes). */
     _radio.setPayloadSize(sizeof(CommandPacket));
     _radio.openWritingPipe(writing_addr);
@@ -231,15 +235,14 @@ void RadioController::processRadio()
         LOGLN(commandIdToString(evt.getPayload()));
         evt.toPacket(packet);
         packet.tag = static_cast<uint8_t>(PacketTag::Event);
-        /* Stop listening. */
-        _radio.stopListening();
-        _radio.write(&packet, sizeof(packet));
+        /* Same bounded path as every other send: the caller reports whether
+         * the other side acknowledged, and a dead chip cannot hold the loop */
+        sendBuffer(&packet, sizeof(packet));
         LOG(F("RadioController::ProcessRadio: Sent EventId:"));
         LOG(eventIdToString(static_cast<EventId>(packet.eventId)));
         LOG(F(" CommandId:"));
         LOG(commandIdToString(static_cast<CommandId>(packet.payload)));
         LOGLN(F("."));
-        _radio.startListening();
     }
 }
 
@@ -274,8 +277,20 @@ EventQueue *RadioController::getRadioQueue()
 
 bool RadioController::sendBuffer(const void *data, uint8_t len)
 {
+    /* RF24's write() returns as soon as the payload is loaded, so it reports
+     * success before the acknowledgement can be known. This bounded pair
+     * waits for TX_DS or MAX_RT, which makes the verdict real, and gives up
+     * after the timeout so a chip that never answers cannot hold the loop.
+     *
+     * startWrite()'s return value is ignored on purpose: it reports bit 0 of
+     * the STATUS register, which is RX_DR, not the TX FIFO's full flag, so a
+     * telemetry packet waiting in the RX FIFO made it look like a failed load
+     * and the send was reported refused while the car had answered */
+    constexpr uint32_t TX_TIMEOUT_MS = 10;
+
     _radio.stopListening();
-    const bool result = _radio.write(data, len);
+    _radio.startWrite(data, len, false);
+    const bool result = _radio.txStandBy(TX_TIMEOUT_MS, true);
     _radio.startListening();
 
     if (!result) {
