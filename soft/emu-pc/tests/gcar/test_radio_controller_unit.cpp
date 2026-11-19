@@ -203,7 +203,10 @@ TEST_F(RadioControllerUnitTest, ProcessRadioReportsAVersionAnswer)
     controller.processRadio();
     const std::string out = testing::internal::GetCapturedStdout();
 
-    EXPECT_NE(out.find("Version build=42"), std::string::npos);
+    const std::string expected = std::string("version build 42 (abc1234), wire protocol v") +
+                                 std::to_string(static_cast<int>(answer.wire));
+
+    EXPECT_NE(out.find(expected), std::string::npos);
 }
 
 TEST_F(RadioControllerUnitTest, ProcessRadioReassemblesLogFragments)

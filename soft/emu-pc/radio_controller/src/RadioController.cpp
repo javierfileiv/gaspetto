@@ -196,8 +196,12 @@ void RadioController::processRadio()
         case PacketTag::Version: {
             VersionPacket version;
             std::memcpy(&version, buffer, sizeof(version));
-            LOG(F("Radio RX: Version build="));
-            LOGLN(static_cast<int>(version.build));
+            LOG(F("Radio RX: version build "));
+            LOG(static_cast<int>(version.build));
+            LOG(F(" ("));
+            LOG(version.version);
+            LOG(F("), wire protocol v"));
+            LOGLN(static_cast<int>(version.wire));
             break;
         }
         case PacketTag::ProgramDone:
