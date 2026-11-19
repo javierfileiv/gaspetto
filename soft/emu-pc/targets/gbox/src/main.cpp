@@ -43,6 +43,17 @@ Context context = {
 };
 GBox gbox(context);
 
+/* The build stamp is target-independent: the host emulator prints it too */
+void printFirmwareVersion()
+{
+    LOG(F("GBox firmware build "));
+    LOG(FW_VERSION);
+    LOG(F(" ("));
+    LOG(FW_BUILD);
+    LOG(F("), wire protocol v"));
+    LOGLN(static_cast<int>(kWireProtocolVersion));
+}
+
 #ifdef ARDUINO
 namespace
 {
@@ -106,8 +117,11 @@ void handleUsbMaintenanceCommands()
                     commandEqualsIgnoreCase(command, "reboot-dfu")) {
                     LOGLN("Entering STM32 DFU bootloader...");
                     enterDfuBootloader();
+                } else if (commandEqualsIgnoreCase(command, "ver") ||
+                           commandEqualsIgnoreCase(command, "version")) {
+                    printFirmwareVersion();
                 } else if (commandEqualsIgnoreCase(command, "help")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help");
+                    LOGLN("USB commands: dfu, reboot-dfu, help, ver");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -188,7 +202,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help");
+    LOGLN("USB commands: dfu, reboot-dfu, help, ver");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
@@ -198,12 +212,7 @@ void setup()
     gbox.initHardware();
     gbox.runHealthCheck();
 
-    LOG(F("GBox firmware build "));
-    LOG(FW_VERSION);
-    LOG(F(" ("));
-    LOG(FW_BUILD);
-    LOG(F("), wire protocol v"));
-    LOGLN(kWireProtocolVersion);
+    printFirmwareVersion();
     /* Initialize the GBox state machine. */
 #ifndef ARDUINO
     gbox.setLowPowerModeCallback(enter_low_power_mode);
