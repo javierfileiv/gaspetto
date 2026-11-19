@@ -91,6 +91,7 @@ protected:
 
 private:
     void prepareForStop();
+    void serviceProgramAnimation();
     void SystemClock_Config();
     void configurePins();
     void setLedRailEnabled(bool enabled);
@@ -101,6 +102,11 @@ private:
     Context &_ctx;
     std::array<SlotReading, BOX_TOTAL_SLOTS> lastScan;
     bool initialized_;
+    /* True from the moment the program is acknowledged to the car's
+     * ProgramDone notice: the yellow chaser runs meanwhile */
+    bool programRunning_;
+    uint32_t programAnimMs_;
+    uint8_t programAnimStep_;
     unsigned long lastDebounceTime_;
     bool isScanning_;
     static constexpr unsigned long debounceDelay = 50; /* 50ms debounce delay */

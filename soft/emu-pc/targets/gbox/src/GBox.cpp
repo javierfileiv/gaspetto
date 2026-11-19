@@ -165,6 +165,9 @@ GBox::GBox(Context &ctx)
         , _ctx(ctx)
         , lastScan{}
         , initialized_(false)
+        , programRunning_(false)
+        , programAnimMs_(0)
+        , programAnimStep_(0)
         , lastDebounceTime_(0)
         , isScanning_(false)
 {
@@ -196,6 +199,10 @@ void GBox::work()
         _ctx.radioController->processRadio();
     }
 
+    /* The chaser runs from the loop, so the box stays responsive while the
+     * car drives the program */
+    serviceProgramAnimation();
+
     if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
 
@@ -207,8 +214,8 @@ void GBox::work()
 
 void GBox::enterLowPowerMode()
 {
-    prepareForStop();
 #ifdef LOW_POWER_MODE
+    prepareForStop();
 #ifndef ARDUINO
     LOGLN("Entering low-power mode...\n");
     if (lowPowerCallback_) {
@@ -220,6 +227,13 @@ void GBox::enterLowPowerMode()
     HAL_ResumeTick();
     restoreFromStop();
 #endif
+#else
+    /* Stop is not implemented yet, so the 5V rail stays up and the button's
+     * LED stays lit; only the pixel chain is cleared. The chaser keeps its
+     * own rail while the car runs the program */
+    if (!programRunning_) {
+        blackoutLeds();
+    }
 #endif
 }
 
@@ -519,6 +533,7 @@ void GBox::runRfErrorAnimation()
 
 void GBox::runProgramDoneAnimation()
 {
+    programRunning_ = false;
     setLedRailEnabled(true);
     delayMs(50);
 
@@ -540,7 +555,6 @@ void GBox::runProgramDoneAnimation()
     led_strip_show();
     delayMs(1500);
     blackoutLeds();
-    setLedRailEnabled(false);
 }
 
 void GBox::scanSlots()
@@ -709,7 +723,31 @@ bool GBox::sendProgram(const CommandPacket &packet)
     LOG(packet.count);
     LOGLN(" commands.");
 
-    return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
+    const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
+
+    programRunning_ = sent;
+    programAnimMs_ = millis();
+    programAnimStep_ = 0;
+    return sent;
+}
+
+void GBox::serviceProgramAnimation()
+{
+    if (!programRunning_) {
+        return;
+    }
+
+    const uint32_t now = millis();
+    if ((now - programAnimMs_) < 400U) {
+        return;
+    }
+    programAnimMs_ = now;
+
+    /* Yellow chaser, one pixel at a time: the car is driving the program */
+    led_strip_fill(0, 0, 0);
+    led_strip_set(programAnimStep_, 255, 180, 0);
+    led_strip_show();
+    programAnimStep_ = static_cast<uint8_t>((programAnimStep_ + 1U) % LED_STRIP_COUNT);
 }
 
 void GBox::prepareForStop()
