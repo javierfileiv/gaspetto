@@ -166,8 +166,6 @@ GBox::GBox(Context &ctx)
         , lastScan{}
         , initialized_(false)
         , programRunning_(false)
-        , programStartMs_(0)
-        , lastTelemetryMs_(0)
         , programAnimMs_(0)
         , programAnimStep_(0)
         , lastDebounceTime_(0)
@@ -467,13 +465,11 @@ void GBox::runScanAnimation()
 void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
-    /* The radio acknowledged the send, not the program: a short green flash is
-     * enough here, and the yellow breath takes over at once while the car
-     * drives. Holding green for seconds hid that breath behind a program
-     * shorter than the hold, and the real verdict is the car's end notice */
-    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
-        led_strip_set(i, 0, 100, 0);
-    }
+    /* An acknowledged send says the link works, which is the centre LED's
+     * role: the other two keep their own meaning. A short flash is enough,
+     * and the yellow breath follows at once while the car drives */
+    led_strip_fill(0, 0, 0);
+    led_strip_set(kLedRadio, 0, 100, 0);
     led_strip_show();
     delayMs(150);
 }
@@ -531,11 +527,6 @@ void GBox::runRfErrorAnimation()
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
-}
-
-void GBox::noteTelemetry()
-{
-    lastTelemetryMs_ = millis();
 }
 
 void GBox::runProgramDoneAnimation()
@@ -733,7 +724,6 @@ bool GBox::sendProgram(const CommandPacket &packet)
     const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 
     programRunning_ = sent;
-    programStartMs_ = millis();
     programAnimMs_ = millis();
     programAnimStep_ = 0;
     return sent;
@@ -748,22 +738,10 @@ void GBox::serviceProgramAnimation()
         return;
     }
 
-    /* The car sends telemetry only while it drives: two seconds without one
-     * means the movement is over, even when the end notice was lost */
-    constexpr uint32_t kSilenceTimeoutMs = 2000;
+    /* The breath runs until the car reports the end of the batch: telemetry
+     * pauses between two movements, so its silence says nothing about the
+     * program being over */
     const uint32_t now = millis();
-    uint32_t lastActivity = programStartMs_;
-
-    if (lastTelemetryMs_ > lastActivity) {
-        lastActivity = lastTelemetryMs_;
-    }
-
-    if ((now - lastActivity) > kSilenceTimeoutMs) {
-        programRunning_ = false;
-        blackoutLeds();
-        return;
-    }
-
     if ((now - programAnimMs_) < kStepMs) {
         return;
     }

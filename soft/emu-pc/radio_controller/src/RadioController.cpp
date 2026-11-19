@@ -179,9 +179,6 @@ void RadioController::processRadio()
         case PacketTag::Telemetry: {
             TelemetryPacket telemetry;
             std::memcpy(&telemetry, buffer, sizeof(telemetry));
-            if (telemetryHandler != nullptr) {
-                telemetryHandler();
-            }
             /* Watched, not acted on: the command that hands telemetry to
              * the application is still to be written */
             LOG(F("Radio RX: Telemetry yaw="));
@@ -371,11 +368,6 @@ void RadioController::setQuiet(bool quiet)
     } else {
         _radio.startListening();
     }
-}
-
-void RadioController::setTelemetryHandler(void (*handler)(void))
-{
-    telemetryHandler = handler;
 }
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)

@@ -32,11 +32,6 @@ public:
     bool sendBuffer(const void *data, uint8_t len);
     bool isChipConnected();
 
-    /** setTelemetryHandler(): Install the function called when a telemetry
-     * packet arrives; a box uses it to tell a car that is still driving from
-     * one that stopped without reporting the end */
-    void setTelemetryHandler(void (*handler)(void));
-
     /** setOtaHandler(): Install the receiver of an image transfer
      * @handler: called for every OTA packet; null drops them
      */
@@ -90,7 +85,6 @@ private:
     const char *logPeerPrefix = nullptr;
     bool otaWarningShown = false;
     bool radioQuiet = false;
-    void (*telemetryHandler)(void) = nullptr;
     uint8_t logLine[64];
     uint8_t logLineLen;
 };
