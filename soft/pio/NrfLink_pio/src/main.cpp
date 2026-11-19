@@ -932,6 +932,8 @@ void handleKey(char ch)
 void loop()
 {
     drainRadio();
+    /* Queued log fragments: one per pass, after the received traffic */
+    Log::service();
 
     if (gMode == kModeCar && (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
         gLastTelemetryMs = millis();
