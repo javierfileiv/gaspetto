@@ -36,6 +36,9 @@ constexpr uint32_t kTxTimeoutMs = 10;
 RF24 radio(NRF24_CE, NRF24_CSN);
 
 uint8_t gMode = kModeCar;
+/* Mode to give back after the post-OTA log window, 0 when none is pending */
+uint8_t gPendingMode = 0;
+uint32_t gPendingModeAt = 0;
 uint32_t gLastTelemetryMs = 0;
 uint16_t gTelemetryTick = 0;
 
@@ -140,6 +143,7 @@ static void printAddress(const uint8_t *addr)
 void setMode(uint8_t mode)
 {
     gMode = mode;
+    gPendingMode = 0;
 
     if (gMode == kModeQuiet) {
         /* Leaving RX mode stops the chip from hearing a packet and from
@@ -502,6 +506,9 @@ constexpr uint16_t kOtaTimeoutMs = 5000;
  * record through another erase when the image is complete */
 constexpr uint16_t kOtaBeginAckMs = 6000;
 constexpr uint16_t kOtaEndAckMs = 10000;
+/* The PC keeps the port open after the verdict to read the car's boot lines,
+ * and those ride _box_: stay in the box mode for the same window */
+constexpr uint32_t kPostOtaModeDelayMs = 15000;
 /* A failed write already means the car's FIFO was full and cost two
  * milliseconds of hardware retransmissions. Three tries cover a short backlog
  * and still keep the whole stall under ten milliseconds, which is what the
@@ -641,6 +648,40 @@ bool pollReceiverError(uint8_t &errorCode)
     return false;
 }
 
+/* The OTA entry borrows the box mode to reach the car. This puts the tool back
+ * where the operator left it on every exit path, so a quiet tool stays quiet
+ * and a car emulator resumes its telemetry once the transfer is over */
+class OtaModeGuard {
+public:
+    OtaModeGuard(uint8_t entryMode, bool &carRestarts)
+            : _entryMode(entryMode)
+            , _carRestarts(carRestarts)
+    {
+    }
+
+    ~OtaModeGuard()
+    {
+        if (gMode == _entryMode) {
+            return;
+        }
+
+        /* An accepted image makes the car reset, and its boot lines ride _box_:
+         * stay in the box mode for the window the PC keeps the port open, then
+         * give the operator's mode back from the loop */
+        if (_carRestarts) {
+            gPendingMode = _entryMode;
+            gPendingModeAt = millis();
+            return;
+        }
+
+        setMode(_entryMode);
+    }
+
+private:
+    uint8_t _entryMode;
+    bool &_carRestarts;
+};
+
 void runOtaStream()
 {
     uint8_t header[8];
@@ -653,6 +694,8 @@ void runOtaStream()
     uint16_t seq = 0;
     uint16_t radioRetries = 0;
     uint8_t error = 0;
+    bool carRestarts = false;
+    const OtaModeGuard restoreMode(gMode, carRestarts);
 
     /* A device command leaves on the car pipe, whatever the current mode */
     if (gMode != kModeBox) {
@@ -811,12 +854,15 @@ void runOtaStream()
         }
     }
 
+    carRestarts = ended;
     Serial.println(ended ? F("[ota] image accepted") : F("[ota] end not accepted"));
     Serial.write(ended ? kOtaAck : kOtaNak);
 }
 void runOtaSelfTest()
 {
     uint8_t chunk[sizeof(OtaPacket::data)];
+    bool carRestarts = false;
+    const OtaModeGuard restoreMode(gMode, carRestarts);
 
     if (gMode != kModeBox) {
         setMode(kModeBox);
@@ -869,6 +915,10 @@ void handleKey(char ch)
     if (consumeResetWord(ch)) {
         return;
     }
+
+    /* A key means the operator is driving again: the mode they pick, or the
+     * one they leave in place, wins over a pending post-OTA restore */
+    gPendingMode = 0;
 
     switch (ch) {
     case '1':
@@ -957,6 +1007,16 @@ void loop()
     drainRadio();
     /* Queued log fragments: one per pass, after the received traffic */
     Log::service();
+
+    /* The post-OTA window is over: give the operator's mode back */
+    if (gPendingMode != 0 && (millis() - gPendingModeAt) >= kPostOtaModeDelayMs) {
+        const uint8_t mode = gPendingMode;
+
+        gPendingMode = 0;
+        Serial.print(F("[ota] log window over, back to mode "));
+        Serial.println(mode);
+        setMode(mode);
+    }
 
     if (gMode == kModeCar && (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
         gLastTelemetryMs = millis();
