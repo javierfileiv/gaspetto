@@ -67,8 +67,8 @@ TEST_F(RadioControllerUnitTest, ProcessRadioTransmitsQueuedEvent)
 
     EXPECT_CALL(rf, _available(_)).WillOnce(Return(false));
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(_, Event::packetSize()))
-            .WillOnce(DoAll(Invoke([&evt](const void *buf, uint8_t len) {
+    EXPECT_CALL(rf, _startWrite(_, Event::packetSize(), false))
+            .WillOnce(DoAll(Invoke([&evt](const void *buf, uint8_t len, bool) {
                                 ASSERT_EQ(len, Event::packetSize());
                                 EventPacket expected{};
                                 evt.toPacket(expected);
@@ -76,6 +76,7 @@ TEST_F(RadioControllerUnitTest, ProcessRadioTransmitsQueuedEvent)
                                 EXPECT_EQ(std::memcmp(buf, &expected, len), 0);
                             }),
                             Return(true)));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rf, _startListening());
 
     controller.processRadio();
@@ -167,8 +168,8 @@ TEST_F(RadioControllerUnitTest, ProcessRadioAnswersAVersionRequest)
             }));
 
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(_, sizeof(VersionPacket)))
-            .WillOnce(Invoke([](const void *buf, uint8_t len) {
+    EXPECT_CALL(rf, _startWrite(_, sizeof(VersionPacket), false))
+            .WillOnce(Invoke([](const void *buf, uint8_t len, bool) {
                 VersionPacket answer = {};
                 std::memcpy(&answer, buf, sizeof(answer));
                 EXPECT_EQ(static_cast<uint8_t>(PacketTag::Version), answer.tag);
@@ -177,6 +178,7 @@ TEST_F(RadioControllerUnitTest, ProcessRadioAnswersAVersionRequest)
                 EXPECT_STREQ(FW_BUILD, answer.version);
                 return true;
             }));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rf, _startListening());
 
     controller.processRadio();
@@ -295,7 +297,8 @@ TEST_F(RadioControllerUnitTest, SendBufferReturnsFalseOnWriteFailure)
     uint8_t payload[4] = { 1, 2, 3, 4 };
 
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(payload, sizeof(payload))).WillOnce(Return(false));
+    EXPECT_CALL(rf, _startWrite(payload, sizeof(payload), false)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(false));
     EXPECT_CALL(rf, _startListening());
 
     EXPECT_FALSE(controller.sendBuffer(payload, sizeof(payload)));
@@ -313,8 +316,8 @@ TEST_F(RadioControllerUnitTest, SendTelemetryStaysOnCommandPipeAndStampsTag)
     {
         InSequence seq;
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket)))
-                .WillOnce(Invoke([&stamped](const void *buf, uint8_t len) {
+        EXPECT_CALL(rf, _startWrite(_, sizeof(TelemetryPacket), false))
+                .WillOnce(Invoke([&stamped](const void *buf, uint8_t len, bool) {
                     TelemetryPacket sent{};
                     /* A wrong length leaves stamped false, which fails the
                      * assertion below just as loudly */
@@ -324,6 +327,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetryStaysOnCommandPipeAndStampsTag)
                     }
                     return true;
                 }));
+        EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rf, _startListening());
     }
 
@@ -342,7 +346,8 @@ TEST_F(RadioControllerUnitTest, SendTelemetryFailurePropagatesWithoutPipeSwitch)
     {
         InSequence seq;
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket))).WillOnce(Return(false));
+        EXPECT_CALL(rf, _startWrite(_, sizeof(TelemetryPacket), false)).WillOnce(Return(true));
+        EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(false));
         EXPECT_CALL(rf, _startListening());
     }
 
@@ -355,6 +360,7 @@ TEST_F(RadioControllerUnitTest, InitReturnsEarlyWhenRadioBeginFails)
 
     EXPECT_CALL(rf, _setPALevel(_, _)).Times(0);
     EXPECT_CALL(rf, _setDataRate(_)).Times(0);
+    EXPECT_CALL(rf, _setRetries(_, _)).Times(0);
     EXPECT_CALL(rf, _setAddressWidth(_)).Times(0);
     EXPECT_CALL(rf, _setPayloadSize(_)).Times(0);
     EXPECT_CALL(rf, _openWritingPipe(_)).Times(0);

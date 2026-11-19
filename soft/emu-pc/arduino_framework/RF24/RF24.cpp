@@ -89,6 +89,30 @@ bool RF24::write(const void *, uint8_t)
     return true;
 }
 
+bool RF24::startWrite(const void *, uint8_t, const bool)
+{
+    /* The load always succeeds in the emulation; the acknowledgement is the
+     * part that can fail, so the simulated failure belongs to txStandBy */
+    return true;
+}
+
+bool RF24::txStandBy(uint32_t, bool)
+{
+    if (g_fail_next_transmission) {
+        g_fail_next_transmission = false;
+        return false;
+    }
+    return true;
+}
+
+void RF24::flush_tx(void)
+{
+}
+
+void RF24::setRetries(uint8_t, uint8_t)
+{
+}
+
 void RF24::setAddressWidth(uint8_t width)
 {
     rf24_log("RF24 PC Emulation address width set to " + std::to_string((int)width) + " bytes.");

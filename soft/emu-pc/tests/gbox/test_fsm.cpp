@@ -89,7 +89,9 @@ TEST(GBoxFsmTest, ButtonPressRunsProcessingAndReturnsToIdle)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -108,7 +110,8 @@ TEST(GBoxFsmTest, EmptyBoardStaysIdleWithoutRadioSend)
     gbox_test::injectEmptyBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -128,7 +131,9 @@ TEST(GBoxFsmTest, RadioFailureStillReturnsToIdle)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(false));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(false));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -147,7 +152,8 @@ TEST(GBoxFsmTest, OverflowBoardBuildFailsWithoutRadioSend)
     gbox_test::injectOverflowBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -164,6 +170,7 @@ TEST(GBoxFsmTest, InitHardwareNotTwice)
     EXPECT_CALL(rig.mockRf24, _setPALevel(_, _));
     EXPECT_CALL(rig.mockRf24, _setDataRate(_)).WillOnce(Return(true));
     EXPECT_CALL(rig.mockRf24, _setAddressWidth(_));
+    EXPECT_CALL(rig.mockRf24, _setRetries(2, 3));
     EXPECT_CALL(rig.mockRf24, _setPayloadSize(_));
     EXPECT_CALL(rig.mockRf24, _openWritingPipe(_));
     EXPECT_CALL(rig.mockRf24, _openReadingPipe(_, _));
@@ -242,7 +249,8 @@ TEST(GBoxFsmTest, InjectRawAdcValuesCanProduceInvalidPieces)
     rig.box.injectRawAdcValues(rawValues);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -262,7 +270,8 @@ TEST(GBoxFsmTest, InjectBoardPiecesHandlesUnknownPieceValue)
     rig.box.injectBoardPieces(board);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -291,7 +300,8 @@ TEST(GBoxFsmTest, IdleStateIgnoresNonButtonEvents)
     ASSERT_EQ(rig.box.getCurrentState(), &rig.idleState);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     Event evt{ EventId::ACTION, CommandId::MOTOR_FORWARD };
@@ -308,7 +318,8 @@ TEST(GBoxFsmTest, AdsBeginFailurePathProducesBuildErrorWithoutRadioSend)
     setenv("ADS_BEGIN_FAIL", "1", 1);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -325,7 +336,8 @@ TEST(GBoxFsmTest, NegativeAdsSamplesTriggerRecoveryAndBuildErrorWithoutRadioSend
     ScopedEnvFlag forceNegativeRaw("ADS_FORCE_NEGATIVE_RAW");
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -340,7 +352,8 @@ TEST(GBoxFsmTest, StuckAdsConversionTriggersTimeoutRecoveryAndBuildErrorWithoutR
     ScopedEnvFlag stuckConversion("ADS_CONVERSION_STUCK");
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -362,7 +375,8 @@ TEST(GBoxFsmTest, WorkReadsARadioPacketWithoutAnsweringTelemetry)
     /* Telemetry is watched, not acted on, so receiving it must not send
      * anything back over the channel the car is already using */
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     rig.box.work();

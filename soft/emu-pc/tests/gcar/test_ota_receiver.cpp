@@ -47,8 +47,8 @@ protected:
         std::memset(gRecordSector, 0xFF, sizeof(gRecordSector));
         flashFailureForTest() = false;
         answers.clear();
-        ON_CALL(radio, _write(_, _))
-                .WillByDefault(Invoke([this](const void *buffer, uint8_t length) {
+        ON_CALL(radio, _startWrite(_, _, _))
+                .WillByDefault(Invoke([this](const void *buffer, uint8_t length, bool) {
                     if (length == sizeof(OtaPacket)) {
                         OtaPacket packet{};
                         std::memcpy(&packet, buffer, sizeof(packet));
@@ -56,6 +56,7 @@ protected:
                     }
                     return true;
                 }));
+        ON_CALL(radio, _txStandBy(_, _)).WillByDefault(Return(true));
     }
 
     void TearDown() override
@@ -316,7 +317,8 @@ TEST_F(OtaReceiverTest, AnAnswerIsRetriedThreeTimesWhenTheRadioRefuses)
 {
     const auto image = makeImage();
 
-    EXPECT_CALL(radio, _write(_, _)).Times(3).WillRepeatedly(Return(false));
+    EXPECT_CALL(radio, _startWrite(_, _, _)).Times(3).WillRepeatedly(Return(true));
+    EXPECT_CALL(radio, _txStandBy(_, _)).Times(3).WillRepeatedly(Return(false));
 
     sendBegin(image);
 }
