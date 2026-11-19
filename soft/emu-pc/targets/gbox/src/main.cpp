@@ -129,8 +129,9 @@ void handleUsbMaintenanceCommands()
                 } else if (commandEqualsIgnoreCase(command, "ver") ||
                            commandEqualsIgnoreCase(command, "version")) {
                     printFirmwareVersion();
-                } else if (commandEqualsIgnoreCase(command, "help")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help, ver");
+                } else if (commandEqualsIgnoreCase(command, "help") ||
+                           commandEqualsIgnoreCase(command, "?")) {
+                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, ?");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -221,7 +222,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help, ver");
+    LOGLN("USB commands: dfu, reboot-dfu, help, ver, ?");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
