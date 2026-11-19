@@ -38,6 +38,12 @@ public:
         return true;
     }
 
+    /** Look at the next event without removing it. */
+    const EventT *peek() const
+    {
+        return count_ == 0 ? nullptr : &events_[head_];
+    }
+
     /** Check if the queue is empty. */
     bool IsEmpty() const
     {

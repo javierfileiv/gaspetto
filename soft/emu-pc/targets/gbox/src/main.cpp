@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "EventQueue.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "GBox.h"
 #include "IdleState.h"
 #include "Log.h"
@@ -8,6 +9,7 @@
 #include "RF24.h"
 #include "RadioController.h"
 #include "TimeredEventQueue.h"
+#include "WireVersion.h"
 #include "config_radio.h"
 #include "dfu_bootloader.h"
 #include "pin_definitions.h"
@@ -174,6 +176,13 @@ void setup()
 
     gbox.initHardware();
     gbox.runHealthCheck();
+
+    LOG(F("GBox firmware build "));
+    LOG(FW_VERSION);
+    LOG(F(" ("));
+    LOG(FW_BUILD);
+    LOG(F("), wire protocol v"));
+    LOGLN(kWireProtocolVersion);
     /* Initialize the GBox state machine. */
 #ifndef ARDUINO
     gbox.setLowPowerModeCallback(enter_low_power_mode);

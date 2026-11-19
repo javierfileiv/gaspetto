@@ -27,13 +27,18 @@ void IdleState::processEvent(Event &evt)
             car->transitionTo(StateId::PROCESSING);
             LOGLN(F("Transition to PROCESSING (Move Backward)"));
             break;
+        /* A quarter turn needs more time than a forward burst, and this
+         * duration is only the safety net: the turn stops on its angle, which
+         * the controller's stability check catches well before it */
         case CommandId::MOTOR_TURN_LEFT:
-            car->setMotorTurnInPlace(-90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+            /* Yaw grows counter-clockwise, so a left turn adds 90 degrees to
+             * whatever heading the car has now */
+            car->setMotorTurnBy(90.0f, TURN_MOTOR_SPEED, TURN_MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
             LOGLN(F("Transition to PROCESSING (Turn Left)"));
             break;
         case CommandId::MOTOR_TURN_RIGHT:
-            car->setMotorTurnInPlace(90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+            car->setMotorTurnBy(-90.0f, TURN_MOTOR_SPEED, TURN_MOTOR_TIMEOUT_MS);
             car->transitionTo(StateId::PROCESSING);
             LOGLN(F("Transition to PROCESSING (Turn Right)"));
             break;

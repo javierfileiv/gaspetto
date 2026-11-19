@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
 
@@ -9,6 +10,24 @@
 
 const uint64_t address = 0xdeadbeef11LL;
 float payload = 0.0;
+
+#if defined(NRF_IRQ_PIN)
+/* Written by the pin interrupt and read by processRadio(): the count is one
+ * per IRQ assertion, not one per packet, because the line stays low until
+ * RX_DR is cleared, so a burst already sitting in the FIFO produces a single
+ * falling edge */
+volatile uint32_t irq_edge_count = 0;
+volatile uint32_t irq_last_edge_ms = 0;
+
+/* Free function, not a method: attachInterrupt() takes a plain function
+ * pointer. It only records, because starting an SPI transfer inside an
+ * interrupt would stall the bus the main loop is also using */
+void radio_controller_count_irq_edge()
+{
+    ++irq_edge_count;
+    irq_last_edge_ms = millis();
+}
+#endif
 
 RadioController::RadioController(RF24 &radio, EventQueue *gaspettoQueue,
                                  const uint8_t writing_addr[5], const uint8_t reading_addr[5])
@@ -41,6 +60,14 @@ void RadioController::init()
         LOGLN(F("radio hardware is not responding!!"));
         return;
     }
+#ifdef ARDUINO
+    /* A module can come back from a test with the continuous-carrier bits set,
+     * and it keeps RF_SETUP across MCU resets because its supply never drops.
+     * In that mode the chip answers SPI and transmits a carrier instead of
+     * packets, so the link is silent with no other symptom: leave the mode
+     * explicitly before trusting the radio */
+    _radio.stopConstCarrier();
+#endif
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
     _radio.setAddressWidth(5);
@@ -50,14 +77,27 @@ void RadioController::init()
     _radio.openReadingPipe(1, reading_addr);
     _radio.printDetails();
     _radio.printPrettyDetails();
-#if NFR_IRQ
-    /* Set up interrupt for RX. */
-    pinMode(NRF_IRQ, INPUT);
-    attachInterrupt(digitalPinToInterrupt(NRF_IRQ), ISR, FALLING);
-    radio.maskIRQ(0, 1, 1);
+#if defined(NRF_IRQ_PIN)
+    /* Attach before startListening(): a packet landing in between would have
+     * no interrupt to announce it. The pull-up is set first because
+     * attachInterrupt() keeps the pull it finds, and it holds an unwired pin
+     * high instead of letting it float into phantom edges */
+    irq_edge_count = 0;
+    irq_last_edge_ms = 0;
+    pinMode(NRF_IRQ_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(NRF_IRQ_PIN), radio_controller_count_irq_edge, FALLING);
+    _radio.clearStatusFlags();
+    /* Only RX_DR reaches the pin: with TX_DS unmasked, every log line this
+     * device sends would count as a received packet */
+    _radio.setStatusFlags(RF24_RX_DR);
 #endif
     _radio.powerUp();
     _radio.startListening();
+#ifdef GASPETTO_LOG_OVER_NRF24
+    /* The chip answered begin(), so fragments can be framed and sent from
+     * here on: until this point the log output mirrored onto the console */
+    Log::markNrf24Ready();
+#endif
 }
 
 void RadioController::processRadio()
@@ -67,10 +107,16 @@ void RadioController::processRadio()
 
     /* RX processing. */
     if (_radio.available(&pipe)) {
-        LOG(F("Radio RX: pipe "));
-        LOG(static_cast<int>(pipe));
-        LOGLN();
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
+
+        /* An image transfer is thousands of packets: a log line per packet
+         * would make the receiver deaf while it transmits the line, on the
+         * very channel the transfer is using */
+        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+            LOG(F("Radio RX: pipe "));
+            LOG(static_cast<int>(pipe));
+            LOGLN();
+        }
 
         /* Byte 0 names the packet: a program keeps its command count
          * there (never above 31) and every other kind carries a
@@ -87,6 +133,24 @@ void RadioController::processRadio()
             LOG(F(" "));
             LOG(commandIdToString(static_cast<CommandId>(eventPacket.payload)));
             LOGLN(F("."));
+
+            /* A diagnostic, not an application event: the car reports what its
+             * IRQ pin saw and the state machine never hears about it. The
+             * packet causing this report landed a moment ago, so a wired pin
+             * has already counted at least one falling edge */
+            if (static_cast<EventId>(eventPacket.eventId) == EventId::IRQ_TEST) {
+#if defined(NRF_IRQ_PIN)
+                LOG(F("[irq] A4 falling edges="));
+                LOG(static_cast<int>(irq_edge_count));
+                LOG(F(", last at "));
+                LOG(static_cast<int>(irq_last_edge_ms));
+                LOGLN(F(" ms"));
+#else
+                LOGLN(F("[irq] no IRQ pin on this target"));
+#endif
+                break;
+            }
+
             if (gaspettoQueue == nullptr) {
                 LOGLN(F("Radio RX: app queue unavailable."));
                 break;
@@ -118,6 +182,29 @@ void RadioController::processRadio()
         case PacketTag::Log:
             handleLogFragment(buffer);
             break;
+        case PacketTag::VersionRequest:
+            respondVersion();
+            break;
+        case PacketTag::Version: {
+            VersionPacket version;
+            std::memcpy(&version, buffer, sizeof(version));
+            LOG(F("Radio RX: Version build="));
+            LOGLN(static_cast<int>(version.build));
+            break;
+        }
+        case PacketTag::Ota: {
+            OtaPacket packet;
+            std::memcpy(&packet, buffer, sizeof(packet));
+            if (otaHandler != nullptr) {
+                otaHandler(packet);
+            } else if (!otaWarningShown) {
+                /* One line is enough: a full transfer is thousands of packets
+                 * and a log per packet would flood the radio it is using */
+                otaWarningShown = true;
+                LOGLN(F("Radio RX: OTA packet with no receiver, dropped."));
+            }
+            break;
+        }
         default:
             /* Not a tag: byte 0 is the command count of a program, and a
              * count above the maximum means an unknown tag after all */
@@ -156,6 +243,21 @@ void RadioController::processRadio()
     }
 }
 
+void RadioController::respondVersion()
+{
+    VersionPacket packet = {};
+
+    packet.tag = static_cast<uint8_t>(PacketTag::Version);
+    packet.wire = kWireProtocolVersion;
+    packet.build = static_cast<uint16_t>(FW_VERSION);
+    /* The revision is a short hash, "-dirty" included when the tree was not
+     * clean at build time. The field starts zeroed, so an over-long string is
+     * truncated instead of left unterminated */
+    std::strncpy(packet.version, FW_BUILD, sizeof(packet.version) - 1);
+
+    sendBuffer(&packet, sizeof(packet));
+}
+
 void RadioController::sendEvent(Event evt)
 {
     if (radioQueue.IsFull()) {
@@ -177,7 +279,12 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
     _radio.startListening();
 
     if (!result) {
-        LOGLN(F("RadioController::sendBuffer failed"));
+        /* An image transfer fails and retries by design, and a log line would
+         * take two more packets on the channel that is already the bottleneck,
+         * which is what turned one lost answer into a storm of losses */
+        if (static_cast<const uint8_t *>(data)[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+            LOGLN(F("RadioController::sendBuffer failed"));
+        }
     }
 
     return result;
@@ -186,6 +293,12 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
 bool RadioController::isChipConnected()
 {
     return _radio.isChipConnected();
+}
+
+void RadioController::setOtaHandler(OtaHandler handler)
+{
+    otaHandler = handler;
+    otaWarningShown = false;
 }
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)

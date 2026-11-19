@@ -70,14 +70,17 @@ void MotorControl::setPWMdutyCycle(MotorSide side, PinPerSide pin, uint32_t duty
 
 void MotorControl::stopLeftMotor()
 {
-    analogWrite(motor[LEFT].pin[BWD], 0);
-    analogWrite(motor[LEFT].pin[FWD], 0);
+    /* Both inputs high is the DRV8871 brake. Both low, which is what this used
+     * to write, leaves the motor on freewheel and the car keeps rolling after
+     * a stop command */
+    analogWrite(motor[LEFT].pin[BWD], 255);
+    analogWrite(motor[LEFT].pin[FWD], 255);
 }
 
 void MotorControl::stopRightMotor()
 {
-    analogWrite(motor[RIGHT].pin[BWD], 0);
-    analogWrite(motor[RIGHT].pin[FWD], 0);
+    analogWrite(motor[RIGHT].pin[BWD], 255);
+    analogWrite(motor[RIGHT].pin[FWD], 255);
 }
 
 void MotorControl::stopBothMotors()

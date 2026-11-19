@@ -41,7 +41,7 @@ double g_Ki = 0.0;
 double g_Kd = 0.0;
 PID g_yawPID(&g_yawInput, &g_yawOutput, &g_yawSetpoint, g_Kp, g_Ki, g_Kd, 0); /* DIRECT mode. */
 
-const float TURN_COMPLETION_DEG = 3.0f; /* Stop turn when error within this threshold. */
+const float TURN_COMPLETION_DEG = 5.0f; /* Stop turn when error within this threshold. */
 const unsigned long TURN_TIMEOUT_MS = 7000; /* Force stop turn after this many ms. */
 }
 
@@ -62,6 +62,7 @@ void MovementController::init(uint32_t pwm_freq)
     _imu.zeroYaw();
     _imu.calibrate();
     _motorControl.init(pwm_freq);
+    telemPwmFreq = static_cast<float>(pwm_freq);
 
     /* Configure PID (20 Hz like test implementation). */
     g_yawPID.SetTunings(g_Kp, g_Ki, g_Kd);
@@ -73,13 +74,18 @@ void MovementController::init(uint32_t pwm_freq)
 
 void MovementController::stopBothMotors()
 {
-    _motorControl.setMotorSpeeds(0, 0, false, false);
+    /* stopBothMotors() on the driver brakes; setMotorSpeeds(0, 0) only lets
+     * the wheels coast */
+    _motorControl.stopBothMotors();
     currentState = MovementState::IDLE;
 }
 
 void MovementController::startStraightDriving(float speed, uint32_t duration_ms)
 {
     if (!imuOk) {
+        /* Silent refusal was indistinguishable from a lost command: the board
+         * answered the radio and then did nothing at all */
+        LOGLN(F("MovementController: IMU unavailable, straight drive refused"));
         return;
     }
 
@@ -93,6 +99,8 @@ void MovementController::startStraightDriving(float speed, uint32_t duration_ms)
     g_yawPID.SetMode(1);
 
     straightStartMs = millis();
+    turnLeftPwm = 0;
+    turnStableCount = 0;
 
     /* Initialize timer if set. */
     if (duration_ms > 0) {
@@ -109,6 +117,7 @@ void MovementController::startTurningInPlace(float final_yaw_angle, float speed,
                                              uint32_t duration_ms)
 {
     if (!imuOk) {
+        LOGLN(F("MovementController: IMU unavailable, turn refused"));
         return;
     }
 
@@ -127,6 +136,8 @@ void MovementController::startTurningInPlace(float final_yaw_angle, float speed,
     g_yawPID.SetMode(1);
 
     straightStartMs = millis();
+    turnLeftPwm = 0;
+    turnStableCount = 0;
 
     /* Initialize timer if set. */
     if (duration_ms > 0) {
@@ -137,6 +148,14 @@ void MovementController::startTurningInPlace(float final_yaw_angle, float speed,
         timedMovement = false;
     }
     currentState = MovementState::TURNING_IN_PLACE;
+}
+
+void MovementController::startTurningBy(float delta_yaw, float speed, uint32_t duration_ms)
+{
+    /* Relative on purpose: two left turns must end at +180, not come back to
+     * +90, and the angle covered has to be the same whatever the current
+     * heading. The absolute target only made sense from a known start */
+    startTurningInPlace(_imu.yaw() + delta_yaw, speed, duration_ms);
 }
 
 bool MovementController::isMoving() const
@@ -200,28 +219,44 @@ void MovementController::applyPidOutput()
     int rightPWM = 0;
 
     if (currentState == MovementState::TURNING_IN_PLACE) {
-        static int stableCount = 0;
         const int STABLE_REQUIRED = 3;
 
-        double correctionScale = motorOffsetOutput / 180.0;
-        correctionScale = constrain(correctionScale, -1.0, 1.0);
-
-        int turnPWM = static_cast<int>(safe_fabs(correctionScale) * baseSpeed);
-        if (turnPWM < 20)
-            turnPWM = 20;
-
-        leftPWM = (correctionScale >= 0) ? -turnPWM : turnPWM;
-        rightPWM = -leftPWM;
-
-        if (safe_fabs(pidError) < TURN_COMPLETION_DEG) {
-            stableCount++;
-            if (stableCount >= STABLE_REQUIRED) {
+        /* Once the car is inside the window the stop is committed: it coasts
+         * or brakes through, and resuming the PID from outside would turn a
+         * small overshoot into a hunt */
+        if (turnStableCount > 0 || safe_fabs(pidError) < TURN_COMPLETION_DEG) {
+            turnStableCount++;
+            if (turnStableCount >= STABLE_REQUIRED) {
                 stopMovement();
                 return;
             }
-        } else {
-            stableCount = 0;
+            /* Brake, do not release: at pivot speed the car would glide
+             * straight through the target */
+            _motorControl.stopBothMotors();
+            turnLeftPwm = 0;
+            return;
         }
+
+        /* One steady rate for the whole turn. A duty proportional to the
+         * error saturated from the start and then collapsed onto the floor,
+         * so a quarter turn was a burst followed by a crawl; now the error
+         * only says which way to go */
+        const int turnPWM = static_cast<int>(baseSpeed);
+
+        /* Ramp the duty instead of jumping to it: an instant 34 turns a slow
+         * pivot into a jolt the chassis feels */
+        const int RAMP_STEP = 5; /* Per PID cycle, so the start takes ~350 ms. */
+        int requestedLeft = (motorOffsetOutput >= 0.0) ? -turnPWM : turnPWM;
+        if (requestedLeft > turnLeftPwm + RAMP_STEP) {
+            turnLeftPwm += RAMP_STEP;
+        } else if (requestedLeft < turnLeftPwm - RAMP_STEP) {
+            turnLeftPwm -= RAMP_STEP;
+        } else {
+            turnLeftPwm = requestedLeft;
+        }
+
+        leftPWM = turnLeftPwm;
+        rightPWM = -leftPWM;
     } else {
         /* Straight driving heading correction. */
         float speedScale = baseSpeed / 255.0f;
@@ -260,6 +295,8 @@ void MovementController::applyPidOutput()
 void MovementController::stopMovement()
 {
     timedMovement = false;
+    turnLeftPwm = 0;
+    turnStableCount = 0;
     _motorControl.stopBothMotors();
     currentState = MovementState::IDLE;
 }

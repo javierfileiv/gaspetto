@@ -2,19 +2,23 @@
 #include "Context.h"
 #include "EventQueue.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "GCar.h"
 #include "IMUOrientation.h"
 #include "IdleState.h"
 #include "Log.h"
 #include "MotorControl.h"
 #include "MovementController.h"
+#include "OtaReceiver.h"
 #include "ProcessingState.h"
 #include "RF24.h"
 #include "RadioController.h"
 #include "RadioProtocol.h"
 #include "States.h"
 #include "TimeredEventQueue.h"
+#include "WireVersion.h"
 #include "config_radio.h"
+#include "dfu_bootloader.h"
 
 #include <cstdint>
 
@@ -23,15 +27,15 @@
 extern Event getEmulatedEvent(void);
 #endif
 
-/* const int NRF_IRQ_PIN = PB0; */
 RF24 radio(NRF24_CE, NRF24_CSN);
 EventQueue eventQueue;
 IdleState idleState;
 ProcessingState processingState;
 IMUOrientation imu;
-MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_BWD, MOTOR_RIGHT_FWD);
+MotorControl motorControl(MOTOR_LEFT_BWD, MOTOR_LEFT_FWD, MOTOR_RIGHT_FWD, MOTOR_RIGHT_BWD);
 MovementController carMovementController(motorControl, imu);
 RadioController radioControllerCar(radio, &eventQueue, gbox_pipe_name, gcar_pipe_name);
+OtaReceiver otaReceiver(radioControllerCar);
 
 TimeredEventQueue timeredEventQueue;
 
@@ -40,6 +44,24 @@ Context context = {
     &idleState,  &processingState,       MOTOR_FREQ,
 };
 GCar gcar(context);
+
+/* The radio hands every OTA packet to the receiver; a plain function keeps the
+ * radio controller free of any knowledge of flash or of the car */
+void onOtaPacket(const OtaPacket &packet)
+{
+    /* An image transfer erases a staging sector for about two seconds, and the
+     * loop is blocked while it does: the PID stops but the motors keep their
+     * last duty, so a movement would carry on blind. Stopping here, before the
+     * erase, and dropping the queue keeps the car still for the whole
+     * transfer, which ends with a reset anyway */
+    if (static_cast<OtaKind>(packet.kind) == OtaKind::Begin) {
+        LOGLN(F("OTA: begin, stopping the car"));
+        gcar.stopBothMotors();
+        gcar.clearEventQueue();
+    }
+
+    otaReceiver.handle(packet);
+}
 
 void ISR(void)
 {
@@ -82,18 +104,25 @@ void setup()
 
     /* Initialize the GCar state machine. */
     gcar.setLowPowerModeCallback(enter_low_power_mode);
+    /* The radio delivers a DFU request as an event: the jump itself is a
+     * target concern, so main wires it and the state machine stays generic */
+    gcar.setDfuCallback(enterDfuBootloader);
+    radioControllerCar.setOtaHandler(onOtaPacket);
     LOGLN(F("GCar init begin"));
     gcar.init(StateId::IDLE);
+
+    LOG(F("GCar firmware build "));
+    LOG(FW_VERSION);
+    LOG(F(" ("));
+    LOG(FW_BUILD);
+    LOG(F("), wire protocol v"));
+    LOGLN(kWireProtocolVersion);
     LOGLN(F("GCar init done"));
 
 #ifdef USE_RADIO_CONTROLLER
     /* Set up telemetry callback to send IMU/PID data via radio */
     carMovementController.setTelemetryCallback(
             [](const TelemetryPacket &telemetry) { radioControllerCar.sendTelemetry(telemetry); });
-#ifdef NRF_IRQ
-    /* Set up ISR for NRF IRQ. */
-    attachInterrupt(digitalPinToInterrupt(NRF_IRQ_PIN), ISR, RISING);
-#endif /* NRF_IRQ */
 #else /* USE_RADIO_CONTROLLER */
     timeredEventQueue.scheduleEventDelayed(1000, Event(EventId::ACTION, CommandId::MOTOR_FORWARD));
     timeredEventQueue.scheduleEventDelayed(6000, Event(EventId::ACTION, CommandId::MOTOR_STOP));

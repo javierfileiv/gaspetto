@@ -1,28 +1,185 @@
-/* USB key shell: the help text, character echo and the command
- * dispatcher with its dfu matcher and digit-prefix state */
+/* USB key shell: context prompt, help text, character echo and the command
+ * dispatcher */
+#include "FirmwareVersion.h"
+#include "WireVersion.h"
 #include "dfu_bootloader.h"
 #include "hwtest.h"
 
 #ifdef TEST_ADS1115
-/* The key list, shown at boot and on demand by '?'. One line per concern,
- * commands with their slot prefix spelled out as real examples */
-void printUsbHelp()
+/* The key list, shown on demand by '?'. Short and grouped: the boot only
+ * prints a hint and the prompt, so the console stays readable */
+void shell_print_usb_help()
 {
-    Serial.println("   modes: h = health | c = calibration | s = rerun test | ? = this help");
-    Serial.println("   slots: 5m = live monitor | 5x = frozen monitor: SPACE = clean 3s");
-    Serial.println("          measure, any other key quits");
-    printJigHelp();
-    Serial.println("   pieces: e empty, f forward, L loop, r turn right, l turn left");
-    Serial.println("   rows:  w = reprint analysis and pasteable table");
-    Serial.println("   leds:  l = LED test menu (walk, per-LED channels, animations; q quits)");
-    Serial.println("   flash: type dfu to jump to the bootloader (reflash or power-cycle to exit)");
-    Serial.println("   reset: type reset to reboot the MCU (five letters in a row)");
-    Serial.println("   power:  b = deep sleep (STOP): only the wake button wakes the chip");
-    Serial.println("   radio:  p = scan the 20 slots, build the program and send it to the car");
-    Serial.println(
-        "           green = ACK, amber = empty board, red = refused, RF error = no answer");
-    Serial.println("           t = radio menu: 1 probe, 2 addresses, 3 test send, q quits");
-    Serial.println("   stream: e = listen to _box_ for the car telemetry and logs, key quits");
+    /* Only the keys that mean something here: a health-mode list that offers
+     * the slot monitors is what made the old shell feel ambiguous */
+    if (test_mode == TestMode::Health)
+    {
+        Serial.println("   health mode");
+        Serial.println("   h rerun cycle | c calibration | s health cycle");
+        Serial.println("   e stream | r ping | l leds | t radio | v version");
+        Serial.println("   b deep sleep | D DFU bootloader | R reset | ? help");
+    }
+    else
+    {
+        Serial.println("   calibration mode");
+        Serial.println("   c scan | s scan | h health");
+        Serial.println("   m live monitor | f frozen | k forget | j campaign");
+        Serial.println("   p send the board | e stream | r ping | l leds | t radio");
+        Serial.println("   v version | b deep sleep | D DFU bootloader | R reset | ? help");
+    }
+}
+
+/* The prompt says which context consumes the next key, so a key that changes
+ * meaning inside a menu is never a surprise */
+void shell_print_prompt()
+{
+    const char *mode = (test_mode == TestMode::Health) ? "health" : "calibration";
+
+    if (led_menu_active)
+    {
+        Serial.print(mode);
+        Serial.print("/leds> ");
+    }
+    else if (radio_menu_active)
+    {
+        Serial.print(mode);
+        Serial.print("/radio> ");
+    }
+    else if (jig_active)
+    {
+        Serial.print(mode);
+        Serial.print("/jig> ");
+    }
+    else
+    {
+        Serial.print(mode);
+        Serial.print("> ");
+    }
+}
+
+/* Sliced delay so USB commands keep being polled while a test cycle waits.
+ * Rail settle delays keep the plain delay(): the electrical settling must
+ * not be interrupted */
+void shell_delay_with_usb(uint32_t totalMs)
+{
+    constexpr uint32_t SLICE_MS = 50;
+    uint32_t remaining          = totalMs;
+    while (remaining > 0)
+    {
+        const uint32_t slice = remaining > SLICE_MS ? SLICE_MS : remaining;
+        delay(slice);
+        remaining -= slice;
+        radio_discard_incoming();
+        shell_handle_usb_commands();
+    }
+}
+
+/* Identity of the firmware in flash: the shell runs on the board, so this is
+ * the build that is really there, not the one in the editor */
+static void shell_print_version()
+{
+    Serial.print("   hw-test build ");
+    Serial.print(FW_VERSION);
+    Serial.print(" (");
+    Serial.print(FW_BUILD);
+    Serial.print("), wire protocol v");
+    Serial.println(static_cast<int>(kWireProtocolVersion));
+}
+
+/* Ask for a slot on its own line. One rule instead of a digit prefix: the
+ * command key comes first and the number follows, so there is no syntax to
+ * remember and no stale digits to clear */
+static uint8_t shell_ask_slot(const char *action)
+{
+    constexpr uint32_t ENTRY_TIMEOUT_MS = 10000;
+
+    uint16_t value         = 0;
+    bool any               = false;
+    const uint32_t started = millis();
+
+    Serial.print("   ");
+    Serial.print(action);
+    Serial.print(": slot 1-");
+    Serial.print(static_cast<int>(CALIBRATION_SLOT_COUNT));
+    Serial.print(" (0 cancels) ? ");
+
+    while (millis() - started < ENTRY_TIMEOUT_MS)
+    {
+        if (Serial.available() <= 0)
+        {
+            delay(1);
+            continue;
+        }
+
+        const int incoming = Serial.read();
+
+        if (incoming == '\r')
+        {
+            continue;
+        }
+        if (incoming == '\n')
+        {
+            Serial.println();
+            break;
+        }
+        if (incoming >= '0' && incoming <= '9')
+        {
+            value = static_cast<uint16_t>(value * 10 + (incoming - '0'));
+            any   = true;
+            Serial.print(static_cast<char>(incoming));
+            continue;
+        }
+
+        Serial.println(" [cancelled]");
+        return 0;
+    }
+
+    if (!any || value < 1 || value > CALIBRATION_SLOT_COUNT)
+    {
+        Serial.println("   no slot given");
+        return 0;
+    }
+
+    return static_cast<uint8_t>(value);
+}
+
+/* Mode switch for the h/c keys: both rails down, the calibration stats
+ * cleared on entry, and the sensor rail handed back to the per-read lease */
+void shell_enter_mode(TestMode mode)
+{
+    if (test_mode == mode)
+    {
+        /* Run it now, not through the loop: the prompt is printed when this
+         * returns, so a deferred run would print its output after the prompt */
+        Serial.println("   test already active, running it");
+        if (mode == TestMode::Calibration)
+        {
+            scan_run_piece_calibration();
+        }
+        else
+        {
+            health_run_cycle();
+        }
+        return;
+    }
+
+    test_mode = mode;
+    digitalWrite(PIN_MOSFET_3V3_SENSORS, HIGH);
+    digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
+    if (test_mode == TestMode::Calibration)
+    {
+        ads_reset_calibration_stats();
+        /* The sensor rail goes up per reading now, so entering the mode only
+         * takes it down: holding it up for the whole session is what warmed
+         * the board and shifted every reading by ~370 counts */
+        calibration_rails_on = false;
+        Serial.println("   mode: calibration ('s' scan, 'm' monitor)");
+    }
+    else
+    {
+        calibration_rails_on = false;
+        Serial.println("   mode: health");
+    }
 }
 
 /* Terminal-style echo of typed keys: serial monitors do not echo locally,
@@ -30,7 +187,7 @@ void printUsbHelp()
  * they arrive and build the line under the fingers; SPACE is a command key
  * with no visible glyph so it marks itself; CR is dropped because LF is the
  * line end (the same convention the import parser follows) */
-static void echoTypedKey(int incoming)
+static void shell_echo_typed_key(int incoming)
 {
     if (incoming == '\n')
     {
@@ -48,26 +205,30 @@ static void echoTypedKey(int incoming)
     }
 }
 
-void handleUsbCommands()
+void shell_handle_usb_commands()
 {
-    /* pendingSlot collects a typed slot number that prefixes a slot command
-     * ('5m', '5R'): digits accumulate in a row and the next command key ends
-     * the selection; any other key clears the pending digits */
-    static uint16_t pendingSlot = 0;
-    static bool digitsStarted   = false;
-
     while (Serial.available() > 0)
     {
         const int incoming = Serial.read();
 
-        echoTypedKey(incoming);
+        shell_echo_typed_key(incoming);
 
-        /* While the slot monitor runs, any key is a stop request */
-        if (gMonitorActive)
+        /* While a monitor runs, any key is a stop request, except 'p' inside
+         * the car stream: there it sends the scanned program and the monitor
+         * keeps running. The slot monitors leave 'p' alone */
+        if (monitor_active)
         {
-            gMonitorExit  = true;
-            pendingSlot   = 0;
-            digitsStarted = false;
+            if (car_stream_active && incoming == 'p')
+            {
+                car_stream_send_requested = true;
+                continue;
+            }
+
+            if (incoming != '\n' && incoming != '\r')
+            {
+                Serial.println();
+            }
+            monitor_exit = true;
             /* Drop the rest of the burst: this stop key cuts a command typed
              * while the monitor ran, and the surviving tail would decode as a
              * different command. The operator retypes it once the monitor has
@@ -91,18 +252,19 @@ void handleUsbCommands()
          * while a window already runs: one key, one measure), trailing
          * newlines are harmless, any other key quits with the same burst
          * drain as the live monitor */
-        if (gFreezeActive)
+        if (freeze_active)
         {
             if (incoming == ' ')
             {
-                if (!gFreezeMeasuring)
+                if (!freeze_measuring)
                 {
-                    gFreezeMeasure = true;
+                    freeze_measure = true;
                 }
             }
             else if (incoming != '\r' && incoming != '\n')
             {
-                gFreezeExit = true;
+                Serial.println();
+                freeze_exit = true;
                 int dropped = 0;
                 while (Serial.available() > 0)
                 {
@@ -116,189 +278,159 @@ void handleUsbCommands()
                     Serial.println("]");
                 }
             }
-            pendingSlot   = 0;
-            digitsStarted = false;
-            if (gFreezeExit)
+            if (freeze_exit)
             {
                 break;
             }
             continue;
         }
 
-        if (gLedMenuActive)
+        if (led_menu_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
-                runLedTestKey(static_cast<char>(incoming));
+                Serial.println();
+                leds_run_test_key(static_cast<char>(incoming));
             }
-            pendingSlot   = 0;
-            digitsStarted = false;
+            shell_print_prompt();
             continue;
         }
 
-        if (gRadioMenuActive)
+        if (radio_menu_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
-                runRadioMenuKey(static_cast<char>(incoming));
+                Serial.println();
+                radio_run_menu_key(static_cast<char>(incoming));
             }
-            pendingSlot   = 0;
-            digitsStarted = false;
+            shell_print_prompt();
             continue;
         }
 
         /* Jig mode intercepts its own keys, like the game does: the walk is
          * driven by the polling loop and only the escape hatches are here */
-        if (gJigActive)
+        if (jig_active)
         {
             if (incoming != '\n' && incoming != '\r')
             {
-                runJigKey(static_cast<char>(incoming));
+                Serial.println();
+                jig_run_key(static_cast<char>(incoming));
             }
-            pendingSlot   = 0;
-            digitsStarted = false;
+            shell_print_prompt();
             continue;
         }
 
-        if (incoming >= '0' && incoming <= '9')
+        /* Dangerous actions are uppercase so they never collide with a
+         * single-key command. Lowercase 'r' pings the car: with the old
+         * word matcher it was swallowed as the first letter of "reset" */
+        if (incoming != '\n' && incoming != '\r')
         {
-            pendingSlot   = static_cast<uint16_t>(pendingSlot * 10 + (incoming - '0'));
-            digitsStarted = true;
-            continue;
+            Serial.println();
         }
-
-        /* Typing reset (five letters in a row) reboots the MCU, same
-         * matcher style as dfu above; the letters are consumed only while
-         * the word still matches, any other character breaks the sequence
-         * and is handled normally. NVIC_SystemReset never returns: it goes
-         * through the full boot path (rails, APA106 dark frame, menus) */
-        static const char kResetWord[] = "reset";
-        static uint8_t resetWordSeen   = 0;
-        if (incoming == kResetWord[resetWordSeen])
-        {
-            if (++resetWordSeen == sizeof(kResetWord) - 1U)
-            {
-                resetWordSeen = 0;
-                Serial.println("\n--- MCU RESET ---");
-                delay(50); /* let the line flush before the USB link drops */
-                NVIC_SystemReset();
-            }
-            continue;
-        }
-        resetWordSeen = 0;
-
-        /* Typing dfu (three letters in a row) enters the DFU bootloader.
-         * The letters are consumed only while the word still matches: any
-         * other character breaks the sequence and is handled normally. The
-         * shared enterDfuBootloader() never returns */
-        static const char kDfuWord[] = "dfu";
-        static uint8_t dfuWordSeen   = 0;
-        if (incoming == kDfuWord[dfuWordSeen])
-        {
-            if (++dfuWordSeen == sizeof(kDfuWord) - 1U)
-            {
-                dfuWordSeen = 0;
-                Serial.println("\n--- DFU: reflash or power-cycle to exit ---");
-                enterDfuBootloader();
-            }
-            continue;
-        }
-        dfuWordSeen = 0;
 
         switch (incoming)
         {
         case 'h':
-            enterMode(TestMode::Health);
+            shell_enter_mode(TestMode::Health);
             break;
         case 'c':
-            enterMode(TestMode::Calibration);
+            shell_enter_mode(TestMode::Calibration);
             break;
         case 's':
-            gRunTestRequested = true;
+            if (test_mode == TestMode::Calibration)
+            {
+                scan_run_piece_calibration();
+            }
+            else
+            {
+                health_run_cycle();
+            }
             break;
         case '?':
-            Serial.print("mode: ");
-            Serial.println(gMode == TestMode::Health ? "health" : "calibration");
-            printUsbHelp();
+            shell_print_usb_help();
+            break;
+        case 'v':
+            shell_print_version();
             break;
         case 'l':
-            if (gLedMenuActive)
-            {
-                break; /* unreachable: the menu intercepts before the switch */
-            }
-            startLedTestMenu();
+            leds_start_test_menu();
             break;
-
         case 't':
-            if (gRadioMenuActive)
-            {
-                break; /* unreachable: the menu intercepts before the switch */
-            }
-            startRadioMenu();
+            radio_start_menu();
             break;
-
         case 'b':
-            runDeepSleepTest();
+            power_run_deep_sleep_test();
             break;
         case 'p':
-            runSendPiecesTest();
+            radio_run_send_pieces_test();
+            break;
+        case 'r':
+            radio_run_ping();
             break;
         case 'e':
-            runCarStreamTest();
+            radio_run_car_stream_test();
             break;
         case 'j':
-            if (gJigActive)
+            if (test_mode != TestMode::Calibration)
             {
-                stopJigMode();
+                Serial.println("   the jig campaign runs in calibration mode ('c')");
                 break;
             }
-            startJigMode();
+            jig_start_mode();
             break;
-        case 'k':
-            if (gMode != TestMode::Calibration)
+        case 'm': {
+            if (test_mode != TestMode::Calibration)
             {
-                Serial.println("forgetting a slot works in calibration mode ('c' to switch)");
+                Serial.println("   slot monitors work in calibration mode ('c')");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            const uint8_t slot = shell_ask_slot("live monitor");
+            if (slot != 0)
             {
-                Serial.println("prefix the slot number: 19k forgets slot 19");
-                break;
+                scan_run_slot_monitor(static_cast<uint8_t>(slot - 1));
             }
-            forgetJigSlot(static_cast<uint8_t>(pendingSlot - 1));
             break;
-        case 'm':
-            if (gMode != TestMode::Calibration)
+        }
+        case 'f': {
+            if (test_mode != TestMode::Calibration)
             {
-                Serial.println("slot monitor works in calibration mode ('c' to switch)");
+                Serial.println("   slot monitors work in calibration mode ('c')");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            const uint8_t slot = shell_ask_slot("frozen monitor");
+            if (slot != 0)
             {
-                Serial.println("type '<slot>m' e.g. '5m' (monitor slot 5)");
-                break;
+                scan_run_frozen_slot_monitor(static_cast<uint8_t>(slot - 1));
             }
-            runSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
             break;
-        case 'x':
-            if (gMode != TestMode::Calibration)
+        }
+        case 'k': {
+            if (test_mode != TestMode::Calibration)
             {
-                Serial.println("frozen monitor works in calibration mode ('c' to switch)");
+                Serial.println("   forgetting a slot works in calibration mode ('c')");
                 break;
             }
-            if (!digitsStarted || pendingSlot < 1 || pendingSlot > kCalibrationSlotCount)
+            const uint8_t slot = shell_ask_slot("forget");
+            if (slot != 0)
             {
-                Serial.println("type '<slot>x' e.g. '5x' (frozen monitor slot 5)");
-                break;
+                jig_forget_slot(static_cast<uint8_t>(slot - 1));
             }
-            runFrozenSlotMonitor(static_cast<uint8_t>(pendingSlot - 1));
+            break;
+        }
+        case 'D':
+            Serial.println("   DFU: reflash or power-cycle to exit");
+            enterDfuBootloader();
+            break;
+        case 'R':
+            Serial.println("   MCU RESET");
+            delay(50); /* let the line flush before the USB link drops */
+            NVIC_SystemReset();
             break;
         default:
             break;
         }
 
-        digitsStarted = false;
-        pendingSlot   = 0;
+        shell_print_prompt();
     }
 }
 #endif /* TEST_ADS1115 */

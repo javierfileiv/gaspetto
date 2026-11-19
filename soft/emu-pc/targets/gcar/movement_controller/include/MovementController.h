@@ -52,6 +52,14 @@ public:
     void startTurningInPlace(float target_yaw, float speed, uint32_t duration_ms = 0) override;
 
     /**
+     * startTurningBy: turn by a delta from the current heading
+     * @delta_yaw: signed angle in degrees, positive is counter-clockwise
+     * @speed: base speed for turning
+     * @duration_ms: optional duration in milliseconds (0 for unlimited)
+     */
+    void startTurningBy(float delta_yaw, float speed, uint32_t duration_ms = 0) override;
+
+    /**
      * updateMovement: update PID control and motor outputs (call from main loop)
      */
     void updateMovement() override;
@@ -113,7 +121,11 @@ private:
     float telemTargetYaw = 0.0f;
     MovementState currentState = MovementState::IDLE;
     float baseSpeed = 0.0f;
-    float telemPwmFreq = 17.0f;
+    /* Turn state: the signed left PWM is ramped up to avoid a jolt, and the
+     * stable count makes the stop irreversible once the window is reached */
+    int turnLeftPwm = 0;
+    int turnStableCount = 0;
+    float telemPwmFreq = 0.0f; /* Reported value, filled from init() */
     float pidError = 0.0f; /* Current PID error. */
     float trimOffset = 0.0f;
 

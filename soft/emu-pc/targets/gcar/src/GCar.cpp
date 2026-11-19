@@ -18,6 +18,25 @@
 
 class State;
 
+namespace
+{
+/* The commands that have to wait for the movement already running. Everything
+ * else, a stop, a queue clear or the bootloader, is an order that must never
+ * wait, or a program could not be interrupted */
+bool isMovementCommand(CommandId id)
+{
+    switch (id) {
+    case CommandId::MOTOR_FORWARD:
+    case CommandId::MOTOR_BACKWARD:
+    case CommandId::MOTOR_TURN_LEFT:
+    case CommandId::MOTOR_TURN_RIGHT:
+        return true;
+    default:
+        return false;
+    }
+}
+} /* namespace */
+
 GCar::GCar(Context &ctx)
         : CarActiveObject()
         , _ctx(ctx)
@@ -28,15 +47,19 @@ GCar::GCar(Context &ctx)
 
 void GCar::init(StateId initialStateId)
 {
+#ifdef USE_RADIO_CONTROLLER
+    /* The radio comes up before anything that can assert: a halted board
+     * cannot receive the DFU request that would rescue it */
+    LOGLN(F("GCar: init radio controller"));
+    G_ASSERT(_ctx.radioController);
+    _ctx.radioController->init();
+#endif
+
     LOGLN(F("GCar: checking movement controller"));
     G_ASSERT(_ctx.movementController);
     LOGLN(F("GCar: init movement controller"));
     _ctx.movementController->init(_ctx.pwm_freq);
-#ifdef USE_RADIO_CONTROLLER
-    LOGLN(F("GCar: init radio controller"));
-    G_ASSERT(_ctx.radioController);
-    _ctx.radioController->init();
-#else
+#ifndef USE_RADIO_CONTROLLER
     LOGLN(F("GCar: timered event queue mode"));
     G_ASSERT(_ctx.timeredEventQueue);
 #endif
@@ -54,6 +77,11 @@ void GCar::setMotorStraightDrive(float speed, uint32_t timeout_ms)
 void GCar::setMotorTurnInPlace(float final_yaw_angle, float speed, uint32_t timeout_ms)
 {
     _ctx.movementController->startTurningInPlace(final_yaw_angle, speed, timeout_ms);
+}
+
+void GCar::setMotorTurnBy(float delta_yaw, float speed, uint32_t timeout_ms)
+{
+    _ctx.movementController->startTurningBy(delta_yaw, speed, timeout_ms);
 }
 
 void GCar::stopBothMotors(void)
@@ -110,23 +138,56 @@ void GCar::work(void)
     _ctx.movementController->updateMovement();
 
     if (!_ctx.mainEventQueue->IsEmpty()) {
-        Event evt;
+        /* A program is a list of movements, so a queued one has to wait for the
+         * one running. Taking it now would hand it to the state machine, which
+         * refuses it, and that is how a four-command program ran only its
+         * first command. The test is on the state, not on the movement: a
+         * movement that just ended leaves the car in PROCESSING until the end
+         * of this same call, and the next command would be refused there */
+        const Event *next = _ctx.mainEventQueue->peek();
+        const bool held = next != nullptr && next->getEventId() == EventId::ACTION &&
+                          isMovementCommand(next->getPayload()) &&
+                          getCurrentStateId() != StateId::IDLE;
 
-        StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
-        _ctx.mainEventQueue->dequeue(evt);
-        LOG(F("GCar RX: processing "));
-        LOG(eventIdToString(evt.getEventId()));
-        if (evt.getEventId() == EventId::ACTION) {
-            LOG(F(" "));
-            LOG(commandIdToString(evt.getPayload()));
+        if (!held) {
+            Event evt;
+
+            StateType *currentState = states[static_cast<uint8_t>(currentStateIndex)];
+            _ctx.mainEventQueue->dequeue(evt);
+            LOG(F("GCar RX: processing "));
+            LOG(eventIdToString(evt.getEventId()));
+            if (evt.getEventId() == EventId::ACTION) {
+                LOG(F(" "));
+                LOG(commandIdToString(evt.getPayload()));
+            }
+            LOGLN();
+
+            /* A DFU request is a device command, not a state behaviour: it has
+             * to work from IDLE and from PROCESSING alike, so the state machine
+             * never sees it. The motors are stopped first because the boot ROM
+             * leaves the bridge pins exactly as the application left them */
+            if (evt.getEventId() == EventId::DFU_REQUEST) {
+                LOGLN(F("GCar: DFU request, stopping the motors"));
+                stopBothMotors();
+                if (dfuCallback_ != nullptr) {
+                    dfuCallback_();
+                }
+                return;
+            }
+
+            currentState->processEvent(evt);
         }
-        LOGLN();
-        currentState->processEvent(evt);
     }
+
     if (getCurrentStateId() != StateId::IDLE && isTargetReached()) {
         LOGLN(F("Target reached. Transitioning to IDLE state."));
         transitionTo(StateId::IDLE);
     }
+}
+
+void GCar::setDfuCallback(void (*callback)(void))
+{
+    dfuCallback_ = callback;
 }
 
 void GCar::enterLowPowerMode()

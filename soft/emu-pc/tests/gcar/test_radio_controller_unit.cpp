@@ -1,5 +1,6 @@
 #include "CommandPacket.h"
 #include "Events.h"
+#include "FirmwareVersion.h"
 #include "RadioController.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
@@ -20,7 +21,9 @@ using ::testing::StrictMock;
 
 namespace
 {
-constexpr uint8_t kQueueCapacity = 10;
+/* Both queues take their capacity from config_event.h: hardcoding 10 here
+ * broke as soon as QUEUE_SIZE grew to hold a whole program */
+constexpr uint8_t kQueueCapacity = QUEUE_SIZE;
 
 bool same5(const uint8_t *lhs, const uint8_t *rhs)
 {
@@ -149,6 +152,56 @@ TEST_F(RadioControllerUnitTest, ProcessRadioRoutesTaggedTelemetryWithoutQueuing)
     /* Telemetry is watched, never turned into an action event */
     EXPECT_TRUE(appQueue.IsEmpty());
     EXPECT_NE(out.find("Telemetry"), std::string::npos);
+}
+
+TEST_F(RadioControllerUnitTest, ProcessRadioAnswersAVersionRequest)
+{
+    VersionPacket request = {};
+    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+
+    EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _read(_, sizeof(VersionPacket)))
+            .WillOnce(Invoke([&request](void *buf, uint8_t len) {
+                ASSERT_EQ(len, sizeof(VersionPacket));
+                std::memcpy(buf, &request, sizeof(request));
+            }));
+
+    EXPECT_CALL(rf, _stopListening());
+    EXPECT_CALL(rf, _write(_, sizeof(VersionPacket)))
+            .WillOnce(Invoke([](const void *buf, uint8_t len) {
+                VersionPacket answer = {};
+                std::memcpy(&answer, buf, sizeof(answer));
+                EXPECT_EQ(static_cast<uint8_t>(PacketTag::Version), answer.tag);
+                EXPECT_EQ(kWireProtocolVersion, answer.wire);
+                EXPECT_EQ(static_cast<uint16_t>(FW_VERSION), answer.build);
+                EXPECT_STREQ(FW_BUILD, answer.version);
+                return true;
+            }));
+    EXPECT_CALL(rf, _startListening());
+
+    controller.processRadio();
+}
+
+TEST_F(RadioControllerUnitTest, ProcessRadioReportsAVersionAnswer)
+{
+    VersionPacket answer = {};
+    answer.tag = static_cast<uint8_t>(PacketTag::Version);
+    answer.wire = kWireProtocolVersion;
+    answer.build = 42;
+    std::strncpy(answer.version, "abc1234", sizeof(answer.version) - 1);
+
+    EXPECT_CALL(rf, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _read(_, sizeof(VersionPacket)))
+            .WillOnce(Invoke([&answer](void *buf, uint8_t len) {
+                ASSERT_EQ(len, sizeof(VersionPacket));
+                std::memcpy(buf, &answer, sizeof(answer));
+            }));
+
+    testing::internal::CaptureStdout();
+    controller.processRadio();
+    const std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("Version build=42"), std::string::npos);
 }
 
 TEST_F(RadioControllerUnitTest, ProcessRadioReassemblesLogFragments)

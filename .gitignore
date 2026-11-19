@@ -1,7 +1,6 @@
 *.lck
 pulseview-NIGHTLY-x86_64-debug.AppImage
 *#auto_saved_files#*
-kicad/**/*autosave*
 soft/emu-pc/build*
 soft/arduino-tests/hall_sensor/SensorData.csv
 soft/arduino-tests/nrf24_rx_tx/rx_tx_tested_WORKING/rx/build
@@ -14,7 +13,6 @@ soft/emu-pc/tests/build-tests
 soft/emu-pc/tests/googletest
 soft/pio/GBox_pio/.pio/
 soft/pio/arduino_straight_drive/tools/capture.csv
-kicad/prototipo-stm32-nrf24l01/**/*.zip
 datasheet/rm-stm32f411xce.pdf
 datasheet/stm32f411ce.pdf
 .venv
@@ -24,3 +22,12 @@ MEDIA/
 # settings) and only ever reflects the machine it was written on
 .vscode/
 *.code-workspace
+#ignore useless kicad files
+kicad/prototipo-stm32-nrf24l01/**/*.zip
+kicad/**/*autosave*
+kicad/**/.history/
+kicad/**/fp-info-cache
+kicad/**/*.lck
+kicad/**/*.kicad_prl
+kicad/**/*-backups/
+kicad/**/*.bak

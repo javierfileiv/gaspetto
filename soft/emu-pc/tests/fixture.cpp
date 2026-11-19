@@ -16,8 +16,10 @@ void enter_low_power_mode(void)
 
 void Fixture::expect_car_init()
 {
-    expect_movement_controller_init();
+    /* GCar initialises the radio first: a halted board must still be able to
+     * receive the DFU request that would rescue it */
     expect_radio_initialization();
+    expect_movement_controller_init();
     EXPECT_CALL(_mock_arduino, SwitchToLowPowerMode);
 }
 
@@ -46,14 +48,14 @@ void Fixture::expect_move_backward(float speed, uint32_t timeout_ms)
     EXPECT_CALL(_mock_movementController, startStraightDriving(-speed, timeout_ms));
 }
 
-void Fixture::expect_turn_left(float target_yaw, float speed, uint32_t timeout_ms)
+void Fixture::expect_turn_left(float delta_yaw, float speed, uint32_t timeout_ms)
 {
-    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
+    EXPECT_CALL(_mock_movementController, startTurningBy(delta_yaw, speed, timeout_ms));
 }
 
-void Fixture::expect_turn_right(float target_yaw, float speed, uint32_t timeout_ms)
+void Fixture::expect_turn_right(float delta_yaw, float speed, uint32_t timeout_ms)
 {
-    EXPECT_CALL(_mock_movementController, startTurningInPlace(target_yaw, speed, timeout_ms));
+    EXPECT_CALL(_mock_movementController, startTurningBy(delta_yaw, speed, timeout_ms));
 }
 
 void Fixture::expect_stop_both_motors()

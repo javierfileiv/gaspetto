@@ -22,6 +22,10 @@ public:
     virtual void startTurningInPlace(float final_yaw_angle, float speed,
                                      uint32_t duration_ms = 0) = 0;
 
+    /** @brief Turn by delta_yaw from the current heading, so successive turns
+     * accumulate instead of aiming at the same absolute angle */
+    virtual void startTurningBy(float delta_yaw, float speed, uint32_t duration_ms = 0) = 0;
+
     /** @brief Update PID control loop (call from main loop). */
     virtual void updateMovement() = 0;
 

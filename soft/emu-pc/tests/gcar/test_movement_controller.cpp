@@ -63,7 +63,7 @@ TEST_F(MovementController_CarInit, TurnRightEvent)
     set_exit_low_power_mode();
     expect_process_radio_no_event();
     expect_update_movement();
-    expect_turn_right(90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_turn_right(-90.0f, TURN_MOTOR_SPEED, TURN_MOTOR_TIMEOUT_MS);
     expect_target_not_reached();
     gaspettoCar.work();
     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);
@@ -83,7 +83,7 @@ TEST_F(MovementController_CarInit, TurnLeftEvent)
     set_exit_low_power_mode();
     expect_process_radio_no_event();
     expect_update_movement();
-    expect_turn_left(-90.0f, TURN_MOTOR_SPEED, MOTOR_TIMEOUT_MS);
+    expect_turn_left(90.0f, TURN_MOTOR_SPEED, TURN_MOTOR_TIMEOUT_MS);
     expect_target_not_reached();
     gaspettoCar.work();
     ASSERT_EQ(gaspettoCar.getCurrentState(), &processingState);

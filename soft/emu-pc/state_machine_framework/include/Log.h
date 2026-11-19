@@ -35,6 +35,7 @@ public:
     NrfLogOutput()
             : _radio(nullptr)
             , _lineLen(0)
+            , _ready(false)
     {
         memset(_line, 0, sizeof(_line));
         memset(_logAddress, 0, sizeof(_logAddress));
@@ -48,8 +49,31 @@ public:
         memcpy(_restoreAddress, restoreAddress, sizeof(_restoreAddress));
     }
 
+    /* A fragment can only be framed and transmitted once the chip answered
+     * begin(): before that the SPI clock may still be off, and touching the
+     * registers blocks the board on a status flag that never comes */
+    void markReady()
+    {
+        if (_radio != nullptr) {
+            /* sendPayload() transmits with the no-acknowledge command, and the
+             * chip only accepts it once EN_DYN_ACK is set; the library leaves
+             * the feature register clear, so without this call the payload is
+             * never loaded and the logs disappear without an error */
+            _radio->enableDynamicAck();
+        }
+        _ready = true;
+    }
+
     size_t write(uint8_t b) override
     {
+        /* Boot lines cannot ride a radio that is not up yet, so they go to
+         * the wired console instead of being dropped: losing the first lines
+         * after a reset is exactly when they matter most */
+        if (!_ready) {
+            Serial.write(b);
+            return 1;
+        }
+
         _line[_lineLen++] = static_cast<char>(b);
         if (b == '\n') {
             flushLineFinal();
@@ -106,13 +130,22 @@ private:
 
     void sendPayload(const uint8_t payload[kLogPayloadSize])
     {
+        /* A log line is best effort, so it leaves without acknowledgement.
+         * With auto-ack the chip retransmits fifteen times when nobody drains
+         * the log pipe, about 22 ms, and the caller stalls waiting for an
+         * answer that will not come: on the car that is several control
+         * cycles lost per line. The no-ack transmit goes out once, and the
+         * bounded wait only covers the airtime */
+        constexpr uint32_t kLogTxTimeoutMs = 2;
+
         _radio->stopListening();
         _radio->openWritingPipe(_logAddress);
         /* kLogPayloadSize, not sizeof(payload): the parameter is a pointer
          * inside this function, and sizeof would be 2 on AVR. The chip would
          * then transmit two bytes and pad the rest with zeros, which is what
          * made every log line arrive with its content blank */
-        _radio->write(payload, kLogPayloadSize);
+        _radio->startWrite(payload, kLogPayloadSize, true);
+        _radio->txStandBy(kLogTxTimeoutMs, true);
         _radio->openWritingPipe(_restoreAddress);
         _radio->startListening();
     }
@@ -120,6 +153,7 @@ private:
     RF24 *_radio;
     char _line[32];
     uint8_t _lineLen;
+    bool _ready;
     uint8_t _logAddress[5];
     uint8_t _restoreAddress[5];
 };
@@ -133,6 +167,13 @@ inline NrfLogOutput &output()
 inline void attachNrf24(RF24 &radio, const uint8_t logAddress[5], const uint8_t restoreAddress[5])
 {
     output().attach(radio, logAddress, restoreAddress);
+}
+
+/* The radio is only usable once begin() answered: every firmware that logs
+ * over the air calls this right after its own radio initialisation */
+inline void markNrf24Ready()
+{
+    output().markReady();
 }
 
 #else
@@ -201,6 +242,11 @@ public:
                             const uint8_t restoreAddress[5])
     {
         gaspetto_log::attachNrf24(radio, logAddress, restoreAddress);
+    }
+
+    static void markNrf24Ready()
+    {
+        gaspetto_log::markNrf24Ready();
     }
 #endif
 

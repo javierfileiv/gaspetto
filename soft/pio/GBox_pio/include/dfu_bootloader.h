@@ -1,1 +1,1 @@
-../../../emu-pc/targets/gbox/include/dfu_bootloader.h
+../../../emu-pc/shared_types/include/dfu_bootloader.h

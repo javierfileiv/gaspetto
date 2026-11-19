@@ -4,64 +4,64 @@
 
 #include <FastLED.h>
 
-static CRGB gLeds[kApaPixelCount];
+static CRGB led_pixels[APA_PIXEL_COUNT];
 
 /* Prepare the data pin and send one dark frame. Call it AFTER the 5V
  * rail is up and settled: the APA106 ignores every frame sent while
  * unpowered */
-void ledsBegin()
+void leds_begin()
 {
-    FastLED.addLeds<APA106, PIN_LED_DATA, RGB>(gLeds, kApaPixelCount);
-    FastLED.setBrightness(kApaIntensity);
+    FastLED.addLeds<APA106, PIN_LED_DATA, RGB>(led_pixels, APA_PIXEL_COUNT);
+    FastLED.setBrightness(APA_INTENSITY);
     FastLED.show();
 }
 
 /* Same color on every pixel of the chain */
-static void ledsFill(uint8_t r, uint8_t g, uint8_t b)
+static void leds_fill(uint8_t r, uint8_t g, uint8_t b)
 {
-    fill_solid(gLeds, kApaPixelCount, CRGB(r, g, b));
+    fill_solid(led_pixels, APA_PIXEL_COUNT, CRGB(r, g, b));
 }
 
 /* Point one pixel; arguments in RGB, same as the eye sees them */
-static void ledsSetPixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
+static void leds_set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
 {
-    if (index >= kApaPixelCount)
+    if (index >= APA_PIXEL_COUNT)
     {
         return; /* an out-of-range index is dropped, the buffer cannot overflow */
     }
-    gLeds[index] = CRGB(r, g, b);
+    led_pixels[index] = CRGB(r, g, b);
 }
 
-static void ledsShow()
+static void leds_show()
 {
     FastLED.show();
 }
 
-constexpr uint8_t kLedState = 0;
-constexpr uint8_t kLedRadio = 1;
-constexpr uint8_t kLedBuild = 2;
+constexpr uint8_t LED_STATE = 0;
+constexpr uint8_t LED_RADIO = 1;
+constexpr uint8_t LED_BUILD = 2;
 
 /* Animation pacing: one constant per gesture class so the speed is tuned
  * in one place */
-constexpr uint16_t kScanStepMs     = 300;  /* one pixel move in the scan bounce */
-constexpr uint16_t kCascadeStepMs  = 400;  /* one pixel step of the green cascade */
-constexpr uint16_t kFastBlinkOnMs  = 250;  /* lit half of the error blinks */
-constexpr uint16_t kFastBlinkOffMs = 150;  /* dark half of the error blinks */
-constexpr uint16_t kSlowBlinkOnMs  = 500;  /* lit half of the amber blinks */
-constexpr uint16_t kSlowBlinkOffMs = 250;  /* dark half of the amber blinks */
-constexpr uint16_t kHoldMs         = 2500; /* final state held before blackout */
-constexpr uint16_t kChannelHoldMs  = 2500; /* pure channel check, per color */
-constexpr uint16_t kWalkStepMs     = 800;  /* one lit pixel in the walk */
+constexpr uint16_t SCAN_STEP_MS      = 300;  /* one pixel move in the scan bounce */
+constexpr uint16_t CASCADE_STEP_MS   = 400;  /* one pixel step of the green cascade */
+constexpr uint16_t FAST_BLINK_ON_MS  = 250;  /* lit half of the error blinks */
+constexpr uint16_t FAST_BLINK_OFF_MS = 150;  /* dark half of the error blinks */
+constexpr uint16_t SLOW_BLINK_ON_MS  = 500;  /* lit half of the amber blinks */
+constexpr uint16_t SLOW_BLINK_OFF_MS = 250;  /* dark half of the amber blinks */
+constexpr uint16_t HOLD_MS           = 2500; /* final state held before blackout */
+constexpr uint16_t CHANNEL_HOLD_MS   = 2500; /* pure channel check, per color */
+constexpr uint16_t WALK_STEP_MS      = 800;  /* one lit pixel in the walk */
 
-bool gLedMenuActive = false;
+bool led_menu_active = false;
 
 /* Announces one intended pixel write; an index past the chain length is
  * logged as skipped so an incomplete board still shows the full walk */
-static void logPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
+static void leds_log_pixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     Serial.print("[led] LED");
     Serial.print(led);
-    if (led >= kApaPixelCount)
+    if (led >= APA_PIXEL_COUNT)
     {
         Serial.println(" skipped (out of range)");
         return;
@@ -75,52 +75,52 @@ static void logPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
     Serial.println(')');
 }
 
-void blackoutLeds()
+void leds_blackout()
 {
     Serial.println("[led] blackout");
-    ledsFill(0, 0, 0);
-    ledsShow();
+    leds_fill(0, 0, 0);
+    leds_show();
 }
 
-void setOneLed(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
+void leds_set_one(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
-    logPixel(led, r, g, b);
-    ledsFill(0, 0, 0);
-    ledsSetPixel(led, r, g, b);
-    ledsShow();
+    leds_log_pixel(led, r, g, b);
+    leds_fill(0, 0, 0);
+    leds_set_pixel(led, r, g, b);
+    leds_show();
 }
 
-void setTwoLeds(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
-                uint8_t gB, uint8_t bB)
+void leds_set_two(uint8_t ledA, uint8_t rA, uint8_t gA, uint8_t bA, uint8_t ledB, uint8_t rB,
+                  uint8_t gB, uint8_t bB)
 {
-    logPixel(ledA, rA, gA, bA);
-    logPixel(ledB, rB, gB, bB);
-    ledsFill(0, 0, 0);
-    ledsSetPixel(ledA, rA, gA, bA);
-    ledsSetPixel(ledB, rB, gB, bB);
-    ledsShow();
+    leds_log_pixel(ledA, rA, gA, bA);
+    leds_log_pixel(ledB, rB, gB, bB);
+    leds_fill(0, 0, 0);
+    leds_set_pixel(ledA, rA, gA, bA);
+    leds_set_pixel(ledB, rB, gB, bB);
+    leds_show();
 }
 
 /* One white pixel at a time: the position check after a fresh solder
  * joint. The first dark index names the broken link, and every pixel
  * behind it stays dark too because the chain stops forwarding there */
-void runLedWalkTest()
+void leds_run_walk_test()
 {
     Serial.println("[led] walk test: one white pixel at a time");
-    for (uint16_t i = 0; i < kApaPixelCount; ++i)
+    for (uint16_t i = 0; i < APA_PIXEL_COUNT; ++i)
     {
         Serial.print("[led] walk: pixel ");
         Serial.print(i);
         Serial.println(" alone (white)");
-        ledsFill(0, 0, 0);
-        ledsSetPixel(i, 255, 255, 255);
-        ledsShow();
-        delay(kWalkStepMs);
+        leds_fill(0, 0, 0);
+        leds_set_pixel(i, 255, 255, 255);
+        leds_show();
+        delay(WALK_STEP_MS);
     }
-    blackoutLeds();
+    leds_blackout();
 }
 
-void runScanAnimationTest()
+void leds_run_scan_animation_test()
 {
     /* Mirrors GBox scan: cyan bounce across 3 LEDs, 2 round-trips */
     Serial.println("[led] scan test: cyan bounce, 2 trips");
@@ -128,126 +128,126 @@ void runScanAnimationTest()
     {
         for (int i = 0; i < 3; ++i)
         {
-            setOneLed(static_cast<uint8_t>(i), 0, 80, 80);
-            delay(kScanStepMs);
+            leds_set_one(static_cast<uint8_t>(i), 0, 80, 80);
+            delay(SCAN_STEP_MS);
         }
         for (int i = 1; i >= 0; --i)
         {
-            setOneLed(static_cast<uint8_t>(i), 0, 80, 80);
-            delay(kScanStepMs);
+            leds_set_one(static_cast<uint8_t>(i), 0, 80, 80);
+            delay(SCAN_STEP_MS);
         }
     }
-    blackoutLeds();
+    leds_blackout();
 }
 
-void runSuccessAnimationTest()
+void leds_run_success_animation_test()
 {
     /* Mirrors GBox success: green cascade then hold all green */
     Serial.println("[led] success test: green cascade");
-    ledsFill(0, 0, 0);
+    leds_fill(0, 0, 0);
     for (int i = 0; i < 3; ++i)
     {
-        logPixel(static_cast<uint8_t>(i), 0, 100, 0);
-        ledsSetPixel(static_cast<uint16_t>(i), 0, 100, 0);
-        ledsShow();
-        delay(kCascadeStepMs);
+        leds_log_pixel(static_cast<uint8_t>(i), 0, 100, 0);
+        leds_set_pixel(static_cast<uint16_t>(i), 0, 100, 0);
+        leds_show();
+        delay(CASCADE_STEP_MS);
     }
-    delay(kHoldMs);
-    blackoutLeds();
+    delay(HOLD_MS);
+    leds_blackout();
 }
 
-void runBuildErrorAnimationTest()
+void leds_run_build_error_animation_test()
 {
     /* Mirrors GBox build error: right LED red blink x3 then hold red */
     Serial.println("[led] build error test: red blink x3");
     for (int i = 0; i < 3; ++i)
     {
-        setOneLed(kLedBuild, 150, 0, 0);
-        delay(kFastBlinkOnMs);
-        blackoutLeds();
-        delay(kFastBlinkOffMs);
+        leds_set_one(LED_BUILD, 150, 0, 0);
+        delay(FAST_BLINK_ON_MS);
+        leds_blackout();
+        delay(FAST_BLINK_OFF_MS);
     }
-    setOneLed(kLedBuild, 150, 0, 0);
-    delay(kHoldMs);
-    blackoutLeds();
+    leds_set_one(LED_BUILD, 150, 0, 0);
+    delay(HOLD_MS);
+    leds_blackout();
 }
 
-void runEmptyBoardAnimationTest()
+void leds_run_empty_board_animation_test()
 {
     /* Mirrors GBox empty board: right LED amber blink x2 then hold amber */
     Serial.println("[led] empty board test: amber blink x2");
     for (int i = 0; i < 2; ++i)
     {
-        setOneLed(kLedBuild, 100, 60, 0);
-        delay(kSlowBlinkOnMs);
-        blackoutLeds();
-        delay(kSlowBlinkOffMs);
+        leds_set_one(LED_BUILD, 100, 60, 0);
+        delay(SLOW_BLINK_ON_MS);
+        leds_blackout();
+        delay(SLOW_BLINK_OFF_MS);
     }
-    setOneLed(kLedBuild, 100, 60, 0);
-    delay(kHoldMs);
-    blackoutLeds();
+    leds_set_one(LED_BUILD, 100, 60, 0);
+    delay(HOLD_MS);
+    leds_blackout();
 }
 
-void runRfErrorAnimationTest()
+void leds_run_rf_error_animation_test()
 {
     /* Mirrors GBox RF error: center red blink x3 then left green + center red */
     Serial.println("[led] rf error test: red blink x3, green+red hold");
     for (int i = 0; i < 3; ++i)
     {
-        setOneLed(kLedRadio, 150, 0, 0);
-        delay(kFastBlinkOnMs);
-        blackoutLeds();
-        delay(kFastBlinkOffMs);
+        leds_set_one(LED_RADIO, 150, 0, 0);
+        delay(FAST_BLINK_ON_MS);
+        leds_blackout();
+        delay(FAST_BLINK_OFF_MS);
     }
-    setTwoLeds(kLedState, 0, 80, 0, kLedRadio, 150, 0, 0);
-    delay(kHoldMs);
-    blackoutLeds();
+    leds_set_two(LED_STATE, 0, 80, 0, LED_RADIO, 150, 0, 0);
+    delay(HOLD_MS);
+    leds_blackout();
 }
 
 /* Pure channel check, one channel at a time on the given LED, long
  * enough to read by eye. The wire order lives in the addLeds template
- * call in ledsBegin (RGB, measured on this batch), so a swap here means
+ * call in leds_begin (RGB, measured on this batch), so a swap here means
  * that order argument is wrong */
-void runChannelOrderTest(uint8_t led)
+void leds_run_channel_order_test(uint8_t led)
 {
     Serial.print("[led] channel order test: pure R, G, B on LED ");
     Serial.println(led);
     Serial.println("[led] expected: RED now, then GREEN, then BLUE");
-    setOneLed(led, 255, 0, 0);
+    leds_set_one(led, 255, 0, 0);
     Serial.println("[led] -> this must be RED (if not: channel order wrong)");
-    delay(kChannelHoldMs);
-    setOneLed(led, 0, 255, 0);
+    delay(CHANNEL_HOLD_MS);
+    leds_set_one(led, 0, 255, 0);
     Serial.println("[led] -> this must be GREEN");
-    delay(kChannelHoldMs);
-    setOneLed(led, 0, 0, 255);
+    delay(CHANNEL_HOLD_MS);
+    leds_set_one(led, 0, 0, 255);
     Serial.println("[led] -> this must be BLUE");
-    delay(kChannelHoldMs);
-    blackoutLeds();
+    delay(CHANNEL_HOLD_MS);
+    leds_blackout();
 }
 
-void runPowerOnCycleAnimation()
+void leds_run_power_on_cycle_animation()
 {
 #ifdef TEST_LED_CHANNEL_ORDER
     /* Pure channel check first: the only animation that exposes a wrong
      * color order immediately */
-    runChannelOrderTest(kLedState);
+    leds_run_channel_order_test(LED_STATE);
 #endif
-    runScanAnimationTest();
-    runSuccessAnimationTest();
+    leds_run_scan_animation_test();
+    leds_run_success_animation_test();
 }
 
-void runPowerOffCycleAnimation()
+void leds_run_power_off_cycle_animation()
 {
-    runBuildErrorAnimationTest();
-    runEmptyBoardAnimationTest();
-    runRfErrorAnimationTest();
+    leds_run_build_error_animation_test();
+    leds_run_empty_board_animation_test();
+    leds_run_rf_error_animation_test();
 }
 
 /* ==========================================
  * Interactive test menu (key 'l')
  * ========================================== */
 
-static void printLedTestMenu()
+static void leds_print_test_menu()
 {
     Serial.println("   [led menu] 1 walk | 2 ch LED0 | 3 ch LED1 | 4 ch LED2");
     Serial.println("              5 scan | 6 success | 7 build err | 8 empty | 9 rf err");
@@ -257,28 +257,28 @@ static void printLedTestMenu()
 /* The menu runs its tests on demand, so the 5V LED rail must be up no
  * matter which mode opened it (calibration keeps that rail off, and a
  * health cycle may have ended with it off) */
-void startLedTestMenu()
+void leds_start_test_menu()
 {
     Serial.println("--- LED TEST MENU ---");
     digitalWrite(PIN_MOSFET_5V_LEDS, LOW);
     delay(250);
     Serial.println("   5V LED rail ON for the menu duration");
-    gLedMenuActive = true;
-    printLedTestMenu();
+    led_menu_active = true;
+    leds_print_test_menu();
 }
 
 /* Closing gives the board back with the rail off: that is the rest state
  * of both modes (calibration requires it, a health cycle ends with it),
  * and the next 's' powers it again */
-static void stopLedTestMenu()
+static void leds_stop_test_menu()
 {
-    blackoutLeds();
+    leds_blackout();
     digitalWrite(PIN_MOSFET_5V_LEDS, HIGH);
-    gLedMenuActive = false;
+    led_menu_active = false;
     Serial.println("   [led menu closed, 5V rail OFF]");
 }
 
-void runLedTestKey(char key)
+void leds_run_test_key(char key)
 {
     /* Re-arm the rail before every test: a health cycle finishing under
      * the menu would otherwise leave the tests lighting nothing */
@@ -287,45 +287,45 @@ void runLedTestKey(char key)
     switch (key)
     {
     case '1':
-        runLedWalkTest();
+        leds_run_walk_test();
         break;
     case '2':
-        runChannelOrderTest(0);
+        leds_run_channel_order_test(0);
         break;
     case '3':
-        runChannelOrderTest(1);
+        leds_run_channel_order_test(1);
         break;
     case '4':
-        runChannelOrderTest(2);
+        leds_run_channel_order_test(2);
         break;
     case '5':
-        runScanAnimationTest();
+        leds_run_scan_animation_test();
         break;
     case '6':
-        runSuccessAnimationTest();
+        leds_run_success_animation_test();
         break;
     case '7':
-        runBuildErrorAnimationTest();
+        leds_run_build_error_animation_test();
         break;
     case '8':
-        runEmptyBoardAnimationTest();
+        leds_run_empty_board_animation_test();
         break;
     case '9':
-        runRfErrorAnimationTest();
+        leds_run_rf_error_animation_test();
         break;
     case '0':
-        runPowerOnCycleAnimation();
-        runPowerOffCycleAnimation();
+        leds_run_power_on_cycle_animation();
+        leds_run_power_off_cycle_animation();
         break;
     case 'q':
-        stopLedTestMenu();
+        leds_stop_test_menu();
         return;
     default:
         Serial.println("   [led menu] 1-4 = LEDs, 5-9 = animations, 0 = all, q = quit");
         return;
     }
-    if (gLedMenuActive)
+    if (led_menu_active)
     {
-        printLedTestMenu(); /* the tests are chatty: reprint the prompt after them */
+        leds_print_test_menu(); /* the tests are chatty: reprint the prompt after them */
     }
 }
