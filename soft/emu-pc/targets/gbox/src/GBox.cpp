@@ -481,7 +481,8 @@ void GBox::runSuccessAnimation()
         leds_.show();
         delayMs(150);
     }
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 #else
     for (int pulse = 0; pulse < 3; ++pulse) {
         LOG("LED pulse GREEN step (Success animation) ");
@@ -509,7 +510,8 @@ void GBox::runBuildErrorAnimation()
     }
     leds_.setPixelColor(kLedBuild, leds_.Color(150, 0, 0));
     leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 #else
     LOGLN("LED build error: LED2 blinks red (Build error animation).");
     for (int blink = 0; blink < 3; ++blink) {
@@ -538,7 +540,8 @@ void GBox::runEmptyBoardAnimation()
     }
     leds_.setPixelColor(kLedBuild, leds_.Color(100, 60, 0));
     leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 #else
     LOGLN("LED empty board: LED2 blinks amber.");
     for (int blink = 0; blink < 2; ++blink) {
@@ -568,7 +571,8 @@ void GBox::runRfErrorAnimation()
     leds_.setPixelColor(kLedState, leds_.Color(0, 80, 0));
     leds_.setPixelColor(kLedRadio, leds_.Color(150, 0, 0));
     leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 #else
     LOGLN("LED radio error: LED1 blinks red.");
     for (int blink = 0; blink < 3; ++blink) {
