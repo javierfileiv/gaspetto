@@ -62,17 +62,47 @@ public:
         memcpy(_restoreAddress, restoreAddress, sizeof(_restoreAddress));
     }
 
-    /* A fragment can only be framed and transmitted once the chip answered
-     * begin(): before that the SPI clock may still be off, and touching the
-     * registers blocks the board on a status flag that never comes */
     /* Muted: every line goes to the wired console instead of the air. The
      * bench tool uses it for its quiet mode, where the link must not even
      * acknowledge a packet */
     void setMuted(bool muted)
     {
+        if (muted == _muted) {
+            return;
+        }
+
         _muted = muted;
+
+        if (!muted) {
+            return;
+        }
+
+        /* A queued fragment was never printed either: the air replaced the
+         * console. Hand it over now and forget it, so those lines do not
+         * reappear on the air when the link wakes */
+        while (_queueCount > 0) {
+            const uint8_t *payload = _queue[_queueTail];
+
+            Serial.write(&payload[2], payload[1] & 0x7FU);
+            _queueTail = static_cast<uint8_t>((_queueTail + 1U) % kLogQueueFragments);
+            --_queueCount;
+        }
+
+        /* A half line never reached the queue either: print it, close it, and
+         * start the next one clean */
+        if (_lineLen > 0) {
+            Serial.write(reinterpret_cast<const uint8_t *>(_line), _lineLen);
+            Serial.write('\n');
+            _lineLen = 0;
+        }
+
+        _queueHead = 0;
+        _queueTail = 0;
     }
 
+    /* A fragment can only be framed and transmitted once the chip answered
+     * begin(): before that the SPI clock may still be off, and touching the
+     * registers blocks the board on a status flag that never comes */
     void markReady()
     {
         if (_radio != nullptr) {
