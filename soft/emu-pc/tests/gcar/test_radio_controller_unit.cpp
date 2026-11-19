@@ -209,6 +209,23 @@ TEST_F(RadioControllerUnitTest, ProcessRadioReportsAVersionAnswer)
     EXPECT_NE(out.find(expected), std::string::npos);
 }
 
+TEST_F(RadioControllerUnitTest, QuietLeavesTheRadioSilent)
+{
+    uint8_t payload[sizeof(CommandPacket)] = {};
+
+    EXPECT_CALL(rf, _stopListening());
+    controller.setQuiet(true);
+    ASSERT_TRUE(controller.isQuiet());
+
+    /* No SPI traffic at all: nothing is read, nothing is loaded for TX */
+    controller.processRadio();
+    EXPECT_FALSE(controller.sendBuffer(payload, sizeof(payload)));
+
+    EXPECT_CALL(rf, _startListening());
+    controller.setQuiet(false);
+    EXPECT_FALSE(controller.isQuiet());
+}
+
 TEST_F(RadioControllerUnitTest, ProcessRadioReassemblesLogFragments)
 {
     uint8_t first[32] = {};
