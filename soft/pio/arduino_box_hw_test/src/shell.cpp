@@ -113,14 +113,15 @@ static uint8_t shell_ask_slot(const char *action)
 
         const int incoming = Serial.read();
 
-        if (incoming == '\r')
+        if (incoming == '\r' || incoming == '\n')
         {
+            if (any)
+            {
+                Serial.println();
+                break;
+            }
+            /* The line ending that came with the command: nothing typed yet */
             continue;
-        }
-        if (incoming == '\n')
-        {
-            Serial.println();
-            break;
         }
         if (incoming >= '0' && incoming <= '9')
         {
@@ -128,6 +129,16 @@ static uint8_t shell_ask_slot(const char *action)
             any   = true;
             Serial.print(static_cast<char>(incoming));
             continue;
+        }
+
+        /* Any other byte ends the entry once a digit is in: terminals send
+         * Enter as CR, LF, both, or an escape sequence, and the operator
+         * means to submit either way. Without digits it is a real key, so the
+         * prompt cancels and says so */
+        if (any)
+        {
+            Serial.println();
+            break;
         }
 
         Serial.println(" [cancelled]");
