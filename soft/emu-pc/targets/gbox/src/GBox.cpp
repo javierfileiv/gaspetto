@@ -7,6 +7,7 @@
 #include "Events.h"
 #include "PieceProgram.h"
 #include "RadioController.h"
+#include "led_strip.h"
 #include "piece_decode.h"
 #include "pin_definitions.h"
 
@@ -18,7 +19,6 @@
 #include "i2c3_bitbang.h"
 #include "stm32f4xx_hal.h"
 
-#include <Adafruit_NeoPixel.h>
 #endif
 #include <Wire.h>
 
@@ -94,8 +94,7 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
-#ifdef ARDUINO
-/* Expected LED behaviour, three NeoPixels on the strip, left to right:
+/* Expected LED behaviour, three APA106 pixels on the strip, left to right:
  * - boot health check: led 0 (left) lights solid green when every probe passes,
  *   solid red otherwise, holds ~1.5s then goes off
  * - board scan: a cyan dot bounces led 0 -> 1 -> 2 -> back twice, then blackout
@@ -110,7 +109,6 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
 constexpr uint8_t kLedState = 0; /* left   : system / scan state   */
 constexpr uint8_t kLedRadio = 1; /* center : radio status           */
 constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
-#endif
 
 TwoWire &wireForAdsBus(AdsBus bus)
 {
@@ -166,9 +164,6 @@ GBox::GBox(Context &ctx)
         : GenericActiveObject()
         , _ctx(ctx)
         , lastScan{}
-#ifdef ARDUINO
-        , leds_(BOX_LED_COUNT, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
-#endif
         , initialized_(false)
         , lastDebounceTime_(0)
         , isScanning_(false)
@@ -280,11 +275,7 @@ void GBox::initHardware()
     gI2c3.setSDA(I2C3_SDA_PIN);
     gI2c3.begin();
 
-#ifdef ARDUINO
-    leds_.begin();
-    leds_.clear();
-    leds_.show();
-#endif
+    led_strip_begin();
 
     if (_ctx.radioController != nullptr) {
         _ctx.radioController->init();
@@ -346,17 +337,15 @@ bool GBox::runHealthCheck()
 
 void GBox::showHealthStatus(bool ok)
 {
-#ifdef ARDUINO
     if (ok) {
-        leds_.setPixelColor(0, leds_.Color(0, 50, 0)); /* Green. */
+        led_strip_set(0, 0, 50, 0); /* Green. */
     } else {
-        leds_.setPixelColor(0, leds_.Color(50, 0, 0)); /* Red. */
+        led_strip_set(0, 50, 0, 0); /* Red. */
     }
-    leds_.show();
-    delay(1500);
-    leds_.setPixelColor(0, 0);
-    leds_.show();
-#endif
+    led_strip_show();
+    delayMs(1500);
+    led_strip_set(0, 0, 0, 0);
+    led_strip_show();
 }
 
 #ifndef ARDUINO
@@ -426,10 +415,8 @@ void GBox::setLedRailEnabled(bool enabled)
 
 void GBox::blackoutLeds()
 {
-#ifdef ARDUINO
-    leds_.clear();
-    leds_.show();
-#endif
+    led_strip_fill(0, 0, 0);
+    led_strip_show();
     LOGLN("LEDs: blackout.");
 }
 
@@ -443,147 +430,91 @@ void GBox::runScanAnimation()
     setLedRailEnabled(true);
     delayMs(50);
 
-#ifdef ARDUINO
     /* Bouncing cyan on kLedState → kLedRadio → kLedBuild → back, 2 round trips. */
     for (int trip = 0; trip < 2; ++trip) {
         for (int i = 0; i < 3; ++i) {
-            leds_.clear();
-            leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 80, 80));
-            leds_.show();
+            led_strip_fill(0, 0, 0);
+            led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
+            led_strip_show();
             delayMs(120);
         }
         for (int i = 1; i >= 0; --i) {
-            leds_.clear();
-            leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 80, 80));
-            leds_.show();
+            led_strip_fill(0, 0, 0);
+            led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
+            led_strip_show();
             delayMs(120);
         }
     }
     blackoutLeds();
-#else
-    for (std::size_t led = 0; led < BOX_LED_COUNT; ++led) {
-        LOG("LED scanner CYAN led (Scan animation) ");
-        LOG(static_cast<int>(led) + 1);
-        LOGLN();
-        delayMs(15);
-    }
-#endif
 }
 
 void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
-    /* Cascade green: LED0 → LED1 → LED2, then hold all solid green ~1min. */
-    leds_.clear();
+    /* Cascade green: LED0 → LED1 → LED2, then hold all solid green. */
+    led_strip_fill(0, 0, 0);
     for (int i = 0; i < 3; ++i) {
-        leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 100, 0));
-        leds_.show();
+        led_strip_set(static_cast<uint16_t>(i), 0, 100, 0);
+        led_strip_show();
         delayMs(150);
     }
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
-#else
-    for (int pulse = 0; pulse < 3; ++pulse) {
-        LOG("LED pulse GREEN step (Success animation) ");
-        LOG(pulse + 1);
-        LOGLN();
-        delayMs(70);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
 }
 
 void GBox::runBuildErrorAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
     /* kLedBuild (right) blinks red ×3, then holds red on kLedBuild. */
     for (int blink = 0; blink < 3; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedBuild, leds_.Color(150, 0, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedBuild, 150, 0, 0);
+        led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    leds_.setPixelColor(kLedBuild, leds_.Color(150, 0, 0));
-    leds_.show();
+    led_strip_set(kLedBuild, 150, 0, 0);
+    led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
-#else
-    LOGLN("LED build error: LED2 blinks red (Build error animation).");
-    for (int blink = 0; blink < 3; ++blink) {
-        LOG("LED blink RED (build) step (Build error animation) ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(90);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
 }
 
 void GBox::runEmptyBoardAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
     /* kLedBuild (right) blinks amber ×2, then holds amber on kLedBuild. */
     for (int blink = 0; blink < 2; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedBuild, leds_.Color(100, 60, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedBuild, 100, 60, 0);
+        led_strip_show();
         delayMs(200);
         blackoutLeds();
         delayMs(100);
     }
-    leds_.setPixelColor(kLedBuild, leds_.Color(100, 60, 0));
-    leds_.show();
+    led_strip_set(kLedBuild, 100, 60, 0);
+    led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
-#else
-    LOGLN("LED empty board: LED2 blinks amber.");
-    for (int blink = 0; blink < 2; ++blink) {
-        LOG("LED blink AMBER (empty) step ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(200);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
 }
 
 void GBox::runRfErrorAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
     /* kLedRadio (center) blinks red ×3, then holds: kLedState green + kLedRadio red. */
     for (int blink = 0; blink < 3; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedRadio, leds_.Color(150, 0, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedRadio, 150, 0, 0);
+        led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    leds_.setPixelColor(kLedState, leds_.Color(0, 80, 0));
-    leds_.setPixelColor(kLedRadio, leds_.Color(150, 0, 0));
-    leds_.show();
+    led_strip_set(kLedState, 0, 80, 0);
+    led_strip_set(kLedRadio, 150, 0, 0);
+    led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
-#else
-    LOGLN("LED radio error: LED1 blinks red.");
-    for (int blink = 0; blink < 3; ++blink) {
-        LOG("LED blink RED (radio) step ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(90);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
 }
 
 void GBox::scanSlots()

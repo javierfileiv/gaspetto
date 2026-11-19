@@ -30,15 +30,14 @@ extern Event getEmulatedEvent(void);
 
 RF24 radio(NRF24_CE, NRF24_CSN);
 
-#ifdef ARDUINO
 /* Counted in the button interrupt and printed by the loop: Serial is far too
  * slow and blocking to be called from an ISR, but the count still says
- * whether the pin produced an edge nobody asked for */
+ * whether the pin produced an edge nobody asked for. The counters exist on
+ * the host build too, they simply stay at zero there */
 volatile uint32_t button_edges = 0;
 volatile uint32_t button_edge_ms = 0;
 volatile uint8_t button_edge_level = 0;
 volatile bool button_press_seen = false;
-#endif
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
@@ -245,7 +244,6 @@ void setup()
 
 void loop()
 {
-#ifdef ARDUINO
     static uint32_t printed_edges = 0;
     const uint32_t edges = button_edges;
 
@@ -267,7 +265,6 @@ void loop()
         Event evt(EventId::BUTTON_PRESSED);
         gbox.debounceAndEnqueue(evt, millis());
     }
-#endif
     handleUsbMaintenanceCommands();
     gbox.work();
 }
