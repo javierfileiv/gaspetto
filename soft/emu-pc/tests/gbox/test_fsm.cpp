@@ -53,6 +53,21 @@ private:
     const char *name_;
 };
 
+/* The base delayMs() has to stay covered, and running an animation for real
+ * would now cost five seconds: expose the method and call it once */
+class DelayExposingGBox : public GBox {
+public:
+    explicit DelayExposingGBox(Context &ctx)
+            : GBox(ctx)
+    {
+    }
+
+    void callBaseDelay() const
+    {
+        delayMs(1);
+    }
+};
+
 struct BoxTestRig {
     EventQueue eventQueue;
     TimeredEventQueue timeredEventQueue;
@@ -287,10 +302,10 @@ TEST(GBoxFsmTest, BaseDelayPathIsExercisedByConcreteBox)
     IdleState idleState;
     ProcessingState processingState;
     Context ctx{ &eventQueue, &timeredEventQueue, nullptr, &idleState, &processingState };
-    GBox box(ctx);
+    DelayExposingGBox box(ctx);
 
-    /* Uses base delayMs() implementation (no test override). */
-    box.runScanAnimation();
+    /* Uses the base delayMs() implementation (no test override). */
+    box.callBaseDelay();
 }
 
 TEST(GBoxFsmTest, IdleStateIgnoresNonButtonEvents)

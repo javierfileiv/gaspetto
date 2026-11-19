@@ -134,6 +134,10 @@ void GCar::work(void)
     _ctx.timeredEventQueue->process(*this);
 #endif
 
+    if (!_ctx.mainEventQueue->IsEmpty()) {
+        commandsQueued_ = true;
+    }
+
     /* Update movement controller (PID, telemetry) - handles its own timing. */
     _ctx.movementController->updateMovement();
 
@@ -183,11 +187,26 @@ void GCar::work(void)
         LOGLN(F("Target reached. Transitioning to IDLE state."));
         transitionTo(StateId::IDLE);
     }
+
+    /* A batch is over when the queue has drained and the car is back in IDLE.
+     * Report it once: the box can animate the real end, not the transmission */
+    if (commandsQueued_ && _ctx.mainEventQueue->IsEmpty() && getCurrentStateId() == StateId::IDLE) {
+        commandsQueued_ = false;
+        if (programDoneCallback_ != nullptr) {
+            LOGLN(F("GCar: batch finished, reporting it"));
+            programDoneCallback_();
+        }
+    }
 }
 
 void GCar::setDfuCallback(void (*callback)(void))
 {
     dfuCallback_ = callback;
+}
+
+void GCar::setProgramDoneCallback(void (*callback)(void))
+{
+    programDoneCallback_ = callback;
 }
 
 void GCar::enterLowPowerMode()

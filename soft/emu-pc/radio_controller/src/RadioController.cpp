@@ -197,6 +197,14 @@ void RadioController::processRadio()
             LOGLN(static_cast<int>(version.build));
             break;
         }
+        case PacketTag::ProgramDone:
+            /* The car finished the batch it was given: let the application
+             * animate it, it knows what a finished program means */
+            LOGLN(F("Radio RX: program done"));
+            if (programDoneHandler != nullptr) {
+                programDoneHandler();
+            }
+            break;
         case PacketTag::Ota: {
             OtaPacket packet;
             std::memcpy(&packet, buffer, sizeof(packet));
@@ -312,6 +320,11 @@ void RadioController::setOtaHandler(OtaHandler handler)
 {
     otaHandler = handler;
     otaWarningShown = false;
+}
+
+void RadioController::setProgramDoneHandler(ProgramDoneHandler handler)
+{
+    programDoneHandler = handler;
 }
 
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)

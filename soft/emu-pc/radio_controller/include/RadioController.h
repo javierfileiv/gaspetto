@@ -21,6 +21,7 @@ class RF24;
 class RadioController : public Log {
 public:
     using OtaHandler = void (*)(const OtaPacket &packet);
+    using ProgramDoneHandler = void (*)(void);
 
     RadioController(RF24 &radio, EventQueue *gaspettoQueue, const uint8_t writing_addr[5],
                     const uint8_t reading_addr[5]);
@@ -35,6 +36,10 @@ public:
      * @handler: called for every OTA packet; null drops them
      */
     void setOtaHandler(OtaHandler handler);
+
+    /** setProgramDoneHandler(): Install the receiver of the car's end of
+     * program notice; null ignores it */
+    void setProgramDoneHandler(ProgramDoneHandler handler);
 
     /**
      * sendTelemetry(): Send telemetry packet via radio
@@ -63,6 +68,7 @@ private:
     EventQueue radioQueue;
     EventQueue *gaspettoQueue;
     OtaHandler otaHandler = nullptr;
+    ProgramDoneHandler programDoneHandler = nullptr;
     bool otaWarningShown = false;
     uint8_t logLine[64];
     uint8_t logLineLen;

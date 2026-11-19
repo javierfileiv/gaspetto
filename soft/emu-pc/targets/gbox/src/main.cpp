@@ -173,6 +173,13 @@ void handleUsbMaintenanceCommands()
 }
 #endif
 
+/* The car reports the end of a command batch on the radio; the box animates
+ * it here, where the state machine and the LEDs live */
+void onProgramDone()
+{
+    gbox.runProgramDoneAnimation();
+}
+
 /* Arduino-specific function for button interrupt */
 void ISR()
 {
@@ -230,6 +237,7 @@ void setup()
 
     gbox.initHardware();
     gbox.runHealthCheck();
+    radioController.setProgramDoneHandler(onProgramDone);
 
     printFirmwareVersion();
     /* Initialize the GBox state machine. */
