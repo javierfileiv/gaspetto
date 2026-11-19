@@ -23,6 +23,7 @@ import subprocess
 import sys
 import termios
 import time
+import tty
 import zlib
 
 OTA_START = 0x01
@@ -210,6 +211,65 @@ def _show_logs(fd, seconds):
         sys.stdout.flush()
 
 
+def _stay_attached(fd):
+    """Hand the console over to NrfLink once the image is sent.
+
+    The port stays open, so the Uno is not reset again and every key reaches
+    it at once. Opening a second terminal would take the port away from this
+    process, and a serial port is not shared: the two readers would split the
+    bytes between them.
+
+    The terminal is put in cbreak mode so one key is enough, as on the tool's
+    own console. Ctrl-] leaves.
+    """
+    stdin_fd = sys.stdin.fileno()
+    saved = termios.tcgetattr(stdin_fd)
+    tty.setcbreak(stdin_fd)
+    print("[gcar_ota] NrfLink is attached: type its keys, Ctrl-] to leave.", flush=True)
+
+    try:
+        while True:
+            ready, _, _ = select.select([fd, stdin_fd], [], [], 0.2)
+
+            if fd in ready:
+                try:
+                    data = os.read(fd, 256)
+                except BlockingIOError:
+                    data = None
+                if data is not None:
+                    if not data:
+                        print("\n[gcar_ota] The port closed.", flush=True)
+                        return
+                    sys.stdout.write(data.decode(errors="ignore"))
+                    sys.stdout.flush()
+
+            if stdin_fd in ready:
+                try:
+                    typed = os.read(stdin_fd, 256)
+                except BlockingIOError:
+                    continue
+                if not typed:
+                    return
+
+                leaving = b"\x1d" in typed
+                if leaving:
+                    typed = typed.split(b"\x1d", 1)[0]
+
+                if typed:
+                    # The tool does not echo, and the terminal no longer does
+                    # either: show the keys so a silent command is still
+                    # visible
+                    sys.stdout.write("".join(ch for ch in typed.decode(errors="ignore")
+                                             if ch.isprintable()))
+                    sys.stdout.flush()
+                    _write_all(fd, typed)
+
+                if leaving:
+                    return
+    finally:
+        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, saved)
+
+
 def _image_payload(image):
     if len(image) > 16 and image[-8:-5] == b"UFD" and image[-5] == 16:
         return image[:-16]
@@ -328,8 +388,9 @@ def _usage():
     print("usage: gcar_ota.py [--no-build] [--port <port>] [firmware.bin]")
     print("       no option: rebuild the car firmware, then send it over the radio")
     print("       --no-build: send the binary already in the build directory")
-    print("       --logs N: keep listening to the car for N seconds after the end")
-    print(f"                 (default {OTA_LOG_SECONDS:.0f})")
+    print("       --logs N: listen to the car for N seconds and leave, no hand-off")
+    print(f"                 (otherwise {OTA_LOG_SECONDS:.0f} s when not attached to a terminal)")
+    print("       --no-stay: use the default log window instead of handing the console over")
     print(f"       default firmware: {_default_firmware()}")
     print(f"       default port: {NRF_PORT_DEFAULT}")
 
@@ -345,6 +406,7 @@ def _main(argv):
         if index + 1 < len(argv):
             port = argv[index + 1]
 
+    no_stay = "--no-stay" in argv
     log_value = None
     log_seconds = OTA_LOG_SECONDS
     if "--logs" in argv:
@@ -384,10 +446,21 @@ def _main(argv):
         print(f"[gcar_ota] Could not open {port}: {error}")
         return 1
 
+    # A terminal can take the tool over directly, which is what an operator
+    # wants after a flash: no second program, and no port to fight over. An
+    # explicit --logs asks for the timed window instead
+    stay = (not no_stay and "--logs" not in argv and sys.stdin.isatty() and
+            sys.stdout.isatty())
+
     try:
         code = _stream(fd, payload)
-        if log_seconds > 0:
+        if code == 0 and stay:
+            _stay_attached(fd)
+        elif log_seconds > 0:
             _show_logs(fd, log_seconds)
+    except KeyboardInterrupt:
+        print()
+        code = 0
     finally:
         os.close(fd)
 
