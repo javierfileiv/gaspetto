@@ -436,13 +436,13 @@ void GBox::runScanAnimation()
             led_strip_fill(0, 0, 0);
             led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
             led_strip_show();
-            delayMs(120);
+            delayMs(500);
         }
         for (int i = 1; i >= 0; --i) {
             led_strip_fill(0, 0, 0);
             led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
             led_strip_show();
-            delayMs(120);
+            delayMs(500);
         }
     }
     blackoutLeds();
