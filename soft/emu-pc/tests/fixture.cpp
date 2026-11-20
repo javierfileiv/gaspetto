@@ -85,6 +85,7 @@ void Fixture::expect_radio_initialization()
     EXPECT_CALL(_mock_RF24, _setPALevel(PA_LEVEL, true));
     EXPECT_CALL(_mock_RF24, _setDataRate(DATA_RATE)).WillOnce(Return(true));
     EXPECT_CALL(_mock_RF24, _setAddressWidth(5));
+    EXPECT_CALL(_mock_RF24, _setRetries(2, 3));
     /* RadioController now sets payload size to CommandPacket (32 bytes) to support both
      * EventPacket (2 bytes) and CommandPacket (32 bytes) formats. */
     EXPECT_CALL(_mock_RF24, _setPayloadSize(sizeof(CommandPacket)));
@@ -143,12 +144,13 @@ void Fixture::expect_transmit_event(Event evt)
     EventPacket packet;
 
     evt.toPacket(packet);
-    auto do_check = [&packet](const void *buf, size_t len) {
+    auto do_check = [&packet](const void *buf, size_t len, bool) {
         ASSERT_EQ(len, Event::packetSize());
         ASSERT_EQ(memcmp(buf, &packet, Event::packetSize()), 0);
     };
-    EXPECT_CALL(_mock_RF24, _write(NotNull(), Event::packetSize()))
+    EXPECT_CALL(_mock_RF24, _startWrite(NotNull(), Event::packetSize(), false))
             .WillOnce(DoAll(Invoke(do_check), Return(true)));
+    EXPECT_CALL(_mock_RF24, _txStandBy(_, _)).WillOnce(Return(true));
 }
 void Fixture::expect_process_radio_no_event()
 {

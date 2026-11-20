@@ -15,4 +15,5 @@ enum class PacketTag : uint8_t {
     Ota = 0x83,
     VersionRequest = 0x84,
     Version = 0x85,
+    ProgramDone = 0x86,
 };
