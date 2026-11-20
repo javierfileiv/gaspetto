@@ -33,8 +33,12 @@ private:
      * broken, and the window stays well under the five seconds a verdict is
      * shown */
     static constexpr uint32_t kAliveWindowMs = 2500;
+    /* A normal loop calls service() every few milliseconds: a longer gap means
+     * a blocking animation or a scan, not a silent link */
+    static constexpr uint32_t kBlockedGapMs = 500;
 
     State _state = State::Unknown;
     uint32_t _lastPingMs = 0;
     uint32_t _lastAnswerMs = 0;
+    uint32_t _lastServiceMs = 0;
 };
