@@ -531,3 +531,47 @@ TEST(GBoxFsmTest, VersionAnswerTurnsTheMiddlePixelGreen)
 
     microsCounter.store(0);
 }
+
+TEST(GBoxFsmTest, ProgramBlinkStopsAfterTheLostEndNotice)
+{
+    BoxTestRig rig;
+    const CommandPacket packet = forwardProgram();
+
+    expectProgramSend(rig);
+    ASSERT_TRUE(rig.box.sendProgram(packet));
+    ASSERT_TRUE(rig.box.isProgramRunning());
+
+    microsCounter.fetch_add(500U * 1000U);
+    rig.box.serviceAnimation();
+    EXPECT_TRUE(rig.box.isProgramRunning());
+
+    microsCounter.fetch_add(15000U * 1000U);
+    rig.box.serviceAnimation();
+    EXPECT_FALSE(rig.box.isProgramRunning());
+
+    microsCounter.store(0);
+}
+
+TEST(GBoxFsmTest, StatusPanelShowsTheBoardFault)
+{
+    BoxTestRig rig;
+
+    rig.box.setSystemOk(false);
+    microsCounter.fetch_add(200U * 1000U);
+    rig.box.servicePanel();
+
+    microsCounter.store(0);
+}
+
+TEST(GBoxFsmTest, PieceNamesCoverEveryPiece)
+{
+    BoxTestRig rig;
+
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::EMPTY), "EMPTY");
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::FORWARD), "FORWARD");
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::BACKWARD), "BACKWARD");
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::TURN_RIGHT), "TURN_RIGHT");
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::TURN_LEFT), "TURN_LEFT");
+    EXPECT_STREQ(rig.box.pieceName(BoxPieceId::LOOP_CALL), "LOOP_CALL");
+    EXPECT_STREQ(rig.box.pieceName(static_cast<BoxPieceId>(99)), "INVALID");
+}
