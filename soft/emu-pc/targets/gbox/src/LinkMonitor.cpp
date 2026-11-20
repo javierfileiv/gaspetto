@@ -2,6 +2,17 @@
 
 bool LinkMonitor::service(uint32_t nowMs)
 {
+    const uint32_t sinceService = nowMs - _lastServiceMs;
+
+    _lastServiceMs = nowMs;
+
+    /* A blocking animation keeps the loop away for seconds: that is not the
+     * link going quiet. Give the window a fresh start, and let the ping that
+     * is now due decide whether the car is still there */
+    if (sinceService > kBlockedGapMs && _state == State::Alive) {
+        _lastAnswerMs = nowMs;
+    }
+
     /* Unsigned subtraction: the clock wrapping after forty-nine days must not
      * freeze the state */
     if (_state == State::Alive && (nowMs - _lastAnswerMs) >= kAliveWindowMs) {
