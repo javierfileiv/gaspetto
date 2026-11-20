@@ -45,6 +45,20 @@ public:
      * radio, so they can be told apart from this device's own lines */
     void setLogPeerPrefix(const char *prefix);
 
+    /** lastVersionMs(): when the last Version answer arrived, 0 if none yet;
+     * a box uses its age as the witness that the other side is alive */
+    uint32_t lastVersionMs() const
+    {
+        return versionLastMs;
+    }
+
+    /** requestVersionLog(): print the next Version answer even when it is the
+     * build the periodic ping already showed */
+    void requestVersionLog()
+    {
+        versionLogForced = true;
+    }
+
     /** setQuiet(): Leave RX mode and refuse every send, so this device does
      * not disturb another link on the bench; false listens again */
     void setQuiet(bool quiet);
@@ -87,4 +101,9 @@ private:
     bool radioQuiet = false;
     uint8_t logLine[64];
     uint8_t logLineLen;
+    uint32_t versionLastMs = 0;
+    uint16_t versionBuild = 0;
+    uint8_t versionWire = 0;
+    char versionHash[28] = "";
+    bool versionLogForced = false;
 };

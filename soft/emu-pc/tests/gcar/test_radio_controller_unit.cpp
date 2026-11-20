@@ -4,6 +4,7 @@
 #include "RadioController.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
+#include "mock_Arduino.h"
 #include "mock_RF24.h"
 
 #include <array>
@@ -16,6 +17,7 @@ using ::testing::_;
 using ::testing::DoAll;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::StrictMock;
 
@@ -33,6 +35,9 @@ bool same5(const uint8_t *lhs, const uint8_t *rhs)
 class RadioControllerUnitTest : public ::testing::Test {
 protected:
     EventQueue appQueue;
+    /* The version answer stamps millis(): the emulated Arduino routes it
+     * through this singleton, which has to exist for the stamp to work */
+    NiceMock<MockArduino> arduino;
     StrictMock<MockRF24> rf{ 10000000 };
     RadioController controller{ rf, &appQueue, gbox_pipe_name, gcar_pipe_name };
 

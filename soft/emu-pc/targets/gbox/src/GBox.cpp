@@ -7,6 +7,7 @@
 #include "Events.h"
 #include "PieceProgram.h"
 #include "RadioController.h"
+#include "RadioProtocol.h"
 #include "led_strip.h"
 #include "piece_decode.h"
 #include "pin_definitions.h"
@@ -94,6 +95,11 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
+/* The idle panel is repainted at this cadence, and the lost link blinks with
+ * this half-period: slow enough to read, fast enough to notice */
+constexpr uint32_t kStatusPaintMs = 100;
+constexpr uint32_t kLinkBlinkMs = 400;
+
 /* Expected LED behaviour, three APA106 pixels on the strip, bottom to top:
  * - boot health check: the bottom pixel lights solid green when every probe
  *   passes, solid red otherwise, holds ~1.5s then goes off
@@ -174,6 +180,9 @@ GBox::GBox(Context &ctx)
         , programRunning_(false)
         , programAnimMs_(0)
         , programAnimStep_(0)
+        , systemOk_(true)
+        , lastVersionSeenMs_(0)
+        , statusPaintedMs_(0)
         , lastDebounceTime_(0)
         , isScanning_(false)
 {
@@ -205,9 +214,11 @@ void GBox::work()
         _ctx.radioController->processRadio();
     }
 
-    /* The chaser runs from the loop, so the box stays responsive while the
-     * car drives the program */
+    /* The breath and the idle panel run from the loop, so the box stays
+     * responsive while the car drives the program */
     serviceProgramAnimation();
+    serviceLink();
+    serviceStatus();
 
     if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
@@ -347,10 +358,12 @@ bool GBox::runHealthCheck()
 
     LOGLN("--- Check complete ---");
 
+    systemOk_ = allOk;
     showHealthStatus(allOk);
     setSensorRailEnabled(false);
     return allOk;
 #else
+    systemOk_ = true;
     return true;
 #endif
 }
@@ -785,6 +798,69 @@ void GBox::serviceProgramAnimation()
     }
     led_strip_show();
     programAnimStep_ = static_cast<uint8_t>((step + 1U) % kSteps);
+}
+
+void GBox::serviceLink()
+{
+    if (_ctx.radioController == nullptr) {
+        return;
+    }
+
+    const uint32_t now = millis();
+
+    /* RadioController stamps every version answer, including the manual
+     * `car` one: a new stamp is the proof the car is still there, and the
+     * monitor only needs the arrival time, not the request that caused it */
+    const uint32_t answerMs = _ctx.radioController->lastVersionMs();
+    if (answerMs != 0 && answerMs != lastVersionSeenMs_) {
+        lastVersionSeenMs_ = answerMs;
+        linkMonitor_.noteAnswer(answerMs);
+    }
+
+    if (!linkMonitor_.service(now)) {
+        return;
+    }
+
+    VersionPacket request = {};
+
+    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+    _ctx.radioController->sendBuffer(&request, sizeof(request));
+}
+
+void GBox::serviceStatus()
+{
+    /* A running program owns the strip: the yellow breath says more than a
+     * status panel would while the car works */
+    if (programRunning_) {
+        return;
+    }
+
+    const uint32_t now = millis();
+    if ((now - statusPaintedMs_) < kStatusPaintMs) {
+        return;
+    }
+    statusPaintedMs_ = now;
+
+    const bool linkAlive = linkMonitor_.state() == LinkMonitor::State::Alive;
+
+    led_strip_fill(0, 0, 0);
+
+    /* Bottom pixel: the box itself, green after a passing health check */
+    if (systemOk_) {
+        led_strip_set(kLedBox, 0, 60, 0);
+    } else {
+        led_strip_set(kLedBox, 140, 0, 0);
+    }
+
+    /* Middle pixel: the link, steady green while fresh, blinking red once the
+     * car has been silent for too long */
+    if (linkAlive) {
+        led_strip_set(kLedLink, 0, 60, 0);
+    } else if (((now / kLinkBlinkMs) % 2U) == 0U) {
+        led_strip_set(kLedLink, 140, 0, 0);
+    }
+
+    led_strip_show();
 }
 
 void GBox::prepareForStop()

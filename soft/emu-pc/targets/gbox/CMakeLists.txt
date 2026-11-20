@@ -5,7 +5,8 @@ target_include_directories(gbox_itf INTERFACE include)
 target_link_libraries(gbox_itf INTERFACE state_machine_framework_itf shared_types)
 
 add_library(
-  gbox_impl STATIC src/GBox.cpp src/IdleState.cpp src/ProcessingState.cpp src/led_strip.cpp
+  gbox_impl STATIC src/GBox.cpp src/IdleState.cpp src/LinkMonitor.cpp src/ProcessingState.cpp
+                   src/led_strip.cpp
 )
 target_include_directories(gbox_impl PUBLIC include)
 target_link_libraries(

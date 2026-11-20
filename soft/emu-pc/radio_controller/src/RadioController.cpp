@@ -198,12 +198,29 @@ void RadioController::processRadio()
         case PacketTag::Version: {
             VersionPacket version;
             std::memcpy(&version, buffer, sizeof(version));
-            LOG(F("Radio RX: version build "));
-            LOG(static_cast<int>(version.build));
-            LOG(F(" ("));
-            LOG(version.version);
-            LOG(F("), wire protocol v"));
-            LOGLN(static_cast<int>(version.wire));
+            versionLastMs = millis();
+
+            /* A box pings once a second: printing the same identity every time
+             * would flood the console, so only a new one, or an answer the
+             * operator asked for, gets a line */
+            const bool sameIdentity =
+                    version.build == versionBuild && version.wire == versionWire &&
+                    std::strncmp(version.version, versionHash, sizeof(versionHash)) == 0;
+
+            if (versionLogForced || !sameIdentity) {
+                versionBuild = version.build;
+                versionWire = version.wire;
+                std::strncpy(versionHash, version.version, sizeof(versionHash) - 1);
+                versionHash[sizeof(versionHash) - 1] = '\0';
+                versionLogForced = false;
+
+                LOG(F("Radio RX: version build "));
+                LOG(static_cast<int>(version.build));
+                LOG(F(" ("));
+                LOG(version.version);
+                LOG(F("), wire protocol v"));
+                LOGLN(static_cast<int>(version.wire));
+            }
             break;
         }
         case PacketTag::ProgramDone:
@@ -324,7 +341,8 @@ bool RadioController::sendBuffer(const void *data, uint8_t len)
          * would add traffic to the channel that just lost one */
         const uint8_t tag = static_cast<const uint8_t *>(data)[0];
         if (tag != static_cast<uint8_t>(PacketTag::Ota) &&
-            tag != static_cast<uint8_t>(PacketTag::Telemetry)) {
+            tag != static_cast<uint8_t>(PacketTag::Telemetry) &&
+            tag != static_cast<uint8_t>(PacketTag::VersionRequest)) {
             LOGLN(F("RadioController::sendBuffer failed"));
         }
     }

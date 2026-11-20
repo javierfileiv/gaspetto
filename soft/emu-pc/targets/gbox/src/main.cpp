@@ -135,6 +135,7 @@ void handleUsbMaintenanceCommands()
                     VersionPacket request = {};
 
                     request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+                    radioController.requestVersionLog();
                     const bool sent = radioController.sendBuffer(&request, sizeof(request));
 
                     LOGLN(sent ? "car version request ACKed, the answer follows" :
