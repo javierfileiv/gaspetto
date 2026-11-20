@@ -114,13 +114,14 @@ constexpr uint32_t kLinkBlinkMs = 400;
  * the rail keeps the button LED lit
  *
  * The strip is mounted vertically and read as the signal path: the box at the
- * bottom, the radio in the middle, the car at the top. FastLED numbers the
- * chain from its data input, so if the strip is wired the other way round,
- * swapping these three constants is enough for every animation to follow.
+ * bottom, the radio in the middle, the car at the top. The chain's data input
+ * is at the top on this board, so index 0 is the top pixel and index 2 the
+ * bottom one. If the strip is wired the other way round, swapping these three
+ * constants is enough for every animation to follow.
  */
-constexpr uint8_t kLedBox = 0; /* bottom : the box itself        */
+constexpr uint8_t kLedCar = 0; /* top    : the car and its run   */
 constexpr uint8_t kLedLink = 1; /* middle : the radio link        */
-constexpr uint8_t kLedCar = 2; /* top    : the car and its run   */
+constexpr uint8_t kLedBuild = 2; /* bottom : the board and build   */
 
 TwoWire &wireForAdsBus(AdsBus bus)
 {
@@ -371,13 +372,13 @@ bool GBox::runHealthCheck()
 void GBox::showHealthStatus(bool ok)
 {
     if (ok) {
-        led_strip_set(0, 0, 50, 0); /* Green. */
+        led_strip_set(kLedBuild, 0, 50, 0); /* Green. */
     } else {
-        led_strip_set(0, 50, 0, 0); /* Red. */
+        led_strip_set(kLedBuild, 50, 0, 0); /* Red. */
     }
     led_strip_show();
     delayMs(1500);
-    led_strip_set(0, 0, 0, 0);
+    led_strip_set(kLedBuild, 0, 0, 0);
     led_strip_show();
 }
 
@@ -501,13 +502,13 @@ void GBox::runBuildErrorAnimation()
      * box's job, so the failure sits on its own pixel */
     for (int blink = 0; blink < 3; ++blink) {
         led_strip_fill(0, 0, 0);
-        led_strip_set(kLedBox, 150, 0, 0);
+        led_strip_set(kLedBuild, 150, 0, 0);
         led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    led_strip_set(kLedBox, 150, 0, 0);
+    led_strip_set(kLedBuild, 150, 0, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
@@ -520,13 +521,13 @@ void GBox::runEmptyBoardAnimation()
      * board to build from */
     for (int blink = 0; blink < 2; ++blink) {
         led_strip_fill(0, 0, 0);
-        led_strip_set(kLedBox, 100, 60, 0);
+        led_strip_set(kLedBuild, 100, 60, 0);
         led_strip_show();
         delayMs(200);
         blackoutLeds();
         delayMs(100);
     }
-    led_strip_set(kLedBox, 100, 60, 0);
+    led_strip_set(kLedBuild, 100, 60, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
@@ -545,7 +546,7 @@ void GBox::runRfErrorAnimation()
         blackoutLeds();
         delayMs(45);
     }
-    led_strip_set(kLedBox, 0, 80, 0);
+    led_strip_set(kLedBuild, 0, 80, 0);
     led_strip_set(kLedLink, 150, 0, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
@@ -845,11 +846,11 @@ void GBox::serviceStatus()
 
     led_strip_fill(0, 0, 0);
 
-    /* Bottom pixel: the box itself, green after a passing health check */
+    /* Bottom pixel: the board itself, green after a passing health check */
     if (systemOk_) {
-        led_strip_set(kLedBox, 0, 60, 0);
+        led_strip_set(kLedBuild, 0, 60, 0);
     } else {
-        led_strip_set(kLedBox, 140, 0, 0);
+        led_strip_set(kLedBuild, 140, 0, 0);
     }
 
     /* Middle pixel: the link, steady green while fresh, blinking red once the
