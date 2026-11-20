@@ -52,6 +52,13 @@ uint8_t gProgramIndex = 0;
 uint32_t gProgramStartMs = 0;
 bool gProgramActive = false;
 
+/* Car-mode faults: each one removes a single thing the real car does, so the
+ * box can be watched reacting to the failure without unplugging anything */
+bool gNoProgramDone = false;
+bool gNoPingAnswer = false;
+bool gNoAck = false;
+bool gNoChatter = false;
+
 /* Mode to give back after the post-OTA log window, 0 when none is pending */
 uint8_t gPendingMode = 0;
 uint32_t gPendingModeAt = 0;
@@ -173,6 +180,13 @@ void setMode(uint8_t mode)
         gProgramActive = false;
         gProgramCount = 0;
         gProgramIndex = 0;
+
+        /* The ACK injection would break the OTA relay, whose pipe setup this
+         * mode switch is usually preparing */
+        if (gNoAck) {
+            gNoAck = false;
+            radio.setAutoAck(true);
+        }
     }
 
     if (gMode == kModeQuiet) {
@@ -351,6 +365,11 @@ void serviceCarProgram()
 void sendProgramDone()
 {
     constexpr uint8_t kAttempts = 10;
+
+    if (gNoProgramDone) {
+        Serial.println(F("[fault] ProgramDone suppressed"));
+        return;
+    }
     constexpr uint32_t kRetryGapMs = 40;
     uint8_t payload[sizeof(CommandPacket)] = {};
 
@@ -373,6 +392,11 @@ void sendProgramDone()
 void respondVersion()
 {
     VersionPacket answer = {};
+
+    if (gNoPingAnswer) {
+        Serial.println(F("[fault] ping left unanswered"));
+        return;
+    }
 
     answer.tag = static_cast<uint8_t>(PacketTag::Version);
     answer.wire = kWireProtocolVersion;
@@ -623,7 +647,14 @@ void drainRadio()
             memcpy(&cmd, payload, sizeof(cmd));
             displayCommandPacket(cmd);
 
-            queueProgram(cmd);
+            /* With the acknowledge off the box sees its send fail: the car
+             * must look unreachable, not run the program four times as the
+             * sender retransmits */
+            if (gNoAck) {
+                Serial.println(F("[fault] program dropped (ACK OFF)"));
+            } else {
+                queueProgram(cmd);
+            }
         } else if (payload[0] == static_cast<uint8_t>(PacketTag::Telemetry)) {
             TelemetryPacket tlm;
 
@@ -1097,6 +1128,39 @@ void handleKey(char ch)
     case 'v':
         sendVersionRequest();
         break;
+    case 'p':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoProgramDone = !gNoProgramDone;
+        Serial.println(gNoProgramDone ? F("[fault] ProgramDone OFF") : F("[fault] ProgramDone ON"));
+        break;
+    case 'l':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoPingAnswer = !gNoPingAnswer;
+        Serial.println(gNoPingAnswer ?
+                               F("[fault] ping answers OFF, the box should call the link lost") :
+                               F("[fault] ping answers ON"));
+        break;
+    case 'n':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoAck = !gNoAck;
+        radio.setAutoAck(!gNoAck);
+        Serial.println(gNoAck ? F("[fault] ACK OFF, the box's sends will fail") :
+                                F("[fault] ACK ON"));
+        break;
+    case 't':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoChatter = !gNoChatter;
+        Serial.println(gNoChatter ? F("[fault] telemetry and logs OFF") :
+                                    F("[fault] telemetry and logs ON"));
+        break;
     case '?':
     case 'h':
     case 'H':
@@ -1175,13 +1239,14 @@ void loop()
         serviceCarProgram();
     }
 
-    if (gMode == kModeCar && gProgramActive &&
+    if (gMode == kModeCar && gProgramActive && !gNoChatter &&
         (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
         gLastTelemetryMs = millis();
         sendTelemetry();
     }
 
-    if (gMode == kModeCar && gProgramActive && (millis() - gLastLogMs) >= kLogPeriodMs) {
+    if (gMode == kModeCar && gProgramActive && !gNoChatter &&
+        (millis() - gLastLogMs) >= kLogPeriodMs) {
         gLastLogMs = millis();
         sendCarLog();
     }
@@ -1214,6 +1279,11 @@ void printHelp()
     Serial.println(F("  f: ask the car to enter its DFU bootloader (works in any mode)"));
     Serial.println(F("  i: ask the car what its IRQ pin saw on A4 (works in any mode)"));
     Serial.println(F("  v: ping the other device: its build and the round-trip time"));
+    Serial.println(F("\nCar mode faults (mode 1 only):"));
+    Serial.println(F("  p: stop sending ProgramDone"));
+    Serial.println(F("  l: stop answering the box ping"));
+    Serial.println(F("  n: stop acknowledging the box sends"));
+    Serial.println(F("  t: stop telemetry and logs"));
     Serial.println(F("  o: send a dummy OTA image (framing check)"));
     Serial.println(F("  reset: type the five letters in a row to reboot the MCU"));
     Serial.println(F("\nMode 2 keys:"));
