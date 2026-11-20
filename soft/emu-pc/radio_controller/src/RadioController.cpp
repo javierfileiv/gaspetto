@@ -119,14 +119,9 @@ void RadioController::processRadio()
     if (_radio.available(&pipe)) {
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
 
-        /* An image transfer is thousands of packets: a log line per packet
-         * would make the receiver deaf while it transmits the line, on the
-         * very channel the transfer is using */
-        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
-            LOG(F("Radio RX: pipe "));
-            LOG(static_cast<int>(pipe));
-            LOGLN();
-        }
+        /* The pipe is not printed: the packet's own line below says what
+         * arrived, and a periodic answer such as the link ping printed one
+         * bare "pipe 1" per second with nothing to explain it */
 
         /* Byte 0 names the packet: a program keeps its command count
          * there (never above 31) and every other kind carries a
