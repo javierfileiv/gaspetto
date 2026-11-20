@@ -1,3 +1,4 @@
+#include "Arduino.h"
 #include "Context.h"
 #include "GBox.h"
 #include "IdleState.h"
@@ -83,6 +84,12 @@ struct BoxTestRig {
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
+        /* The ADS emulation moves the clock forward by 100 ms per conversion,
+         * and the box pings the car once a second. Start every test from a
+         * known time, or a test that forbids radio traffic would see a ping
+         * left over from the scan of a previous one */
+        microsCounter.store(0);
+
         /* work() reads the radio on every pass, so a silent receiver is the
          * default here. A test that wants a packet declares its own
          * expectation, and gmock gives it precedence over this one */

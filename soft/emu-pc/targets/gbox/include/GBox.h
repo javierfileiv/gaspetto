@@ -5,6 +5,7 @@
 #include "CommandPacket.h"
 #include "Context.h"
 #include "Events.h"
+#include "LinkMonitor.h"
 #include "Log.h"
 #include "States.h"
 
@@ -98,6 +99,8 @@ protected:
 private:
     void prepareForStop();
     void serviceProgramAnimation();
+    void serviceLink();
+    void serviceStatus();
     void SystemClock_Config();
     void configurePins();
     void setLedRailEnabled(bool enabled);
@@ -106,6 +109,7 @@ private:
     const char *pieceToString(BoxPieceId piece) const;
 
     Context &_ctx;
+    LinkMonitor linkMonitor_;
     std::array<SlotReading, BOX_TOTAL_SLOTS> lastScan;
     bool initialized_;
     /* True from the moment the program is acknowledged to the car's
@@ -113,6 +117,10 @@ private:
     bool programRunning_;
     uint32_t programAnimMs_;
     uint8_t programAnimStep_;
+    /* Last health check result, painted on the bottom pixel */
+    bool systemOk_;
+    uint32_t lastVersionSeenMs_;
+    uint32_t statusPaintedMs_;
     unsigned long lastDebounceTime_;
     bool isScanning_;
     static constexpr unsigned long debounceDelay = 50; /* 50ms debounce delay */
