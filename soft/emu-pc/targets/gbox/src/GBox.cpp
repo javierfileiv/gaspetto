@@ -101,6 +101,10 @@ constexpr uint32_t kStatusPaintMs = 100;
 constexpr uint32_t kLinkBlinkMs = 400;
 /* The program's pixel blinks at this half-period while the car runs */
 constexpr uint32_t kProgramBlinkMs = 500;
+/* The car's end notice can be lost: the blink must not run forever. Fifteen
+ * seconds covers a short program; a longer one needs this raised or scaled
+ * with the command count */
+constexpr uint32_t kProgramDoneTimeoutMs = 15000;
 
 /* Expected LED behaviour, three APA106 pixels on the strip, bottom to top:
  * - boot health check: the bottom pixel lights solid green when every probe
@@ -182,6 +186,7 @@ GBox::GBox(Context &ctx)
         , initialized_(false)
         , programRunning_(false)
         , programAnimMs_(0)
+        , programStartedMs_(0)
         , programAnimStep_(0)
         , systemOk_(true)
         , lastVersionSeenMs_(0)
@@ -755,12 +760,18 @@ bool GBox::sendProgram(const CommandPacket &packet)
     const bool wasRunning = programRunning_;
     const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 
-    /* The car appends a program sent while another runs, so the blink must not
+    /* The car appends a program sent while another runs, so the breath must not
      * jump back to black for it. A failed send does not cancel the run either:
      * the car is still driving the previous program */
-    if (sent && !wasRunning) {
-        programAnimMs_ = millis();
-        programAnimStep_ = 0;
+    if (sent) {
+        /* An appended program extends the run, so the cap restarts with every
+         * accepted send instead of expiring mid-program */
+        programStartedMs_ = millis();
+
+        if (!wasRunning) {
+            programAnimMs_ = millis();
+            programAnimStep_ = 0;
+        }
     }
 
     programRunning_ = sent || wasRunning;
@@ -774,6 +785,15 @@ void GBox::serviceProgramAnimation()
     }
 
     const uint32_t now = millis();
+
+    /* The end notice never came: stop pretending the car is still working */
+    if ((now - programStartedMs_) >= kProgramDoneTimeoutMs) {
+        programRunning_ = false;
+        led_strip_set(kLedCar, 0, 0, 0);
+        led_strip_show();
+        LOGLN("ProgramDone timeout, the yellow blink stops here.");
+        return;
+    }
 
     if ((now - programAnimMs_) < kProgramBlinkMs) {
         return;

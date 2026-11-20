@@ -116,6 +116,7 @@ private:
      * ProgramDone notice: the yellow blink runs meanwhile */
     bool programRunning_;
     uint32_t programAnimMs_;
+    uint32_t programStartedMs_;
     uint8_t programAnimStep_;
     /* Last health check result, painted on the bottom pixel */
     bool systemOk_;
