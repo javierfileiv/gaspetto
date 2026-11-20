@@ -96,29 +96,32 @@ public:
 protected:
     virtual void delayMs(int ms) const;
 
-private:
-    void prepareForStop();
+    /* Exercised directly by the host tests, which have no real strip */
     void serviceProgramAnimation();
     void serviceLink();
     void serviceStatus();
+    void showHealthStatus(bool ok);
+    const char *pieceToString(BoxPieceId piece) const;
+
+    /* Last health check result, painted on the bottom pixel */
+    bool systemOk_;
+
+private:
+    void prepareForStop();
     void SystemClock_Config();
     void configurePins();
     void setLedRailEnabled(bool enabled);
-    void showHealthStatus(bool ok);
     void blackoutLeds();
-    const char *pieceToString(BoxPieceId piece) const;
 
     Context &_ctx;
     LinkMonitor linkMonitor_;
     std::array<SlotReading, BOX_TOTAL_SLOTS> lastScan;
     bool initialized_;
     /* True from the moment the program is acknowledged to the car's
-     * ProgramDone notice: the yellow breath runs meanwhile */
+     * ProgramDone notice: the yellow blink runs meanwhile */
     bool programRunning_;
     uint32_t programAnimMs_;
     uint8_t programAnimStep_;
-    /* Last health check result, painted on the bottom pixel */
-    bool systemOk_;
     uint32_t lastVersionSeenMs_;
     uint32_t statusPaintedMs_;
     unsigned long lastDebounceTime_;

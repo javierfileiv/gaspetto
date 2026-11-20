@@ -4,11 +4,13 @@
 #include "IdleState.h"
 #include "ProcessingState.h"
 #include "RadioController.h"
+#include "WireVersion.h"
 #include "board_presets.h"
 #include "config_radio.h"
 #include "mock_RF24.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -24,6 +26,31 @@ public:
     explicit TestableGBox(Context &ctx)
             : GBox(ctx)
     {
+    }
+
+    void serviceAnimation()
+    {
+        serviceProgramAnimation();
+    }
+
+    void servicePanel()
+    {
+        serviceStatus();
+    }
+
+    void showHealth(bool ok)
+    {
+        showHealthStatus(ok);
+    }
+
+    void setSystemOk(bool ok)
+    {
+        systemOk_ = ok;
+    }
+
+    const char *pieceName(BoxPieceId piece) const
+    {
+        return pieceToString(piece);
     }
 
 protected:
@@ -404,4 +431,103 @@ TEST(GBoxFsmTest, WorkReadsARadioPacketWithoutAnsweringTelemetry)
     rig.box.work();
 
     EXPECT_EQ(rig.box.getCurrentState(), &rig.idleState);
+}
+
+namespace
+{
+void expectProgramSend(BoxTestRig &rig)
+{
+    EXPECT_CALL(rig.mockRf24, _stopListening());
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false)).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _startListening());
+}
+
+CommandPacket forwardProgram()
+{
+    CommandPacket packet{};
+
+    packet.count = 1;
+    packet.commands[0] = static_cast<uint8_t>(CommandId::MOTOR_FORWARD);
+    return packet;
+}
+} /* namespace */
+
+TEST(GBoxFsmTest, HealthCheckMarksTheSystemOk)
+{
+    BoxTestRig rig;
+
+    EXPECT_TRUE(rig.box.runHealthCheck());
+}
+
+TEST(GBoxFsmTest, HealthStatusLightsTheBuildPixel)
+{
+    BoxTestRig rig;
+
+    rig.box.showHealth(true);
+    rig.box.showHealth(false);
+}
+
+TEST(GBoxFsmTest, ProgramDonePlaysTheGreenPulse)
+{
+    BoxTestRig rig;
+
+    rig.box.runProgramDoneAnimation();
+}
+
+TEST(GBoxFsmTest, AnAppendedProgramKeepsTheBlink)
+{
+    BoxTestRig rig;
+    const CommandPacket packet = forwardProgram();
+
+    expectProgramSend(rig);
+    ASSERT_TRUE(rig.box.sendProgram(packet));
+
+    expectProgramSend(rig);
+    ASSERT_TRUE(rig.box.sendProgram(packet));
+
+    EXPECT_TRUE(rig.box.isProgramRunning());
+}
+
+TEST(GBoxFsmTest, StatusPanelKeepsTheBoxAndLinkPixels)
+{
+    BoxTestRig rig;
+    const CommandPacket packet = forwardProgram();
+
+    expectProgramSend(rig);
+    ASSERT_TRUE(rig.box.sendProgram(packet));
+
+    microsCounter.fetch_add(200U * 1000U);
+    rig.box.servicePanel();
+    EXPECT_TRUE(rig.box.isProgramRunning());
+
+    rig.box.runProgramDoneAnimation();
+    EXPECT_FALSE(rig.box.isProgramRunning());
+
+    microsCounter.fetch_add(200U * 1000U);
+    rig.box.servicePanel();
+
+    microsCounter.store(0);
+}
+
+TEST(GBoxFsmTest, VersionAnswerTurnsTheMiddlePixelGreen)
+{
+    BoxTestRig rig;
+    VersionPacket answer = {};
+
+    answer.tag = static_cast<uint8_t>(PacketTag::Version);
+    answer.wire = kWireProtocolVersion;
+    answer.build = 42;
+    std::strncpy(answer.version, "abc1234", sizeof(answer.version) - 1);
+
+    microsCounter.store(1000U * 1000U);
+    rig.mockRf24.simulateReceivedPacket(1, &answer, sizeof(answer));
+
+    EXPECT_CALL(rig.mockRf24, _available(_)).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _read(_, sizeof(CommandPacket)));
+    expectProgramSend(rig);
+
+    rig.box.work();
+
+    microsCounter.store(0);
 }
