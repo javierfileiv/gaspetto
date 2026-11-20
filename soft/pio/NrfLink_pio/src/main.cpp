@@ -24,26 +24,44 @@ constexpr uint8_t kModeCar = 1;
 constexpr uint8_t kModeBox = 2;
 constexpr uint8_t kModeQuiet = 3;
 
-/* One telemetry packet per second in car mode, so the link can be watched
- * without touching the keyboard */
-constexpr uint32_t kTelemetryPeriodMs = 1000;
+/* Telemetry every 500 ms while a simulated program runs, like the car: it
+ * sends none when it is idle, so the stream follows the execution instead of
+ * running for its own sake */
+constexpr uint32_t kTelemetryPeriodMs = 500;
 
 /* The chip retransmits twice before it gives up, so this bounds the wait
  * after MAX_RT rather than the whole exchange; the verdict still comes from
  * txStandBy, unlike radio.write() which returns before the ACK */
 constexpr uint32_t kTxTimeoutMs = 10;
 
+/* A simulated command takes this long, which is about the car's quarter turn:
+ * the box then has a real program window to animate */
+constexpr uint32_t kMovementDurationMs = 3000;
+constexpr uint8_t kProgramCapacity = BOX_MAX_PAYLOAD_COMMANDS;
+
 RF24 radio(NRF24_CE, NRF24_CSN);
 
 uint8_t gMode = kModeCar;
+
+/* Car emulation plays a received program command by command and sends the
+ * same end notice the real car sends: without it the box's yellow breath
+ * never stops, and the bench cannot replace the car */
+uint8_t gProgramCommands[kProgramCapacity];
+uint8_t gProgramCount = 0;
+uint8_t gProgramIndex = 0;
+uint32_t gProgramStartMs = 0;
+bool gProgramActive = false;
+
 /* Mode to give back after the post-OTA log window, 0 when none is pending */
 uint8_t gPendingMode = 0;
 uint32_t gPendingModeAt = 0;
 uint32_t gLastTelemetryMs = 0;
 uint16_t gTelemetryTick = 0;
 
-/* One simulated car log line every kLogPeriodMs, offset from the telemetry
- * period so the fragments and the telemetry never land on the same beat */
+/* One simulated car log line every kLogPeriodMs while a program runs, offset
+ * from the telemetry period so the fragments and the telemetry never land on
+ * the same beat. At rest the emulator stays silent, like the car, so a box
+ * just flashed shows nothing until a program is sent */
 constexpr uint32_t kLogPeriodMs = 430;
 uint32_t gLastLogMs = 0;
 uint16_t gLogTick = 0;
@@ -72,6 +90,10 @@ void displayTelemetry(const TelemetryPacket &t);
 void displayCommandPacket(const CommandPacket &pkt);
 void displayVersion(const VersionPacket &version);
 void sendVersionRequest();
+void respondVersion();
+void queueProgram(const CommandPacket &packet);
+void serviceCarProgram();
+void sendProgramDone();
 
 void setup()
 {
@@ -144,6 +166,14 @@ void setMode(uint8_t mode)
 {
     gMode = mode;
     gPendingMode = 0;
+
+    /* The program queue belongs to car emulation: leaving the mode drops it,
+     * or a stale end notice would arrive after the operator moved on */
+    if (gMode != kModeCar) {
+        gProgramActive = false;
+        gProgramCount = 0;
+        gProgramIndex = 0;
+    }
 
     if (gMode == kModeQuiet) {
         /* Leaving RX mode stops the chip from hearing a packet and from
@@ -231,6 +261,125 @@ void sendCarLog()
     LOG(static_cast<float>((gLogTick * 13U) % 360U), 1);
     LOG(F(" speed="));
     LOGLN(gLogTick % 60U);
+}
+
+/* How long a command takes in the simulation: movements last, stops and queue
+ * clears take effect at once, like the car */
+uint32_t commandDurationMs(uint8_t command)
+{
+    switch (static_cast<CommandId>(command)) {
+    case CommandId::MOTOR_FORWARD:
+    case CommandId::MOTOR_BACKWARD:
+    case CommandId::MOTOR_TURN_LEFT:
+    case CommandId::MOTOR_TURN_RIGHT:
+        return kMovementDurationMs;
+    default:
+        return 0;
+    }
+}
+
+void startNextCommand()
+{
+    Serial.print(F("[car] running "));
+    Serial.print(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+    Serial.print(F(" for "));
+    Serial.print(commandDurationMs(gProgramCommands[gProgramIndex]));
+    Serial.println(F(" ms"));
+}
+
+void queueProgram(const CommandPacket &packet)
+{
+    uint8_t accepted = 0;
+
+    for (uint8_t i = 0; i < packet.count && gProgramCount < kProgramCapacity; ++i) {
+        gProgramCommands[gProgramCount++] = packet.commands[i];
+        ++accepted;
+    }
+
+    Serial.print(F("[car] program queued: "));
+    Serial.print(static_cast<int>(accepted));
+    Serial.print(F(" command(s), "));
+    Serial.print(static_cast<int>(gProgramCount));
+    Serial.println(F(" pending"));
+
+    if (!gProgramActive && gProgramCount > 0) {
+        gProgramActive = true;
+        gProgramIndex = 0;
+        gProgramStartMs = millis();
+        startNextCommand();
+    }
+}
+
+void serviceCarProgram()
+{
+    if (!gProgramActive) {
+        return;
+    }
+
+    if ((millis() - gProgramStartMs) < commandDurationMs(gProgramCommands[gProgramIndex])) {
+        return;
+    }
+
+    Serial.print(F("[car] finished "));
+    Serial.println(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+
+    ++gProgramIndex;
+    gProgramStartMs = millis();
+
+    /* Instant commands are consumed in the same pass: waiting a whole loop for
+     * a stop would make the batch feel slower than the car */
+    while (gProgramIndex < gProgramCount &&
+           commandDurationMs(gProgramCommands[gProgramIndex]) == 0) {
+        Serial.print(F("[car] finished "));
+        Serial.println(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+        ++gProgramIndex;
+    }
+
+    if (gProgramIndex < gProgramCount) {
+        startNextCommand();
+        return;
+    }
+
+    gProgramActive = false;
+    gProgramCount = 0;
+    gProgramIndex = 0;
+    sendProgramDone();
+}
+
+/* Same notice and same retries as the car: the box must not miss it, or its
+ * breath never stops */
+void sendProgramDone()
+{
+    constexpr uint8_t kAttempts = 10;
+    constexpr uint32_t kRetryGapMs = 40;
+    uint8_t payload[sizeof(CommandPacket)] = {};
+
+    payload[0] = static_cast<uint8_t>(PacketTag::ProgramDone);
+
+    for (uint8_t attempt = 0; attempt < kAttempts; ++attempt) {
+        if (radio_send(radio, payload, sizeof(payload), kTxTimeoutMs)) {
+            Serial.print(F("[program] done ACKed on try "));
+            Serial.println(attempt + 1);
+            return;
+        }
+        delay(kRetryGapMs);
+    }
+
+    Serial.println(F("[program] done never acknowledged"));
+}
+
+/* The box pings the car with a VersionRequest: emulation has to answer, or the
+ * box would call the link lost with no car around */
+void respondVersion()
+{
+    VersionPacket answer = {};
+
+    answer.tag = static_cast<uint8_t>(PacketTag::Version);
+    answer.wire = kWireProtocolVersion;
+    answer.build = 0; /* this tool carries no commit stamp of its own */
+    strncpy(answer.version, "nrf-link", sizeof(answer.version) - 1);
+
+    radio_send(radio, &answer, sizeof(answer), kTxTimeoutMs);
 }
 
 void displayCommandPacket(const CommandPacket &pkt)
@@ -464,6 +613,8 @@ void drainRadio()
 
             memcpy(&version, payload, sizeof(version));
             displayVersion(version);
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::VersionRequest)) {
+            respondVersion();
         } else if (payload[0] == static_cast<uint8_t>(PacketTag::ProgramDone)) {
             Serial.println(F("[program] done: the car finished the batch"));
         } else if (gMode == kModeCar) {
@@ -471,6 +622,8 @@ void drainRadio()
 
             memcpy(&cmd, payload, sizeof(cmd));
             displayCommandPacket(cmd);
+
+            queueProgram(cmd);
         } else if (payload[0] == static_cast<uint8_t>(PacketTag::Telemetry)) {
             TelemetryPacket tlm;
 
@@ -1018,12 +1171,17 @@ void loop()
         setMode(mode);
     }
 
-    if (gMode == kModeCar && (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
+    if (gMode == kModeCar) {
+        serviceCarProgram();
+    }
+
+    if (gMode == kModeCar && gProgramActive &&
+        (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
         gLastTelemetryMs = millis();
         sendTelemetry();
     }
 
-    if (gMode == kModeCar && (millis() - gLastLogMs) >= kLogPeriodMs) {
+    if (gMode == kModeCar && gProgramActive && (millis() - gLastLogMs) >= kLogPeriodMs) {
         gLastLogMs = millis();
         sendCarLog();
     }
@@ -1048,8 +1206,8 @@ void printHelp()
 {
     Serial.println(F("\n=== NrfLink - Gaspetto radio link tool ==="));
     Serial.println(F("Modes:"));
-    Serial.println(F("  1: car emulation (default) - reads the program the Box sends"));
-    Serial.println(F("     on _car_ and answers with telemetry and logs on _box_"));
+    Serial.println(F("  1: car emulation (default) - plays the program the Box sends"));
+    Serial.println(F("     on _car_, answers its ping, then reports the end on _box_"));
     Serial.println(F("  2: box/sender - sends commands on _car_, reads telemetry on _box_"));
     Serial.println(F("  3: quiet - radio idle, nothing sent or received, console only"));
     Serial.println(F("  ?: this help"));
