@@ -121,14 +121,19 @@ void handleUsbMaintenanceCommands()
 
             if (end > start) {
                 const char *command = &commandBuffer[start];
+                /* Every command accepts its first letter: the shell is used
+                 * at the bench, and full words are slow to type on a serial
+                 * console */
                 if (commandEqualsIgnoreCase(command, "dfu") ||
-                    commandEqualsIgnoreCase(command, "reboot-dfu")) {
+                    commandEqualsIgnoreCase(command, "d")) {
                     LOGLN("Entering STM32 DFU bootloader...");
                     enterDfuBootloader();
                 } else if (commandEqualsIgnoreCase(command, "ver") ||
-                           commandEqualsIgnoreCase(command, "version")) {
+                           commandEqualsIgnoreCase(command, "version") ||
+                           commandEqualsIgnoreCase(command, "v")) {
                     printFirmwareVersion();
-                } else if (commandEqualsIgnoreCase(command, "car")) {
+                } else if (commandEqualsIgnoreCase(command, "car") ||
+                           commandEqualsIgnoreCase(command, "c")) {
                     /* Same version request the NrfLink sends: the car answers
                      * on _box_ and RadioController prints it when it arrives */
                     VersionPacket request = {};
@@ -139,7 +144,8 @@ void handleUsbMaintenanceCommands()
 
                     LOGLN(sent ? "car version request ACKed, the answer follows" :
                                  "car version request FAILED (no ACK)");
-                } else if (commandEqualsIgnoreCase(command, "idle")) {
+                } else if (commandEqualsIgnoreCase(command, "idle") ||
+                           commandEqualsIgnoreCase(command, "i")) {
                     /* Toggle, because the shell must stay reachable while the
                      * radio is off: a second idle brings the link back */
                     const bool quiet = !radioController.isQuiet();
@@ -147,7 +153,8 @@ void handleUsbMaintenanceCommands()
                     radioController.setQuiet(quiet);
                     LOGLN(quiet ? "Radio idle: nothing is sent or received, type idle again to resume" :
                                   "Radio idle: off, listening again");
-                } else if (commandEqualsIgnoreCase(command, "reset")) {
+                } else if (commandEqualsIgnoreCase(command, "reset") ||
+                           commandEqualsIgnoreCase(command, "r")) {
                     /* A plain reset, not the bootloader: the line has to leave
                      * before the core goes, or the reason for the reset is the
                      * only thing missing from the console */
@@ -156,8 +163,9 @@ void handleUsbMaintenanceCommands()
                     delay(10);
                     NVIC_SystemReset();
                 } else if (commandEqualsIgnoreCase(command, "help") ||
+                           commandEqualsIgnoreCase(command, "h") ||
                            commandEqualsIgnoreCase(command, "?")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, reset, help, ver, car, idle, ?");
+                    LOGLN("USB commands: dfu (d), reset (r), help (h, ?), ver (v), car (c), idle (i)");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -255,7 +263,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, reset, help, ver, car, idle, ?");
+    LOGLN("USB commands: dfu (d), reset (r), help (h, ?), ver (v), car (c), idle (i)");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
