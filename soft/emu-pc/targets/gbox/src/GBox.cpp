@@ -99,6 +99,8 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
  * this half-period: slow enough to read, fast enough to notice */
 constexpr uint32_t kStatusPaintMs = 100;
 constexpr uint32_t kLinkBlinkMs = 400;
+/* The program's pixel blinks at this half-period while the car runs */
+constexpr uint32_t kProgramBlinkMs = 500;
 
 /* Expected LED behaviour, three APA106 pixels on the strip, bottom to top:
  * - boot health check: the bottom pixel lights solid green when every probe
@@ -537,7 +539,7 @@ void GBox::runRfErrorAnimation()
 {
     setLedRailEnabled(true);
     /* The middle pixel blinks red ×3, then holds red with the bottom pixel
-     * green: the box is fine, the link is not */
+     * green: the board is fine, the link is not */
     for (int blink = 0; blink < 3; ++blink) {
         led_strip_fill(0, 0, 0);
         led_strip_set(kLedLink, 150, 0, 0);
@@ -753,7 +755,7 @@ bool GBox::sendProgram(const CommandPacket &packet)
     const bool wasRunning = programRunning_;
     const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
 
-    /* The car appends a program sent while another runs, so the breath must not
+    /* The car appends a program sent while another runs, so the blink must not
      * jump back to black for it. A failed send does not cancel the run either:
      * the car is still driving the previous program */
     if (sent && !wasRunning) {
@@ -767,38 +769,25 @@ bool GBox::sendProgram(const CommandPacket &packet)
 
 void GBox::serviceProgramAnimation()
 {
-    constexpr uint32_t kStepMs = 250;
-    constexpr uint8_t kSteps = 20; /* one breath every five seconds */
-
     if (!programRunning_) {
         return;
     }
 
-    /* The breath runs until the car reports the end of the batch: telemetry
-     * pauses between two movements, so its silence says nothing about the
-     * program being over */
     const uint32_t now = millis();
-    if ((now - programAnimMs_) < kStepMs) {
+
+    if ((now - programAnimMs_) < kProgramBlinkMs) {
         return;
     }
     programAnimMs_ = now;
 
-    /* Yellow breathing on all three pixels, five seconds per cycle and
-     * repeated until the car reports the end. Each pixel is a third of a cycle
-     * behind its neighbour, so the crest climbs the column: the strip is
-     * mounted vertically and a wave reads better than a synced blink */
-    constexpr uint8_t kPhasePerPixel = kSteps / 3;
-    const uint8_t step = programAnimStep_;
+    /* The car's pixel is the one that speaks for the car: it blinks yellow
+     * while the program runs, and the box and link pixels keep saying their
+     * own state instead of being borrowed by the animation */
+    const bool lit = (programAnimStep_ == 0);
 
-    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
-        const uint8_t phased = static_cast<uint8_t>((step + kSteps - i * kPhasePerPixel) % kSteps);
-        const uint8_t level = (phased < (kSteps / 2)) ? phased :
-                                                        static_cast<uint8_t>(kSteps - phased);
-
-        led_strip_set(i, static_cast<uint8_t>(level * 18U), static_cast<uint8_t>(level * 13U), 0);
-    }
+    led_strip_set(kLedCar, lit ? 180 : 0, lit ? 130 : 0, 0);
     led_strip_show();
-    programAnimStep_ = static_cast<uint8_t>((step + 1U) % kSteps);
+    programAnimStep_ = static_cast<uint8_t>((programAnimStep_ + 1U) % 2U);
 }
 
 void GBox::serviceLink()
@@ -830,12 +819,6 @@ void GBox::serviceLink()
 
 void GBox::serviceStatus()
 {
-    /* A running program owns the strip: the yellow breath says more than a
-     * status panel would while the car works */
-    if (programRunning_) {
-        return;
-    }
-
     const uint32_t now = millis();
     if ((now - statusPaintedMs_) < kStatusPaintMs) {
         return;
@@ -843,8 +826,6 @@ void GBox::serviceStatus()
     statusPaintedMs_ = now;
 
     const bool linkAlive = linkMonitor_.state() == LinkMonitor::State::Alive;
-
-    led_strip_fill(0, 0, 0);
 
     /* Bottom pixel: the board itself, green after a passing health check */
     if (systemOk_) {
@@ -859,6 +840,12 @@ void GBox::serviceStatus()
         led_strip_set(kLedLink, 0, 60, 0);
     } else if (((now / kLinkBlinkMs) % 2U) == 0U) {
         led_strip_set(kLedLink, 140, 0, 0);
+    }
+
+    /* Top pixel: the program animation owns it while the car works, so only
+     * clear it once the run is over */
+    if (!programRunning_) {
+        led_strip_set(kLedCar, 0, 0, 0);
     }
 
     led_strip_show();

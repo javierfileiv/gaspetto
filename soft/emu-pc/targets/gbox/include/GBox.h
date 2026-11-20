@@ -113,7 +113,7 @@ private:
     std::array<SlotReading, BOX_TOTAL_SLOTS> lastScan;
     bool initialized_;
     /* True from the moment the program is acknowledged to the car's
-     * ProgramDone notice: the yellow breath runs meanwhile */
+     * ProgramDone notice: the yellow blink runs meanwhile */
     bool programRunning_;
     uint32_t programAnimMs_;
     uint8_t programAnimStep_;
