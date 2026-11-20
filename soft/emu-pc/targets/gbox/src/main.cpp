@@ -147,9 +147,17 @@ void handleUsbMaintenanceCommands()
                     radioController.setQuiet(quiet);
                     LOGLN(quiet ? "Radio idle: nothing is sent or received, type idle again to resume" :
                                   "Radio idle: off, listening again");
+                } else if (commandEqualsIgnoreCase(command, "reset")) {
+                    /* A plain reset, not the bootloader: the line has to leave
+                     * before the core goes, or the reason for the reset is the
+                     * only thing missing from the console */
+                    LOGLN("Resetting the MCU...");
+                    Serial.flush();
+                    delay(10);
+                    NVIC_SystemReset();
                 } else if (commandEqualsIgnoreCase(command, "help") ||
                            commandEqualsIgnoreCase(command, "?")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, idle, ?");
+                    LOGLN("USB commands: dfu, reboot-dfu, reset, help, ver, car, idle, ?");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -247,7 +255,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help, ver, car, idle, ?");
+    LOGLN("USB commands: dfu, reboot-dfu, reset, help, ver, car, idle, ?");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
