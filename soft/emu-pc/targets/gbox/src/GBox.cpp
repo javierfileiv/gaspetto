@@ -94,21 +94,27 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
-/* Expected LED behaviour, three APA106 pixels on the strip, left to right:
- * - boot health check: led 0 (left) lights solid green when every probe passes,
- *   solid red otherwise, holds ~1.5s then goes off
- * - board scan: a cyan dot bounces led 0 -> 1 -> 2 -> back twice, then blackout
- * - program accepted: green cascades led 0 -> 1 -> 2, all three hold green
- * - build failed: led 2 (right) blinks red three times, then holds red
- * - empty board: led 2 blinks amber twice, then holds amber
- * - RF send failed: led 1 (center) blinks red three times, then holds with led
- *   1 red plus led 0 green
- * Terminal states hold their pattern ~60s, then the box arms STOP mode and all
- * LEDs go off (PC emulation runs the same patterns as log-only animations)
+/* Expected LED behaviour, three APA106 pixels on the strip, bottom to top:
+ * - boot health check: the bottom pixel lights solid green when every probe
+ *   passes, solid red otherwise, holds ~1.5s then goes off
+ * - board scan: a cyan dot climbs bottom -> middle -> top and back twice, then
+ *   blackout
+ * - program accepted: a green flash on the middle pixel, the link's role
+ * - build failed: the bottom pixel blinks red three times, then holds red
+ * - empty board: the bottom pixel blinks amber twice, then holds amber
+ * - RF send failed: the middle pixel blinks red three times, then holds red
+ *   with the bottom pixel green
+ * Terminal states hold their pattern ~3s, then the box goes back to idle and
+ * the rail keeps the button LED lit
+ *
+ * The strip is mounted vertically and read as the signal path: the box at the
+ * bottom, the radio in the middle, the car at the top. FastLED numbers the
+ * chain from its data input, so if the strip is wired the other way round,
+ * swapping these three constants is enough for every animation to follow.
  */
-constexpr uint8_t kLedState = 0; /* left   : system / scan state   */
-constexpr uint8_t kLedRadio = 1; /* center : radio status           */
-constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
+constexpr uint8_t kLedBox = 0; /* bottom : the box itself        */
+constexpr uint8_t kLedLink = 1; /* middle : the radio link        */
+constexpr uint8_t kLedCar = 2; /* top    : the car and its run   */
 
 TwoWire &wireForAdsBus(AdsBus bus)
 {
@@ -444,7 +450,8 @@ void GBox::runScanAnimation()
     setLedRailEnabled(true);
     delayMs(50);
 
-    /* Bouncing cyan on kLedState → kLedRadio → kLedBuild → back, 2 round trips. */
+    /* Bouncing cyan from bottom to top and back, 2 round trips: the scan
+     * belongs to the box, and the motion reads along the column */
     for (int trip = 0; trip < 2; ++trip) {
         for (int i = 0; i < 3; ++i) {
             led_strip_fill(0, 0, 0);
@@ -465,11 +472,11 @@ void GBox::runScanAnimation()
 void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
-    /* An acknowledged send says the link works, which is the centre LED's
+    /* An acknowledged send says the link works, which is the middle pixel's
      * role: the other two keep their own meaning. A short flash is enough,
      * and the yellow breath follows at once while the car drives */
     led_strip_fill(0, 0, 0);
-    led_strip_set(kLedRadio, 0, 100, 0);
+    led_strip_set(kLedLink, 0, 100, 0);
     led_strip_show();
     delayMs(150);
 }
@@ -477,16 +484,17 @@ void GBox::runSuccessAnimation()
 void GBox::runBuildErrorAnimation()
 {
     setLedRailEnabled(true);
-    /* kLedBuild (right) blinks red ×3, then holds red on kLedBuild. */
+    /* The bottom pixel blinks red ×3, then holds: building the program is the
+     * box's job, so the failure sits on its own pixel */
     for (int blink = 0; blink < 3; ++blink) {
         led_strip_fill(0, 0, 0);
-        led_strip_set(kLedBuild, 150, 0, 0);
+        led_strip_set(kLedBox, 150, 0, 0);
         led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    led_strip_set(kLedBuild, 150, 0, 0);
+    led_strip_set(kLedBox, 150, 0, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
@@ -495,16 +503,17 @@ void GBox::runBuildErrorAnimation()
 void GBox::runEmptyBoardAnimation()
 {
     setLedRailEnabled(true);
-    /* kLedBuild (right) blinks amber ×2, then holds amber on kLedBuild. */
+    /* The bottom pixel blinks amber ×2, then holds: there was nothing on the
+     * board to build from */
     for (int blink = 0; blink < 2; ++blink) {
         led_strip_fill(0, 0, 0);
-        led_strip_set(kLedBuild, 100, 60, 0);
+        led_strip_set(kLedBox, 100, 60, 0);
         led_strip_show();
         delayMs(200);
         blackoutLeds();
         delayMs(100);
     }
-    led_strip_set(kLedBuild, 100, 60, 0);
+    led_strip_set(kLedBox, 100, 60, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
@@ -513,17 +522,18 @@ void GBox::runEmptyBoardAnimation()
 void GBox::runRfErrorAnimation()
 {
     setLedRailEnabled(true);
-    /* kLedRadio (center) blinks red ×3, then holds: kLedState green + kLedRadio red. */
+    /* The middle pixel blinks red ×3, then holds red with the bottom pixel
+     * green: the box is fine, the link is not */
     for (int blink = 0; blink < 3; ++blink) {
         led_strip_fill(0, 0, 0);
-        led_strip_set(kLedRadio, 150, 0, 0);
+        led_strip_set(kLedLink, 150, 0, 0);
         led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    led_strip_set(kLedState, 0, 80, 0);
-    led_strip_set(kLedRadio, 150, 0, 0);
+    led_strip_set(kLedBox, 0, 80, 0);
+    led_strip_set(kLedLink, 150, 0, 0);
     led_strip_show();
     /* Long enough to read the colour, short enough that the button still works */
     delayMs(3000);
@@ -760,11 +770,19 @@ void GBox::serviceProgramAnimation()
     programAnimMs_ = now;
 
     /* Yellow breathing on all three pixels, five seconds per cycle and
-     * repeated until the car reports the end: the program is being driven */
+     * repeated until the car reports the end. Each pixel is a third of a cycle
+     * behind its neighbour, so the crest climbs the column: the strip is
+     * mounted vertically and a wave reads better than a synced blink */
+    constexpr uint8_t kPhasePerPixel = kSteps / 3;
     const uint8_t step = programAnimStep_;
-    const uint8_t level = (step < (kSteps / 2)) ? step : static_cast<uint8_t>(kSteps - step);
 
-    led_strip_fill(static_cast<uint8_t>(level * 18U), static_cast<uint8_t>(level * 13U), 0);
+    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+        const uint8_t phased = static_cast<uint8_t>((step + kSteps - i * kPhasePerPixel) % kSteps);
+        const uint8_t level = (phased < (kSteps / 2)) ? phased :
+                                                        static_cast<uint8_t>(kSteps - phased);
+
+        led_strip_set(i, static_cast<uint8_t>(level * 18U), static_cast<uint8_t>(level * 13U), 0);
+    }
     led_strip_show();
     programAnimStep_ = static_cast<uint8_t>((step + 1U) % kSteps);
 }
