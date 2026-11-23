@@ -158,6 +158,10 @@ bool radio_begin()
      * shell drains pipe 1 between keys: a full FIFO stops the chip from
      * acknowledging, and the car then waits on every acknowledged send */
     radio.openReadingPipe(1, gbox_pipe_name);
+    /* stopConstCarrier() powers the chip down per the datasheet, so bring it
+     * back up explicitly and leave it listening: the probe must end in the
+     * state the bench runs in, not in one the first idle slice repairs */
+    radio.startListening();
     radio_print_registers();
     radio_ok = true;
     return true;
@@ -272,7 +276,7 @@ static void radio_run_send_feedback(void (*animation)())
 
 /* Scan -> build -> transmit, the chain production GBox runs when it
  * validates a program, without GBox itself: the decode is the compiled
- * per-slot row (scan_piece_for_raw, the one walk), the build is the shared
+ * per-slot row (piece_decode, the one walk), the build is the shared
  * buildProgramFromPieces, only the transport is this bench. The verdict
  * mirrors the production LED semantics: green on ACK, amber on an empty
  * board, red on a refused build, RF error when the car does not answer */
@@ -565,6 +569,10 @@ void radio_run_car_stream_test()
                 lastHeartbeatMs = millis();
                 break;
             }
+            case PacketTag::ProgramDone:
+                Serial.println("   [DONE] the car finished the command batch");
+                lastHeartbeatMs = millis();
+                break;
             case PacketTag::Log: {
                 const uint8_t flags   = buffer[1];
                 const uint8_t dataLen = flags & 0x7FU;

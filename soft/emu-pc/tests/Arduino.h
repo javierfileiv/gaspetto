@@ -4,7 +4,12 @@
 #include "Arduino_pins_pc.h"
 #include "HardwareTimer.h"
 
+#include <atomic>
 #include <cstdint>
+
+/* The emulated clock the ADS conversions move forward: a test that resets it
+ * needs the same declaration the framework carries */
+extern std::atomic<unsigned long> microsCounter;
 
 /* Arduino function declarations for test linkage. */
 extern "C" {

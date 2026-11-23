@@ -21,6 +21,7 @@ class RF24;
 class RadioController : public Log {
 public:
     using OtaHandler = void (*)(const OtaPacket &packet);
+    using ProgramDoneHandler = void (*)(void);
 
     RadioController(RF24 &radio, EventQueue *gaspettoQueue, const uint8_t writing_addr[5],
                     const uint8_t reading_addr[5]);
@@ -35,6 +36,37 @@ public:
      * @handler: called for every OTA packet; null drops them
      */
     void setOtaHandler(OtaHandler handler);
+
+    /** setProgramDoneHandler(): Install the receiver of the car's end of
+     * program notice; null ignores it */
+    void setProgramDoneHandler(ProgramDoneHandler handler);
+
+    /** setLogPeerPrefix(): Name the device whose log lines arrive on the
+     * radio, so they can be told apart from this device's own lines */
+    void setLogPeerPrefix(const char *prefix);
+
+    /** lastVersionMs(): when the last Version answer arrived, 0 if none yet;
+     * a box uses its age as the witness that the other side is alive */
+    uint32_t lastVersionMs() const
+    {
+        return versionLastMs;
+    }
+
+    /** requestVersionLog(): print the next Version answer even when it is the
+     * build the periodic ping already showed */
+    void requestVersionLog()
+    {
+        versionLogForced = true;
+    }
+
+    /** setQuiet(): Leave RX mode and refuse every send, so this device does
+     * not disturb another link on the bench; false listens again */
+    void setQuiet(bool quiet);
+
+    bool isQuiet() const
+    {
+        return radioQuiet;
+    }
 
     /**
      * sendTelemetry(): Send telemetry packet via radio
@@ -63,7 +95,15 @@ private:
     EventQueue radioQueue;
     EventQueue *gaspettoQueue;
     OtaHandler otaHandler = nullptr;
+    ProgramDoneHandler programDoneHandler = nullptr;
+    const char *logPeerPrefix = nullptr;
     bool otaWarningShown = false;
+    bool radioQuiet = false;
     uint8_t logLine[64];
     uint8_t logLineLen;
+    uint32_t versionLastMs = 0;
+    uint16_t versionBuild = 0;
+    uint8_t versionWire = 0;
+    char versionHash[28] = "";
+    bool versionLogForced = false;
 };

@@ -69,6 +69,27 @@ bool MockRF24::write(const void *buf, uint8_t len)
     return mock->_write(buf, len);
 }
 
+bool MockRF24::startWrite(const void *buf, uint8_t len, const bool multicast)
+{
+    auto mock = MockRF24::get_instance();
+
+    return mock->_startWrite(buf, len, multicast);
+}
+
+bool MockRF24::txStandBy(uint32_t timeout, bool startTx)
+{
+    auto mock = MockRF24::get_instance();
+
+    return mock->_txStandBy(timeout, startTx);
+}
+
+void MockRF24::setRetries(uint8_t delay, uint8_t count)
+{
+    auto mock = MockRF24::get_instance();
+
+    mock->_setRetries(delay, count);
+}
+
 void MockRF24::openWritingPipe(const uint8_t *address)
 {
     auto mock = MockRF24::get_instance();

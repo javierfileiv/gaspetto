@@ -64,9 +64,7 @@ goes quiet to save power until the next button press.
 - `soft/pio`: PlatformIO firmware projects
 	- `GCar_pio`, `GBox_pio`: robot and box firmware
 	- `GCar_boot`: the robot bootloader, flashed by hand
-	- `NrfLink_pio`: radio link test tool for Arduino Uno + NRF24L01 — sends motor
-	commands to the car over the radio, and can put the car in its DFU
-	bootloader
+	- `NrfLink_pio`: radio link test tool for Arduino Uno + NRF24L01
 	- hardware test apps
 - `tools`: helper scripts used locally and in CI
 - `.github/workflows`: CI workflows
@@ -132,6 +130,30 @@ bootloader.
 A failed request costs nothing: the application was never touched, so a RESET
 boots it again through the bootloader. BOOT0 plus RESET remains available as a
 last resort.
+
+## The serial link tool
+
+`tools/gaspetto_link.py` is the PC side of the radio link. With no option it is
+a plain console on the port, like `tio`: it does not reset the board and does
+not send anything. `Ctrl-]` leaves.
+
+```bash
+./tools/gaspetto_link.py --port /dev/ttyUSB0   # NrfLink console
+./tools/gaspetto_link.py --port /dev/ttyACM0   # box console
+```
+
+With `--ota` it rebuilds the car firmware, streams it over the radio through
+the relay on the port, the NrfLink or the GBox, and then stays on the console,
+so the car's boot lines can be watched without opening another terminal. `--no-build` sends the binary
+already built in `GCar_pio/.pio/build/gcar/`, and `--logs N` reads the port for
+N seconds and leaves instead of handing the console over. `GASPETTO_LINK_PORT`
+overrides the default port; the older `GCAR_NRF_PORT` still works.
+
+With `--box` (or `--dfu`) the tool flashes the box itself: it rebuilds
+`GBox_pio`, sends `dfu` on the box's serial port, waits for the `0483:df11`
+device, then runs `dfu-util`. The box enters the STM32 ROM bootloader on that
+serial command, so no tio session is needed. `--no-build` sends the box binary
+already built in `GBox_pio/.pio/build/blackpill_f411ce/`.
 
 ### Memory layout
 

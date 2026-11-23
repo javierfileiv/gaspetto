@@ -29,6 +29,15 @@ extern Event getEmulatedEvent(void);
 #endif
 
 RF24 radio(NRF24_CE, NRF24_CSN);
+
+/* Counted in the button interrupt and printed by the loop: Serial is far too
+ * slow and blocking to be called from an ISR, but the count still says
+ * whether the pin produced an edge nobody asked for. The counters exist on
+ * the host build too, they simply stay at zero there */
+volatile uint32_t button_edges = 0;
+volatile uint32_t button_edge_ms = 0;
+volatile uint8_t button_edge_level = 0;
+volatile bool button_press_seen = false;
 IdleState idleState;
 ProcessingState processingState;
 TimeredEventQueue timeredEventQueue;
@@ -42,6 +51,17 @@ Context context = {
     &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState,
 };
 GBox gbox(context);
+
+/* The build stamp is target-independent: the host emulator prints it too */
+void printFirmwareVersion()
+{
+    LOG(F("GBox firmware build "));
+    LOG(FW_VERSION);
+    LOG(F(" ("));
+    LOG(FW_BUILD);
+    LOG(F("), wire protocol v"));
+    LOGLN(static_cast<int>(kWireProtocolVersion));
+}
 
 #ifdef ARDUINO
 namespace
@@ -71,6 +91,7 @@ void handleUsbMaintenanceCommands()
 {
     static char commandBuffer[kUsbCommandBufferSize] = {};
     static std::size_t commandLength = 0;
+    static bool lastWasCarriageReturn = false;
 
     while (Serial.available() > 0) {
         const int rawValue = Serial.read();
@@ -80,6 +101,12 @@ void handleUsbMaintenanceCommands()
 
         const char currentChar = static_cast<char>(rawValue);
         if (currentChar == '\r' || currentChar == '\n') {
+            /* Echo the line end once: a terminal sends CR, LF or both */
+            if (!(currentChar == '\n' && lastWasCarriageReturn)) {
+                Serial.println();
+            }
+            lastWasCarriageReturn = (currentChar == '\r');
+
             commandBuffer[commandLength] = '\0';
 
             std::size_t start = 0;
@@ -95,12 +122,51 @@ void handleUsbMaintenanceCommands()
 
             if (end > start) {
                 const char *command = &commandBuffer[start];
+                /* Every command accepts its first letter: the shell is used
+                 * at the bench, and full words are slow to type on a serial
+                 * console */
                 if (commandEqualsIgnoreCase(command, "dfu") ||
-                    commandEqualsIgnoreCase(command, "reboot-dfu")) {
+                    commandEqualsIgnoreCase(command, "d")) {
                     LOGLN("Entering STM32 DFU bootloader...");
                     enterDfuBootloader();
-                } else if (commandEqualsIgnoreCase(command, "help")) {
-                    LOGLN("USB commands: dfu, reboot-dfu, help");
+                } else if (commandEqualsIgnoreCase(command, "ver") ||
+                           commandEqualsIgnoreCase(command, "version") ||
+                           commandEqualsIgnoreCase(command, "v")) {
+                    printFirmwareVersion();
+                } else if (commandEqualsIgnoreCase(command, "car") ||
+                           commandEqualsIgnoreCase(command, "c")) {
+                    /* Same version request the NrfLink sends: the car answers
+                     * on _box_ and RadioController prints it when it arrives */
+                    VersionPacket request = {};
+
+                    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+                    radioController.requestVersionLog();
+                    const bool sent = radioController.sendBuffer(&request, sizeof(request));
+
+                    LOGLN(sent ? "car version request ACKed, the answer follows" :
+                                 "car version request FAILED (no ACK)");
+                } else if (commandEqualsIgnoreCase(command, "idle") ||
+                           commandEqualsIgnoreCase(command, "i")) {
+                    /* Toggle, because the shell must stay reachable while the
+                     * radio is off: a second idle brings the link back */
+                    const bool quiet = !radioController.isQuiet();
+
+                    radioController.setQuiet(quiet);
+                    LOGLN(quiet ? "Radio idle: nothing is sent or received, type idle again to resume" :
+                                  "Radio idle: off, listening again");
+                } else if (commandEqualsIgnoreCase(command, "reset") ||
+                           commandEqualsIgnoreCase(command, "r")) {
+                    /* A plain reset, not the bootloader: the line has to leave
+                     * before the core goes, or the reason for the reset is the
+                     * only thing missing from the console */
+                    LOGLN("Resetting the MCU...");
+                    Serial.flush();
+                    delay(10);
+                    NVIC_SystemReset();
+                } else if (commandEqualsIgnoreCase(command, "help") ||
+                           commandEqualsIgnoreCase(command, "h") ||
+                           commandEqualsIgnoreCase(command, "?")) {
+                    LOGLN("USB commands: dfu (d), reset (r), help (h, ?), ver (v), car (c), idle (i)");
                 } else {
                     LOG("Unknown USB command: ");
                     LOGLN(command);
@@ -111,6 +177,15 @@ void handleUsbMaintenanceCommands()
             commandBuffer[0] = '\0';
             continue;
         }
+        lastWasCarriageReturn = false;
+
+        if (currentChar == '\b' || currentChar == 0x7F) {
+            if (commandLength > 0) {
+                --commandLength;
+                Serial.print("\b \b");
+            }
+            continue;
+        }
 
         if (commandLength + 1 >= kUsbCommandBufferSize) {
             commandLength = 0;
@@ -119,6 +194,11 @@ void handleUsbMaintenanceCommands()
             continue;
         }
 
+        /* Echo what is typed: the port has no local echo, and without it the
+         * operator cannot tell a dead keyboard from a dead command */
+        if (currentChar >= ' ' && currentChar <= '~') {
+            Serial.print(currentChar);
+        }
         commandBuffer[commandLength++] = currentChar;
     }
 }
@@ -129,15 +209,32 @@ void handleUsbMaintenanceCommands()
 }
 #endif
 
+/* The car reports the end of a command batch on the radio; the box animates
+ * it here, where the state machine and the LEDs live */
+void onProgramDone()
+{
+    gbox.runProgramDoneAnimation();
+}
+
 /* Arduino-specific function for button interrupt */
 void ISR()
 {
 #ifdef ARDUINO
-    Event evt(EventId::BUTTON_PRESSED);
+    /* Record the edge and the level it left behind, then let the loop print
+     * it: a press holds the line low, a rail transient is gone by the time
+     * the interrupt runs */
+    ++button_edges;
+    button_edge_ms = millis();
+    button_edge_level = (digitalRead(PIN_WAKE_BUTTON) == HIGH) ? 1 : 0;
+    /* A real press holds the line low; the spike a rail switch couples into
+     * it is gone by the time the interrupt runs, so it reads high here */
+    if (button_edge_level == 0) {
+        button_press_seen = true;
+    }
 #else
     Event evt = getEmulatedEvent();
-#endif
     gbox.debounceAndEnqueue(evt, millis());
+#endif
 }
 
 void enter_low_power_mode()
@@ -167,7 +264,7 @@ void setup()
         delay(10);
     }
     LOGLN("GBox BlackPill boot");
-    LOGLN("USB commands: dfu, reboot-dfu, help");
+    LOGLN("USB commands: dfu (d), reset (r), help (h, ?), ver (v), car (c), idle (i)");
 #else
     LOGLN("Gaspetto Box Initialized");
     LOGLN("Starting up...");
@@ -176,13 +273,10 @@ void setup()
 
     gbox.initHardware();
     gbox.runHealthCheck();
+    radioController.setProgramDoneHandler(onProgramDone);
+    radioController.setLogPeerPrefix("[CAR] ");
 
-    LOG(F("GBox firmware build "));
-    LOG(FW_VERSION);
-    LOG(F(" ("));
-    LOG(FW_BUILD);
-    LOG(F("), wire protocol v"));
-    LOGLN(kWireProtocolVersion);
+    printFirmwareVersion();
     /* Initialize the GBox state machine. */
 #ifndef ARDUINO
     gbox.setLowPowerModeCallback(enter_low_power_mode);
@@ -195,6 +289,27 @@ void setup()
 
 void loop()
 {
+    static uint32_t printed_edges = 0;
+    const uint32_t edges = button_edges;
+
+    if (edges != printed_edges) {
+        printed_edges = edges;
+        LOG(F("button edge #"));
+        LOG(edges);
+        LOG(F(" at "));
+        LOG(static_cast<uint32_t>(button_edge_ms));
+        LOG(F(" ms, pin "));
+        LOGLN(button_edge_level != 0 ? F("HIGH") : F("LOW"));
+    }
+
+    /* Queue from the loop, not from the interrupt, but keep the press seen
+     * by the ISR: a real press during a scan or a verdict animation is then
+     * still accepted once the loop comes back */
+    if (button_press_seen) {
+        button_press_seen = false;
+        Event evt(EventId::BUTTON_PRESSED);
+        gbox.debounceAndEnqueue(evt, millis());
+    }
     handleUsbMaintenanceCommands();
     gbox.work();
 }

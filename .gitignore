@@ -17,6 +17,7 @@ datasheet/rm-stm32f411xce.pdf
 datasheet/stm32f411ce.pdf
 .venv
 MEDIA/
+**/__pycache__/
 
 # VS Code: churns on every editor session (recommendations, local paths,
 # settings) and only ever reflects the machine it was written on

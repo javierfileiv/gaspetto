@@ -5,6 +5,7 @@
 #include "FirmwareVersion.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
+#include "radio_send.h"
 
 #include <cstring>
 
@@ -71,6 +72,10 @@ void RadioController::init()
     _radio.setPALevel(PA_LEVEL);
     _radio.setDataRate(DATA_RATE);
     _radio.setAddressWidth(5);
+    /* Three retransmissions instead of the library's fifteen: a packet the
+     * other side never acknowledges must not cost 22 ms, and the bounded send
+     * in sendBuffer needs MAX_RT to arrive well inside its timeout */
+    _radio.setRetries(2, 3);
     /* Support both EventPacket (2 bytes) and CommandPacket (32 bytes). */
     _radio.setPayloadSize(sizeof(CommandPacket));
     _radio.openWritingPipe(writing_addr);
@@ -105,18 +110,18 @@ void RadioController::processRadio()
     uint8_t buffer[sizeof(CommandPacket)];
     uint8_t pipe;
 
+    /* Quiet: the chip is out of RX mode and nothing must be read from it */
+    if (radioQuiet) {
+        return;
+    }
+
     /* RX processing. */
     if (_radio.available(&pipe)) {
         _radio.read(buffer, sizeof(buffer)); /* Fetch payload from FIFO. */
 
-        /* An image transfer is thousands of packets: a log line per packet
-         * would make the receiver deaf while it transmits the line, on the
-         * very channel the transfer is using */
-        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
-            LOG(F("Radio RX: pipe "));
-            LOG(static_cast<int>(pipe));
-            LOGLN();
-        }
+        /* The pipe is not printed: the packet's own line below says what
+         * arrived, and a periodic answer such as the link ping printed one
+         * bare "pipe 1" per second with nothing to explain it */
 
         /* Byte 0 names the packet: a program keeps its command count
          * there (never above 31) and every other kind carries a
@@ -188,10 +193,39 @@ void RadioController::processRadio()
         case PacketTag::Version: {
             VersionPacket version;
             std::memcpy(&version, buffer, sizeof(version));
-            LOG(F("Radio RX: Version build="));
-            LOGLN(static_cast<int>(version.build));
+            versionLastMs = millis();
+
+            /* A box pings once a second: printing the same identity every time
+             * would flood the console, so only a new one, or an answer the
+             * operator asked for, gets a line */
+            const bool sameIdentity =
+                    version.build == versionBuild && version.wire == versionWire &&
+                    std::strncmp(version.version, versionHash, sizeof(versionHash)) == 0;
+
+            if (versionLogForced || !sameIdentity) {
+                versionBuild = version.build;
+                versionWire = version.wire;
+                std::strncpy(versionHash, version.version, sizeof(versionHash) - 1);
+                versionHash[sizeof(versionHash) - 1] = '\0';
+                versionLogForced = false;
+
+                LOG(F("Radio RX: version build "));
+                LOG(static_cast<int>(version.build));
+                LOG(F(" ("));
+                LOG(version.version);
+                LOG(F("), wire protocol v"));
+                LOGLN(static_cast<int>(version.wire));
+            }
             break;
         }
+        case PacketTag::ProgramDone:
+            /* The car finished the batch it was given: let the application
+             * animate it, it knows what a finished program means */
+            LOGLN(F("Radio RX: program done"));
+            if (programDoneHandler != nullptr) {
+                programDoneHandler();
+            }
+            break;
         case PacketTag::Ota: {
             OtaPacket packet;
             std::memcpy(&packet, buffer, sizeof(packet));
@@ -231,15 +265,14 @@ void RadioController::processRadio()
         LOGLN(commandIdToString(evt.getPayload()));
         evt.toPacket(packet);
         packet.tag = static_cast<uint8_t>(PacketTag::Event);
-        /* Stop listening. */
-        _radio.stopListening();
-        _radio.write(&packet, sizeof(packet));
+        /* Same bounded path as every other send: the caller reports whether
+         * the other side acknowledged, and a dead chip cannot hold the loop */
+        sendBuffer(&packet, sizeof(packet));
         LOG(F("RadioController::ProcessRadio: Sent EventId:"));
         LOG(eventIdToString(static_cast<EventId>(packet.eventId)));
         LOG(F(" CommandId:"));
         LOG(commandIdToString(static_cast<CommandId>(packet.payload)));
         LOGLN(F("."));
-        _radio.startListening();
     }
 }
 
@@ -274,15 +307,37 @@ EventQueue *RadioController::getRadioQueue()
 
 bool RadioController::sendBuffer(const void *data, uint8_t len)
 {
-    _radio.stopListening();
-    const bool result = _radio.write(data, len);
-    _radio.startListening();
+    /* RF24's write() returns as soon as the payload is loaded, so it reports
+     * success before the acknowledgement can be known. This bounded pair
+     * waits for TX_DS or MAX_RT, which makes the verdict real, and gives up
+     * after the timeout so a chip that never answers cannot hold the loop.
+     *
+     * startWrite()'s return value is ignored on purpose: it reports bit 0 of
+     * the STATUS register, which is RX_DR, not the TX FIFO's full flag, so a
+     * telemetry packet waiting in the RX FIFO made it look like a failed load
+     * and the send was reported refused while the car had answered */
+    constexpr uint32_t TX_TIMEOUT_MS = 10;
+
+    /* Quiet: a program or a log must not go out while the radio is handed to
+     * another link. Refusing here also keeps the chip from loading a payload
+     * it cannot transmit */
+    if (radioQuiet) {
+        LOGLN(F("RadioController: radio is idle, send refused"));
+        return false;
+    }
+
+    const bool result = radio_send(_radio, data, len, TX_TIMEOUT_MS);
 
     if (!result) {
         /* An image transfer fails and retries by design, and a log line would
          * take two more packets on the channel that is already the bottleneck,
          * which is what turned one lost answer into a storm of losses */
-        if (static_cast<const uint8_t *>(data)[0] != static_cast<uint8_t>(PacketTag::Ota)) {
+        /* Telemetry is periodic best effort, and a log line per lost sample
+         * would add traffic to the channel that just lost one */
+        const uint8_t tag = static_cast<const uint8_t *>(data)[0];
+        if (tag != static_cast<uint8_t>(PacketTag::Ota) &&
+            tag != static_cast<uint8_t>(PacketTag::Telemetry) &&
+            tag != static_cast<uint8_t>(PacketTag::VersionRequest)) {
             LOGLN(F("RadioController::sendBuffer failed"));
         }
     }
@@ -301,6 +356,33 @@ void RadioController::setOtaHandler(OtaHandler handler)
     otaWarningShown = false;
 }
 
+void RadioController::setProgramDoneHandler(ProgramDoneHandler handler)
+{
+    programDoneHandler = handler;
+}
+
+void RadioController::setLogPeerPrefix(const char *prefix)
+{
+    logPeerPrefix = prefix;
+}
+
+void RadioController::setQuiet(bool quiet)
+{
+    if (quiet == radioQuiet) {
+        return;
+    }
+    radioQuiet = quiet;
+
+    /* RX is where the chip answers a packet with its acknowledge: leaving that
+     * mode is what makes it silent, and sendBuffer() refuses the other
+     * direction while the flag is set */
+    if (radioQuiet) {
+        _radio.stopListening();
+    } else {
+        _radio.startListening();
+    }
+}
+
 bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
 {
     /* One address for everything this device sends: sendBuffer() switches
@@ -310,11 +392,7 @@ bool RadioController::sendTelemetry(const TelemetryPacket &telemetry)
     TelemetryPacket packet = telemetry;
     packet.tag = static_cast<uint8_t>(PacketTag::Telemetry);
 
-    const bool result = sendBuffer(&packet, sizeof(packet));
-    if (!result) {
-        LOGLN(F("Telemetry send failed"));
-    }
-    return result;
+    return sendBuffer(&packet, sizeof(packet));
 }
 
 void RadioController::decodeCommandPacket(const CommandPacket &packet)
@@ -373,6 +451,12 @@ void RadioController::handleLogFragment(const uint8_t *buffer)
 
     if (hasMore) {
         return;
+    }
+
+    /* Name the sender once the line is complete: the receiver's own log
+     * lines have no prefix, and the two must not be confused in one stream */
+    if (logPeerPrefix != nullptr) {
+        LOG(logPeerPrefix);
     }
 
     for (uint8_t i = 0; i < logLineLen; ++i) {

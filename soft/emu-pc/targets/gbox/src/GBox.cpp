@@ -7,7 +7,9 @@
 #include "Events.h"
 #include "PieceProgram.h"
 #include "RadioController.h"
-#include "piece_thresholds.h"
+#include "RadioProtocol.h"
+#include "led_strip.h"
+#include "piece_decode.h"
 #include "pin_definitions.h"
 
 #include <Adafruit_ADS1X15.h>
@@ -18,7 +20,6 @@
 #include "i2c3_bitbang.h"
 #include "stm32f4xx_hal.h"
 
-#include <Adafruit_NeoPixel.h>
 #endif
 #include <Wire.h>
 
@@ -52,29 +53,6 @@ static_assert(GASPETTO_ADC_SAMPLES_PER_CHANNEL > 0,
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES > 0, "GASPETTO_ADC_MIN_VALID_SAMPLES must be >= 1");
 static_assert(GASPETTO_ADC_MIN_VALID_SAMPLES <= GASPETTO_ADC_SAMPLES_PER_CHANNEL,
               "GASPETTO_ADC_MIN_VALID_SAMPLES must be <= GASPETTO_ADC_SAMPLES_PER_CHANNEL");
-
-/* Decode table ordered by measured ascending raw value:
- *   TURN_LEFT (8640) < BACKWARD (11470) < EMPTY (13048) <
- *   TURN_RIGHT (13679) < FORWARD (14418) < LOOP_CALL (15957) */
-constexpr std::array<AdcDecodeEntry, 6> kAdcDecodeTable = {
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_LEFT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_BACKWARD_START - 1),
-                    BoxPieceId::TURN_LEFT, "TURN_LEFT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_BACKWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_EMPTY_START - 1),
-                    BoxPieceId::BACKWARD, "BACKWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_EMPTY_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START - 1),
-                    BoxPieceId::EMPTY, "EMPTY" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_TURN_RIGHT_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_FORWARD_START - 1),
-                    BoxPieceId::TURN_RIGHT, "TURN_RIGHT" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_FORWARD_START,
-                    static_cast<uint16_t>(GASPETTO_ADC_THRESHOLD_LOOP_START - 1),
-                    BoxPieceId::FORWARD, "FORWARD" },
-    AdcDecodeEntry{ GASPETTO_ADC_THRESHOLD_LOOP_START, GASPETTO_ADC_THRESHOLD_LOOP_END,
-                    BoxPieceId::LOOP_CALL, "LOOP_CALL" },
-};
 
 constexpr uint8_t kChannelsPerAds = 4;
 constexpr uint32_t kI2cClockHz = GASPETTO_I2C_CLOCK_HZ;
@@ -117,23 +95,39 @@ constexpr std::array<AdsDeviceConfig, 5> kAdsDevices = {
     AdsDeviceConfig{ AdsBus::BUS_3, 0x4A, 16 },
 };
 
-#ifdef ARDUINO
-/* Expected LED behaviour, three NeoPixels on the strip, left to right:
- * - boot health check: led 0 (left) lights solid green when every probe passes,
- *   solid red otherwise, holds ~1.5s then goes off
- * - board scan: a cyan dot bounces led 0 -> 1 -> 2 -> back twice, then blackout
- * - program accepted: green cascades led 0 -> 1 -> 2, all three hold green
- * - build failed: led 2 (right) blinks red three times, then holds red
- * - empty board: led 2 blinks amber twice, then holds amber
- * - RF send failed: led 1 (center) blinks red three times, then holds with led
- *   1 red plus led 0 green
- * Terminal states hold their pattern ~60s, then the box arms STOP mode and all
- * LEDs go off (PC emulation runs the same patterns as log-only animations)
+/* The idle panel is repainted at this cadence, and the lost link blinks with
+ * this half-period: slow enough to read, fast enough to notice */
+constexpr uint32_t kStatusPaintMs = 100;
+constexpr uint32_t kLinkBlinkMs = 400;
+/* The program's pixel blinks at this half-period while the car runs */
+constexpr uint32_t kProgramBlinkMs = 500;
+/* The car's end notice can be lost: the blink must not run forever. Fifteen
+ * seconds covers a short program; a longer one needs this raised or scaled
+ * with the command count */
+constexpr uint32_t kProgramDoneTimeoutMs = 15000;
+
+/* Expected LED behaviour, three APA106 pixels on the strip, bottom to top:
+ * - boot health check: the bottom pixel lights solid green when every probe
+ *   passes, solid red otherwise, holds ~1.5s then goes off
+ * - board scan: a cyan dot climbs bottom -> middle -> top and back twice, then
+ *   blackout
+ * - program accepted: a green flash on the middle pixel, the link's role
+ * - build failed: the bottom pixel blinks red three times, then holds red
+ * - empty board: the bottom pixel blinks amber twice, then holds amber
+ * - RF send failed: the middle pixel blinks red three times, then holds red
+ *   with the bottom pixel green
+ * Terminal states hold their pattern ~3s, then the box goes back to idle and
+ * the rail keeps the button LED lit
+ *
+ * The strip is mounted vertically and read as the signal path: the box at the
+ * bottom, the radio in the middle, the car at the top. The chain's data input
+ * is at the top on this board, so index 0 is the top pixel and index 2 the
+ * bottom one. If the strip is wired the other way round, swapping these three
+ * constants is enough for every animation to follow.
  */
-constexpr uint8_t kLedState = 0; /* left   : system / scan state   */
-constexpr uint8_t kLedRadio = 1; /* center : radio status           */
-constexpr uint8_t kLedBuild = 2; /* right  : build / program error  */
-#endif
+constexpr uint8_t kLedCar = 0; /* top    : the car and its run   */
+constexpr uint8_t kLedLink = 1; /* middle : the radio link        */
+constexpr uint8_t kLedBuild = 2; /* bottom : the board and build   */
 
 TwoWire &wireForAdsBus(AdsBus bus)
 {
@@ -189,10 +183,14 @@ GBox::GBox(Context &ctx)
         : GenericActiveObject()
         , _ctx(ctx)
         , lastScan{}
-#ifdef ARDUINO
-        , leds_(BOX_LED_COUNT, PIN_LED_DATA, NEO_GRB + NEO_KHZ800)
-#endif
         , initialized_(false)
+        , programRunning_(false)
+        , programAnimMs_(0)
+        , programStartedMs_(0)
+        , programAnimStep_(0)
+        , systemOk_(true)
+        , lastVersionSeenMs_(0)
+        , statusPaintedMs_(0)
         , lastDebounceTime_(0)
         , isScanning_(false)
 {
@@ -216,6 +214,20 @@ int GBox::postEvent(Event evt)
 
 void GBox::work()
 {
+    /* The box is the receiver of the pair: telemetry, logs and version
+     * requests arrive on _box_ and are answered or printed here. Reading one
+     * packet per pass keeps the chip acknowledged without delaying the state
+     * machine, and it is also what makes the car's log writes cheap */
+    if (_ctx.radioController != nullptr) {
+        _ctx.radioController->processRadio();
+    }
+
+    /* The breath and the idle panel run from the loop, so the box stays
+     * responsive while the car drives the program */
+    serviceProgramAnimation();
+    serviceLink();
+    serviceStatus();
+
     if (_ctx.mainEventQueue && !_ctx.mainEventQueue->IsEmpty()) {
         Event evt;
 
@@ -227,8 +239,8 @@ void GBox::work()
 
 void GBox::enterLowPowerMode()
 {
-    prepareForStop();
 #ifdef LOW_POWER_MODE
+    prepareForStop();
 #ifndef ARDUINO
     LOGLN("Entering low-power mode...\n");
     if (lowPowerCallback_) {
@@ -240,6 +252,13 @@ void GBox::enterLowPowerMode()
     HAL_ResumeTick();
     restoreFromStop();
 #endif
+#else
+    /* Stop is not implemented yet, so the 5V rail stays up and the button's
+     * LED stays lit; only the pixel chain is cleared. The chaser keeps its
+     * own rail while the car runs the program */
+    if (!programRunning_) {
+        blackoutLeds();
+    }
 #endif
 }
 
@@ -295,11 +314,7 @@ void GBox::initHardware()
     gI2c3.setSDA(I2C3_SDA_PIN);
     gI2c3.begin();
 
-#ifdef ARDUINO
-    leds_.begin();
-    leds_.clear();
-    leds_.show();
-#endif
+    led_strip_begin();
 
     if (_ctx.radioController != nullptr) {
         _ctx.radioController->init();
@@ -351,27 +366,27 @@ bool GBox::runHealthCheck()
 
     LOGLN("--- Check complete ---");
 
+    systemOk_ = allOk;
     showHealthStatus(allOk);
     setSensorRailEnabled(false);
     return allOk;
 #else
+    systemOk_ = true;
     return true;
 #endif
 }
 
 void GBox::showHealthStatus(bool ok)
 {
-#ifdef ARDUINO
     if (ok) {
-        leds_.setPixelColor(0, leds_.Color(0, 50, 0)); /* Green. */
+        led_strip_set(kLedBuild, 0, 50, 0); /* Green. */
     } else {
-        leds_.setPixelColor(0, leds_.Color(50, 0, 0)); /* Red. */
+        led_strip_set(kLedBuild, 50, 0, 0); /* Red. */
     }
-    leds_.show();
-    delay(1500);
-    leds_.setPixelColor(0, 0);
-    leds_.show();
-#endif
+    led_strip_show();
+    delayMs(1500);
+    led_strip_set(kLedBuild, 0, 0, 0);
+    led_strip_show();
 }
 
 #ifndef ARDUINO
@@ -379,8 +394,9 @@ void GBox::showHealthStatus(bool ok)
 void GBox::injectBoardPieces(const BoxBoardPieces &boardPieces)
 {
     for (std::size_t index = 0; index < BOX_TOTAL_SLOTS; ++index) {
-        Adafruit_ADS1115::setRawValue(index,
-                                      static_cast<int16_t>(rawValueForPiece(boardPieces[index])));
+        Adafruit_ADS1115::setRawValue(
+                index, static_cast<int16_t>(piece_raw_for_slot(static_cast<uint8_t>(index),
+                                                               boardPieces[index])));
     }
     LOGLN("GBox: board pieces injected.");
 }
@@ -440,10 +456,8 @@ void GBox::setLedRailEnabled(bool enabled)
 
 void GBox::blackoutLeds()
 {
-#ifdef ARDUINO
-    leds_.clear();
-    leds_.show();
-#endif
+    led_strip_fill(0, 0, 0);
+    led_strip_show();
     LOGLN("LEDs: blackout.");
 }
 
@@ -457,143 +471,119 @@ void GBox::runScanAnimation()
     setLedRailEnabled(true);
     delayMs(50);
 
-#ifdef ARDUINO
-    /* Bouncing cyan on kLedState → kLedRadio → kLedBuild → back, 2 round trips. */
+    /* Bouncing cyan from bottom to top and back, 2 round trips: the scan
+     * belongs to the box, and the motion reads along the column */
     for (int trip = 0; trip < 2; ++trip) {
         for (int i = 0; i < 3; ++i) {
-            leds_.clear();
-            leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 80, 80));
-            leds_.show();
+            led_strip_fill(0, 0, 0);
+            led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
+            led_strip_show();
             delayMs(120);
         }
         for (int i = 1; i >= 0; --i) {
-            leds_.clear();
-            leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 80, 80));
-            leds_.show();
+            led_strip_fill(0, 0, 0);
+            led_strip_set(static_cast<uint16_t>(i), 0, 80, 80);
+            led_strip_show();
             delayMs(120);
         }
     }
     blackoutLeds();
-#else
-    for (std::size_t led = 0; led < BOX_LED_COUNT; ++led) {
-        LOG("LED scanner CYAN led (Scan animation) ");
-        LOG(static_cast<int>(led) + 1);
-        LOGLN();
-        delayMs(15);
-    }
-#endif
 }
 
 void GBox::runSuccessAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
-    /* Cascade green: LED0 → LED1 → LED2, then hold all solid green ~1min. */
-    leds_.clear();
-    for (int i = 0; i < 3; ++i) {
-        leds_.setPixelColor(static_cast<uint16_t>(i), leds_.Color(0, 100, 0));
-        leds_.show();
-        delayMs(150);
-    }
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
-#else
-    for (int pulse = 0; pulse < 3; ++pulse) {
-        LOG("LED pulse GREEN step (Success animation) ");
-        LOG(pulse + 1);
-        LOGLN();
-        delayMs(70);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
+    /* An acknowledged send says the link works, which is the middle pixel's
+     * role: the other two keep their own meaning. A short flash is enough,
+     * and the yellow breath follows at once while the car drives */
+    led_strip_fill(0, 0, 0);
+    led_strip_set(kLedLink, 0, 100, 0);
+    led_strip_show();
+    delayMs(150);
 }
 
 void GBox::runBuildErrorAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
-    /* kLedBuild (right) blinks red ×3, then holds red on kLedBuild. */
+    /* The bottom pixel blinks red ×3, then holds: building the program is the
+     * box's job, so the failure sits on its own pixel */
     for (int blink = 0; blink < 3; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedBuild, leds_.Color(150, 0, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedBuild, 150, 0, 0);
+        led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    leds_.setPixelColor(kLedBuild, leds_.Color(150, 0, 0));
-    leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
-#else
-    LOGLN("LED build error: LED2 blinks red (Build error animation).");
-    for (int blink = 0; blink < 3; ++blink) {
-        LOG("LED blink RED (build) step (Build error animation) ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(90);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
+    led_strip_set(kLedBuild, 150, 0, 0);
+    led_strip_show();
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 }
 
 void GBox::runEmptyBoardAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
-    /* kLedBuild (right) blinks amber ×2, then holds amber on kLedBuild. */
+    /* The bottom pixel blinks amber ×2, then holds: there was nothing on the
+     * board to build from */
     for (int blink = 0; blink < 2; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedBuild, leds_.Color(100, 60, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedBuild, 100, 60, 0);
+        led_strip_show();
         delayMs(200);
         blackoutLeds();
         delayMs(100);
     }
-    leds_.setPixelColor(kLedBuild, leds_.Color(100, 60, 0));
-    leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
-#else
-    LOGLN("LED empty board: LED2 blinks amber.");
-    for (int blink = 0; blink < 2; ++blink) {
-        LOG("LED blink AMBER (empty) step ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(200);
-    }
-    blackoutLeds();
-    setLedRailEnabled(false);
-#endif
+    led_strip_set(kLedBuild, 100, 60, 0);
+    led_strip_show();
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
 }
 
 void GBox::runRfErrorAnimation()
 {
     setLedRailEnabled(true);
-#ifdef ARDUINO
-    /* kLedRadio (center) blinks red ×3, then holds: kLedState green + kLedRadio red. */
+    /* The middle pixel blinks red ×3, then holds red with the bottom pixel
+     * green: the board is fine, the link is not */
     for (int blink = 0; blink < 3; ++blink) {
-        leds_.clear();
-        leds_.setPixelColor(kLedRadio, leds_.Color(150, 0, 0));
-        leds_.show();
+        led_strip_fill(0, 0, 0);
+        led_strip_set(kLedLink, 150, 0, 0);
+        led_strip_show();
         delayMs(90);
         blackoutLeds();
         delayMs(45);
     }
-    leds_.setPixelColor(kLedState, leds_.Color(0, 80, 0));
-    leds_.setPixelColor(kLedRadio, leds_.Color(150, 0, 0));
-    leds_.show();
-    delayMs(60000); /* Hold result visible ~1min before STOP. */
-#else
-    LOGLN("LED radio error: LED1 blinks red.");
-    for (int blink = 0; blink < 3; ++blink) {
-        LOG("LED blink RED (radio) step ");
-        LOG(blink + 1);
-        LOGLN();
-        delayMs(90);
+    led_strip_set(kLedBuild, 0, 80, 0);
+    led_strip_set(kLedLink, 150, 0, 0);
+    led_strip_show();
+    /* Long enough to read the colour, short enough that the button still works */
+    delayMs(3000);
+}
+
+void GBox::runProgramDoneAnimation()
+{
+    programRunning_ = false;
+    setLedRailEnabled(true);
+    delayMs(50);
+
+    /* Two green pulses, then hold: the car finished the batch it was given.
+     * Unlike the acknowledgement, this is the real end of the program */
+    for (int pulse = 0; pulse < 2; ++pulse) {
+        led_strip_fill(0, 0, 0);
+        for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+            led_strip_set(i, 0, 100, 0);
+        }
+        led_strip_show();
+        delayMs(300);
+        blackoutLeds();
+        delayMs(150);
     }
+    for (uint16_t i = 0; i < LED_STRIP_COUNT; ++i) {
+        led_strip_set(i, 0, 100, 0);
+    }
+    led_strip_show();
+    delayMs(1500);
     blackoutLeds();
-    setLedRailEnabled(false);
-#endif
 }
 
 void GBox::scanSlots()
@@ -688,7 +678,9 @@ void GBox::scanSlots()
             }
 
             lastScan[slot].rawValue = readOk ? rawU16 : 0;
-            lastScan[slot].piece = readOk ? decodePiece(rawU16) : BoxPieceId::INVALID;
+            lastScan[slot].piece = readOk ? piece_decode(static_cast<uint8_t>(slot),
+                                                         static_cast<int16_t>(rawU16)) :
+                                            BoxPieceId::INVALID;
 
             LOG("Scan slot ");
             LOG(static_cast<int>(slot) + 1);
@@ -721,6 +713,11 @@ void GBox::scanSlots()
                 LOG(negativeCount);
                 LOGLN(" => INVALID");
             }
+
+            /* A program already running keeps its breath: the slot reads block
+             * the loop, and freezing the strip for the whole scan would look
+             * like the car stopped */
+            serviceProgramAnimation();
         }
     }
 }
@@ -760,7 +757,118 @@ bool GBox::sendProgram(const CommandPacket &packet)
     LOG(packet.count);
     LOGLN(" commands.");
 
-    return _ctx.radioController->sendBuffer(&packet, sizeof(packet));
+    const bool wasRunning = programRunning_;
+    const bool sent = _ctx.radioController->sendBuffer(&packet, sizeof(packet));
+
+    /* The car appends a program sent while another runs, so the breath must not
+     * jump back to black for it. A failed send does not cancel the run either:
+     * the car is still driving the previous program */
+    if (sent) {
+        /* An appended program extends the run, so the cap restarts with every
+         * accepted send instead of expiring mid-program */
+        programStartedMs_ = millis();
+
+        if (!wasRunning) {
+            programAnimMs_ = millis();
+            programAnimStep_ = 0;
+        }
+    }
+
+    programRunning_ = sent || wasRunning;
+    return sent;
+}
+
+void GBox::serviceProgramAnimation()
+{
+    if (!programRunning_) {
+        return;
+    }
+
+    const uint32_t now = millis();
+
+    /* The end notice never came: stop pretending the car is still working */
+    if ((now - programStartedMs_) >= kProgramDoneTimeoutMs) {
+        programRunning_ = false;
+        led_strip_set(kLedCar, 0, 0, 0);
+        led_strip_show();
+        LOGLN("ProgramDone timeout, the yellow blink stops here.");
+        return;
+    }
+
+    if ((now - programAnimMs_) < kProgramBlinkMs) {
+        return;
+    }
+    programAnimMs_ = now;
+
+    /* The car's pixel is the one that speaks for the car: it blinks yellow
+     * while the program runs, and the box and link pixels keep saying their
+     * own state instead of being borrowed by the animation */
+    const bool lit = (programAnimStep_ == 0);
+
+    led_strip_set(kLedCar, lit ? 180 : 0, lit ? 130 : 0, 0);
+    led_strip_show();
+    programAnimStep_ = static_cast<uint8_t>((programAnimStep_ + 1U) % 2U);
+}
+
+void GBox::serviceLink()
+{
+    if (_ctx.radioController == nullptr) {
+        return;
+    }
+
+    const uint32_t now = millis();
+
+    /* RadioController stamps every version answer, including the manual
+     * `car` one: a new stamp is the proof the car is still there, and the
+     * monitor only needs the arrival time, not the request that caused it */
+    const uint32_t answerMs = _ctx.radioController->lastVersionMs();
+    if (answerMs != 0 && answerMs != lastVersionSeenMs_) {
+        lastVersionSeenMs_ = answerMs;
+        linkMonitor_.noteAnswer(answerMs);
+    }
+
+    if (!linkMonitor_.service(now)) {
+        return;
+    }
+
+    VersionPacket request = {};
+
+    request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
+    _ctx.radioController->sendBuffer(&request, sizeof(request));
+}
+
+void GBox::serviceStatus()
+{
+    const uint32_t now = millis();
+    if ((now - statusPaintedMs_) < kStatusPaintMs) {
+        return;
+    }
+    statusPaintedMs_ = now;
+
+    const bool linkAlive = linkMonitor_.state() == LinkMonitor::State::Alive;
+
+    /* Bottom pixel: the board itself, green after a passing health check */
+    if (systemOk_) {
+        led_strip_set(kLedBuild, 0, 60, 0);
+    } else {
+        led_strip_set(kLedBuild, 140, 0, 0);
+    }
+
+    /* Middle pixel: the link, steady green while fresh, blinking red once the
+     * car has been silent for too long */
+    if (linkAlive) {
+        led_strip_set(kLedLink, 0, 60, 0);
+    } else if (((now / kLinkBlinkMs) % 2U) == 0U) {
+        led_strip_set(kLedLink, 140, 0, 0);
+    }
+
+    /* Top pixel: the program animation owns it while the car works, so only
+     * clear it once the run is over */
+    if (!programRunning_) {
+        led_strip_set(kLedCar, 0, 0, 0);
+    }
+
+    led_strip_show();
 }
 
 void GBox::prepareForStop()
@@ -769,28 +877,6 @@ void GBox::prepareForStop()
     setLedRailEnabled(false);
     setSensorRailEnabled(false);
     LOGLN("GBox: STOP mode armed.");
-}
-
-uint16_t GBox::rawValueForPiece(BoxPieceId piece) const
-{
-    for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
-        if (entry.piece == piece) {
-            return static_cast<uint16_t>((entry.minValue + entry.maxValue) / 2U);
-        }
-    }
-
-    return 0;
-}
-
-BoxPieceId GBox::decodePiece(uint16_t rawValue) const
-{
-    for (const AdcDecodeEntry &entry : kAdcDecodeTable) {
-        if (rawValue >= entry.minValue && rawValue <= entry.maxValue) {
-            return entry.piece;
-        }
-    }
-
-    return BoxPieceId::INVALID;
 }
 
 const char *GBox::pieceToString(BoxPieceId piece) const

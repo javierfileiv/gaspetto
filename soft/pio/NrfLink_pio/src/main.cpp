@@ -1,37 +1,60 @@
 #include "Arduino.h"
 #include "CommandPacket.h"
-#include "Crc32.h"
 #include "Events.h"
 #include "Log.h"
-#include "OtaProtocol.h"
 #include "RF24.h"
 #include "RadioProtocol.h"
+#include "WireVersion.h"
 #include "config_radio.h"
+#include "link_modes.h"
+#include "ota.h"
+#include "radio_send.h"
+#include "radio_timing.h"
 
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include <string.h>
 
-/* Mode 1 emulates the car: it listens for the program the Box sends on
- * _car_ and answers with telemetry on _box_, where the box listens. Mode 2
- * emulates the box: it sends commands on _car_ and listens for telemetry
- * on _box_. The car is the default because the bench test drives the box
- * side. */
-constexpr uint8_t kModeCar = 1;
-constexpr uint8_t kModeBox = 2;
+/* Telemetry every 500 ms while a simulated program runs, like the car: it
+ * sends none when it is idle, so the stream follows the execution instead of
+ * running for its own sake */
+constexpr uint32_t kTelemetryPeriodMs = 500;
 
-/* One telemetry packet per second in car mode, so the link can be watched
- * without touching the keyboard */
-constexpr uint32_t kTelemetryPeriodMs = 1000;
+/* A simulated command takes this long, which is about the car's quarter turn:
+ * the box then has a real program window to animate */
+constexpr uint32_t kMovementDurationMs = 3000;
+constexpr uint8_t kProgramCapacity = BOX_MAX_PAYLOAD_COMMANDS;
 
 RF24 radio(NRF24_CE, NRF24_CSN);
 
 uint8_t gMode = kModeCar;
+
+/* Car emulation plays a received program command by command and sends the
+ * same end notice the real car sends: without it the box's yellow breath
+ * never stops, and the bench cannot replace the car */
+uint8_t gProgramCommands[kProgramCapacity];
+uint8_t gProgramCount = 0;
+uint8_t gProgramIndex = 0;
+uint32_t gProgramStartMs = 0;
+bool gProgramActive = false;
+
+/* Car-mode faults: each one removes a single thing the real car does, so the
+ * box can be watched reacting to the failure without unplugging anything */
+bool gNoProgramDone = false;
+bool gNoPingAnswer = false;
+bool gNoAck = false;
+bool gNoChatter = false;
+
+/* Mode to give back after the post-OTA log window, 0 when none is pending */
+uint8_t gPendingMode = 0;
+uint32_t gPendingModeAt = 0;
 uint32_t gLastTelemetryMs = 0;
 uint16_t gTelemetryTick = 0;
 
-/* One simulated car log line every kLogPeriodMs, offset from the telemetry
- * period so the fragments and the telemetry never land on the same beat */
+/* One simulated car log line every kLogPeriodMs while a program runs, offset
+ * from the telemetry period so the fragments and the telemetry never land on
+ * the same beat. At rest the emulator stays silent, like the car, so a box
+ * just flashed shows nothing until a program is sent */
 constexpr uint32_t kLogPeriodMs = 430;
 uint32_t gLastLogMs = 0;
 uint16_t gLogTick = 0;
@@ -53,13 +76,15 @@ void sendCarLog();
 void sendDfuRequest();
 void sendIrqTest();
 void drainRadio();
-void runOtaStream();
-void runOtaSelfTest();
 void drainLogFragment(uint8_t pipe, const uint8_t *payload);
 void displayTelemetry(const TelemetryPacket &t);
 void displayCommandPacket(const CommandPacket &pkt);
 void displayVersion(const VersionPacket &version);
 void sendVersionRequest();
+void respondVersion();
+void queueProgram(const CommandPacket &packet);
+void serviceCarProgram();
+void sendProgramDone();
 
 void setup()
 {
@@ -131,6 +156,35 @@ static void printAddress(const uint8_t *addr)
 void setMode(uint8_t mode)
 {
     gMode = mode;
+    gPendingMode = 0;
+
+    /* The program queue belongs to car emulation: leaving the mode drops it,
+     * or a stale end notice would arrive after the operator moved on */
+    if (gMode != kModeCar) {
+        gProgramActive = false;
+        gProgramCount = 0;
+        gProgramIndex = 0;
+
+        /* The ACK injection would break the OTA relay, whose pipe setup this
+         * mode switch is usually preparing */
+        if (gNoAck) {
+            gNoAck = false;
+            radio.setAutoAck(true);
+        }
+    }
+
+    if (gMode == kModeQuiet) {
+        /* Leaving RX mode stops the chip from hearing a packet and from
+         * answering its acknowledge; the sends are guarded in drainRadio()
+         * and the loop, and the log transport falls back to the console so
+         * the operator keeps the lines without a byte on the air */
+        Log::setMuted(true);
+        radio.stopListening();
+        Serial.println(F("[mode] 3 = quiet, radio idle, console only"));
+        return;
+    }
+
+    Log::setMuted(false);
 
     if (gMode == kModeCar) {
         radio.openWritingPipe(gbox_pipe_name); /* pipe 0 = _box_, telemetry rides it */
@@ -179,9 +233,7 @@ void sendTelemetry()
     t.kd = 0.05f;
     t.pwmFreq = 1000.0f;
 
-    radio.stopListening();
-    sent = radio.write(&t, sizeof(t));
-    radio.startListening();
+    sent = radio_send(radio, &t, sizeof(t), kTxTimeoutMs);
 
     Serial.print(F("[tx] telemetry #"));
     Serial.print(gTelemetryTick);
@@ -209,6 +261,135 @@ void sendCarLog()
     LOGLN(gLogTick % 60U);
 }
 
+/* How long a command takes in the simulation: movements last, stops and queue
+ * clears take effect at once, like the car */
+uint32_t commandDurationMs(uint8_t command)
+{
+    switch (static_cast<CommandId>(command)) {
+    case CommandId::MOTOR_FORWARD:
+    case CommandId::MOTOR_BACKWARD:
+    case CommandId::MOTOR_TURN_LEFT:
+    case CommandId::MOTOR_TURN_RIGHT:
+        return kMovementDurationMs;
+    default:
+        return 0;
+    }
+}
+
+void startNextCommand()
+{
+    Serial.print(F("[car] running "));
+    Serial.print(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+    Serial.print(F(" for "));
+    Serial.print(commandDurationMs(gProgramCommands[gProgramIndex]));
+    Serial.println(F(" ms"));
+}
+
+void queueProgram(const CommandPacket &packet)
+{
+    uint8_t accepted = 0;
+
+    for (uint8_t i = 0; i < packet.count && gProgramCount < kProgramCapacity; ++i) {
+        gProgramCommands[gProgramCount++] = packet.commands[i];
+        ++accepted;
+    }
+
+    Serial.print(F("[car] program queued: "));
+    Serial.print(static_cast<int>(accepted));
+    Serial.print(F(" command(s), "));
+    Serial.print(static_cast<int>(gProgramCount));
+    Serial.println(F(" pending"));
+
+    if (!gProgramActive && gProgramCount > 0) {
+        gProgramActive = true;
+        gProgramIndex = 0;
+        gProgramStartMs = millis();
+        startNextCommand();
+    }
+}
+
+void serviceCarProgram()
+{
+    if (!gProgramActive) {
+        return;
+    }
+
+    if ((millis() - gProgramStartMs) < commandDurationMs(gProgramCommands[gProgramIndex])) {
+        return;
+    }
+
+    Serial.print(F("[car] finished "));
+    Serial.println(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+
+    ++gProgramIndex;
+    gProgramStartMs = millis();
+
+    /* Instant commands are consumed in the same pass: waiting a whole loop for
+     * a stop would make the batch feel slower than the car */
+    while (gProgramIndex < gProgramCount &&
+           commandDurationMs(gProgramCommands[gProgramIndex]) == 0) {
+        Serial.print(F("[car] finished "));
+        Serial.println(commandIdToString(static_cast<CommandId>(gProgramCommands[gProgramIndex])));
+        ++gProgramIndex;
+    }
+
+    if (gProgramIndex < gProgramCount) {
+        startNextCommand();
+        return;
+    }
+
+    gProgramActive = false;
+    gProgramCount = 0;
+    gProgramIndex = 0;
+    sendProgramDone();
+}
+
+/* Same notice and same retries as the car: the box must not miss it, or its
+ * breath never stops */
+void sendProgramDone()
+{
+    constexpr uint8_t kAttempts = 10;
+
+    if (gNoProgramDone) {
+        Serial.println(F("[fault] ProgramDone suppressed"));
+        return;
+    }
+    constexpr uint32_t kRetryGapMs = 40;
+    uint8_t payload[sizeof(CommandPacket)] = {};
+
+    payload[0] = static_cast<uint8_t>(PacketTag::ProgramDone);
+
+    for (uint8_t attempt = 0; attempt < kAttempts; ++attempt) {
+        if (radio_send(radio, payload, sizeof(payload), kTxTimeoutMs)) {
+            Serial.print(F("[program] done ACKed on try "));
+            Serial.println(attempt + 1);
+            return;
+        }
+        delay(kRetryGapMs);
+    }
+
+    Serial.println(F("[program] done never acknowledged"));
+}
+
+/* The box pings the car with a VersionRequest: emulation has to answer, or the
+ * box would call the link lost with no car around */
+void respondVersion()
+{
+    VersionPacket answer = {};
+
+    if (gNoPingAnswer) {
+        Serial.println(F("[fault] ping left unanswered"));
+        return;
+    }
+
+    answer.tag = static_cast<uint8_t>(PacketTag::Version);
+    answer.wire = kWireProtocolVersion;
+    answer.build = 0; /* this tool carries no commit stamp of its own */
+    strncpy(answer.version, "nrf-link", sizeof(answer.version) - 1);
+
+    radio_send(radio, &answer, sizeof(answer), kTxTimeoutMs);
+}
+
 void displayCommandPacket(const CommandPacket &pkt)
 {
     uint8_t i;
@@ -230,9 +411,7 @@ void sendCommand(CommandId cmd)
     pkt.count = 1;
     pkt.commands[0] = static_cast<uint8_t>(cmd);
 
-    radio.stopListening();
-    sent = radio.write(&pkt, sizeof(pkt));
-    radio.startListening();
+    sent = radio_send(radio, &pkt, sizeof(pkt), kTxTimeoutMs);
 
     Serial.print(sent ? "Sent command: " : "FAILED to send: ");
     Serial.println(commandIdToString(cmd));
@@ -255,9 +434,7 @@ void sendVersionRequest()
 
     request.tag = static_cast<uint8_t>(PacketTag::VersionRequest);
 
-    radio.stopListening();
-    const bool sent = radio.write(&request, sizeof(request));
-    radio.startListening();
+    const bool sent = radio_send(radio, &request, sizeof(request), kTxTimeoutMs);
 
     if (sent) {
         ping_sent_ms = millis();
@@ -287,9 +464,7 @@ void sendDfuRequest()
         setMode(kModeBox);
     }
 
-    radio.stopListening();
-    sent = radio.write(payload, sizeof(payload));
-    radio.startListening();
+    sent = radio_send(radio, payload, sizeof(payload), kTxTimeoutMs);
 
     Serial.print(sent ? F("DFU request ACKed by the car") : F("DFU request FAILED (no ACK)"));
     Serial.println(F(", the board should re-enumerate in about a second"));
@@ -314,9 +489,7 @@ void sendIrqTest()
         setMode(kModeBox);
     }
 
-    radio.stopListening();
-    sent = radio.write(payload, sizeof(payload));
-    radio.startListening();
+    sent = radio_send(radio, payload, sizeof(payload), kTxTimeoutMs);
 
     Serial.print(sent ? F("IRQ test ACKed by the car") : F("IRQ test FAILED (no ACK)"));
     Serial.println(F(", its A4 report follows"));
@@ -345,9 +518,7 @@ void sendProgram()
         return;
     }
 
-    radio.stopListening();
-    sent = radio.write(&currentProgram, sizeof(currentProgram));
-    radio.startListening();
+    sent = radio_send(radio, &currentProgram, sizeof(currentProgram), kTxTimeoutMs);
 
     Serial.print(sent ? "Sent program with " : "FAILED to send program with ");
     Serial.print(currentProgram.count);
@@ -423,6 +594,10 @@ void drainRadio()
 {
     uint8_t pipe;
 
+    if (gMode == kModeQuiet) {
+        return;
+    }
+
     while (radio.available(&pipe)) {
         uint8_t payload[sizeof(CommandPacket)] = { 0 };
 
@@ -446,11 +621,24 @@ void drainRadio()
 
             memcpy(&version, payload, sizeof(version));
             displayVersion(version);
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::VersionRequest)) {
+            respondVersion();
+        } else if (payload[0] == static_cast<uint8_t>(PacketTag::ProgramDone)) {
+            Serial.println(F("[program] done: the car finished the batch"));
         } else if (gMode == kModeCar) {
             CommandPacket cmd;
 
             memcpy(&cmd, payload, sizeof(cmd));
             displayCommandPacket(cmd);
+
+            /* With the acknowledge off the box sees its send fail: the car
+             * must look unreachable, not run the program four times as the
+             * sender retransmits */
+            if (gNoAck) {
+                Serial.println(F("[fault] program dropped (ACK OFF)"));
+            } else {
+                queueProgram(cmd);
+            }
         } else if (payload[0] == static_cast<uint8_t>(PacketTag::Telemetry)) {
             TelemetryPacket tlm;
 
@@ -463,399 +651,15 @@ void drainRadio()
     }
 }
 
-/* ========================================== */
-/* OTA relay                                  */
-/* ========================================== */
-/* The PC streams a binary image on this port: a 0x01 start byte, the image
- * length and its CRC as two little-endian words, then the image itself. Every
- * 28-byte chunk becomes one Data packet. The nRF24 acknowledges each packet at
- * the hardware level, so the car never answers during the data phase: it only
- * speaks once after the erase, once for the CRC, and on a real error. That is
- * what keeps the channel out of the turnaround race two thousand times over */
-constexpr uint8_t kOtaStart = 0x01;
-/* Control codes, not letters: NrfLink prints hex addresses and log lines
- * on the same port, and a plain 'F' would be read as a refusal */
-constexpr uint8_t kOtaAck = 0x06;
-constexpr uint8_t kOtaNak = 0x15;
-/* Flow control, and the only byte that travels during the data phase: one
- * credit per group of packets means "I have taken that much, send more" */
-constexpr uint8_t kOtaCredit = 0x11;
-constexpr uint8_t kOtaCreditPackets = 4;
-constexpr uint16_t kOtaTimeoutMs = 5000;
-/* The car erases the staging sector before it can take a byte, and writes the
- * record through another erase when the image is complete */
-constexpr uint16_t kOtaBeginAckMs = 6000;
-constexpr uint16_t kOtaEndAckMs = 10000;
-/* A failed write already means the car's FIFO was full and cost two
- * milliseconds of hardware retransmissions. Three tries cover a short backlog
- * and still keep the whole stall under ten milliseconds, which is what the
- * serial buffer can absorb while the PC keeps sending */
-constexpr uint8_t kOtaWriteAttempts = 3;
-
-bool readExact(uint8_t *buffer, uint8_t count, uint16_t timeoutMs)
-{
-    uint8_t got = 0;
-    const uint32_t start = millis();
-
-    while (got < count) {
-        if (Serial.available() > 0) {
-            buffer[got++] = static_cast<uint8_t>(Serial.read());
-            continue;
-        }
-        if (millis() - start > timeoutMs) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/* After a failed transfer the PC may still be sending: eat what is left so a
- * 0x01 inside the image cannot start a bogus session from the main loop */
-void drainSerial(uint16_t ms)
-{
-    const uint32_t start = millis();
-
-    while (millis() - start < ms) {
-        while (Serial.available() > 0) {
-            Serial.read();
-        }
-    }
-}
-
-void writeLe32(uint8_t *at, uint32_t value)
-{
-    at[0] = static_cast<uint8_t>(value);
-    at[1] = static_cast<uint8_t>(value >> 8);
-    at[2] = static_cast<uint8_t>(value >> 16);
-    at[3] = static_cast<uint8_t>(value >> 24);
-}
-
-bool sendOtaPacket(OtaKind kind, uint16_t seq, const uint8_t *data, uint8_t length)
-{
-    OtaPacket packet = {};
-
-    packet.tag = static_cast<uint8_t>(PacketTag::Ota);
-    packet.kind = static_cast<uint8_t>(kind);
-    packet.seq = seq;
-
-    if (data != nullptr && length > 0) {
-        memcpy(packet.data, data, length);
-    }
-
-    radio.stopListening();
-    const bool sent = radio.write(&packet, sizeof(packet));
-    radio.startListening();
-    return sent;
-}
-
-bool sendOtaBegin(uint32_t length, uint32_t crc)
-{
-    uint8_t header[10] = {};
-
-    header[0] = kWireProtocolVersion;
-    writeLe32(&header[2], length);
-    writeLe32(&header[6], crc);
-    return sendOtaPacket(OtaKind::Begin, 0, header, sizeof(header));
-}
-
-enum class OtaWait : uint8_t { Ok, Error, Timeout };
-
-/* Wait for one of the car's rare answers. The radio acknowledgement only says
- * a packet reached the chip; this one carries what the car decided */
-OtaWait waitOtaResponse(uint16_t seq, uint16_t timeoutMs, uint8_t &errorCode)
-{
-    const uint32_t start = millis();
-
-    while (millis() - start < timeoutMs) {
-        uint8_t pipe;
-        uint8_t buffer[sizeof(OtaPacket)];
-        OtaPacket packet;
-
-        if (!radio.available(&pipe)) {
-            continue;
-        }
-
-        radio.read(buffer, sizeof(buffer));
-        if (buffer[0] == static_cast<uint8_t>(PacketTag::Log)) {
-            /* The car's own lines explain a refusal, show them live */
-            drainLogFragment(pipe, buffer);
-            continue;
-        }
-        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
-            continue; /* a packet meant for another reader */
-        }
-
-        memcpy(&packet, buffer, sizeof(packet));
-        if (packet.kind == static_cast<uint8_t>(OtaKind::Error)) {
-            errorCode = packet.data[0];
-            return OtaWait::Error;
-        }
-        if (packet.kind == static_cast<uint8_t>(OtaKind::Ack) && packet.seq == seq) {
-            return OtaWait::Ok;
-        }
-    }
-
-    return OtaWait::Timeout;
-}
-
-/* The car only speaks up to complain, so a look between two packets is enough:
- * waiting here would give the channel away for nothing */
-bool pollReceiverError(uint8_t &errorCode)
-{
-    uint8_t pipe;
-
-    while (radio.available(&pipe)) {
-        uint8_t buffer[sizeof(OtaPacket)];
-        OtaPacket packet;
-
-        radio.read(buffer, sizeof(buffer));
-        if (buffer[0] == static_cast<uint8_t>(PacketTag::Log)) {
-            drainLogFragment(pipe, buffer);
-            continue;
-        }
-        if (buffer[0] != static_cast<uint8_t>(PacketTag::Ota)) {
-            continue;
-        }
-
-        memcpy(&packet, buffer, sizeof(packet));
-        if (packet.kind == static_cast<uint8_t>(OtaKind::Error)) {
-            errorCode = packet.data[0];
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void runOtaStream()
-{
-    uint8_t header[8];
-    uint8_t chunk[sizeof(OtaPacket::data)];
-    uint32_t length = 0;
-    uint32_t crc = 0;
-    uint32_t expected = 0;
-    uint32_t received = 0;
-    uint32_t streamCrc = kCrc32Init;
-    uint16_t seq = 0;
-    uint16_t radioRetries = 0;
-    uint8_t error = 0;
-
-    /* A device command leaves on the car pipe, whatever the current mode */
-    if (gMode != kModeBox) {
-        setMode(kModeBox);
-    }
-
-    if (!readExact(header, sizeof(header), kOtaTimeoutMs)) {
-        Serial.println(F("[ota] no header, dropped"));
-        return;
-    }
-
-    length = static_cast<uint32_t>(header[0]) | (static_cast<uint32_t>(header[1]) << 8) |
-             (static_cast<uint32_t>(header[2]) << 16) | (static_cast<uint32_t>(header[3]) << 24);
-    crc = static_cast<uint32_t>(header[4]) | (static_cast<uint32_t>(header[5]) << 8) |
-          (static_cast<uint32_t>(header[6]) << 16) | (static_cast<uint32_t>(header[7]) << 24);
-
-    expected = length;
-
-    Serial.print(F("[ota] image "));
-    Serial.print(length);
-    Serial.print(F(" bytes, crc 0x"));
-    Serial.println(crc, HEX);
-
-    /* The radio acknowledgement is not the signal that matters here: the car
-     * erases the staging sector for two seconds and its FIFO refuses packets
-     * meanwhile. What counts is the application's answer, after it */
-    bool accepted = false;
-    for (uint8_t attempt = 0; attempt < 3 && !accepted; ++attempt) {
-        Serial.print(F("[ota] begin attempt "));
-        Serial.print(attempt + 1);
-        Serial.println(sendOtaBegin(length, crc) ? F(", the radio acknowledged it") :
-                                                   F(", no answer from the chip"));
-
-        const OtaWait begin = waitOtaResponse(kOtaBeginAck, kOtaBeginAckMs, error);
-        if (begin == OtaWait::Ok) {
-            accepted = true;
-        } else if (begin == OtaWait::Error) {
-            Serial.print(F("[ota] begin refused, error "));
-            Serial.println(error);
-            Serial.write(kOtaNak);
-            drainSerial(300);
-            return;
-        }
-    }
-
-    if (!accepted) {
-        Serial.println(F("[ota] begin not accepted"));
-        Serial.write(kOtaNak);
-        drainSerial(300);
-        return;
-    }
-
-    Serial.println(F("[ota] begin accepted"));
-    /* The image waits until the car is listening again: the PC takes this byte
-     * as the order to start, and would otherwise overflow our serial buffer
-     * while we are still busy with the answer above */
-    Serial.write(kOtaAck);
-
-    while (length > 0) {
-        const uint8_t take = length > sizeof(chunk) ? sizeof(chunk) : static_cast<uint8_t>(length);
-        bool delivered = false;
-
-        if (!readExact(chunk, take, kOtaTimeoutMs)) {
-            /* The PC cannot be blamed any more: it never sends more than the
-             * credits below allow, so a shortfall here means the serial link
-             * itself lost bytes */
-            Serial.print(F("[ota] stream stopped after "));
-            Serial.print(received);
-            Serial.print(F(" of "));
-            Serial.print(expected);
-            Serial.print(F(" bytes, radio retries "));
-            Serial.println(radioRetries);
-            Serial.write(kOtaNak);
-            drainSerial(300);
-            return;
-        }
-
-        /* The tail of the last packet is padded with the erased-flash value;
-         * the receiver only counts the bytes the record covers */
-        memset(&chunk[take], 0xFF, sizeof(chunk) - take);
-
-        for (uint8_t attempt = 0; attempt < kOtaWriteAttempts && !delivered; ++attempt) {
-            delivered = sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk));
-            if (!delivered) {
-                ++radioRetries;
-                /* The car reads one packet per loop, so a full FIFO needs a
-                 * few milliseconds to free a slot: burning the three attempts
-                 * at once would report a refusal it could have avoided */
-                delay(3);
-            }
-        }
-
-        if (!delivered) {
-            Serial.print(F("[ota] radio refused packet "));
-            Serial.println(seq);
-            Serial.write(kOtaNak);
-            drainSerial(300);
-            return;
-        }
-
-        if (pollReceiverError(error)) {
-            Serial.print(F("[ota] receiver error "));
-            Serial.println(error);
-            Serial.write(kOtaNak);
-            drainSerial(300);
-            return;
-        }
-
-        received += take;
-        /* Only the bytes the image really covers: the tail of the last packet
-         * is padding, and the PC's CRC does not include it */
-        streamCrc = crc32Update(streamCrc, chunk, take);
-        ++seq;
-        length -= take;
-
-        /* The car reads one packet per loop, and its FIFO only holds three:
-         * sending the next 28 bytes immediately would fill it and the packet
-         * after that would be refused. One millisecond keeps the pipe full
-         * without overrunning it */
-        delay(1);
-
-        /* One credit per full group of packets. The PC may not send more than
-         * its credits allow, which keeps this board's serial buffer from
-         * overflowing: without it the PC runs ahead, the buffer fills, and the
-         * UART drops the surplus without anyone noticing */
-        if (seq % kOtaCreditPackets == 0) {
-            Serial.write(kOtaCredit);
-        }
-    }
-
-    /* The PC is the authority on the image, so the relay only has to check
-     * that what it received is what the PC announced. Catching it here says
-     * the loss happened on the serial link, not in the car */
-    streamCrc = crc32Finish(streamCrc);
-    if (streamCrc != crc) {
-        Serial.print(F("[ota] stream corrupt: crc 0x"));
-        Serial.print(streamCrc, HEX);
-        Serial.print(F(" instead of 0x"));
-        Serial.println(crc, HEX);
-        Serial.write(kOtaNak);
-        drainSerial(300);
-        return;
-    }
-
-    bool ended = false;
-    for (uint8_t attempt = 0; attempt < 3 && !ended; ++attempt) {
-        sendOtaPacket(OtaKind::End, seq, nullptr, 0);
-
-        const OtaWait wait = waitOtaResponse(seq, kOtaEndAckMs, error);
-        if (wait == OtaWait::Ok) {
-            ended = true;
-        } else if (wait == OtaWait::Error) {
-            Serial.print(F("[ota] receiver error "));
-            Serial.println(error);
-            break;
-        }
-    }
-
-    Serial.println(ended ? F("[ota] image accepted") : F("[ota] end not accepted"));
-    Serial.write(ended ? kOtaAck : kOtaNak);
-}
-void runOtaSelfTest()
-{
-    uint8_t chunk[sizeof(OtaPacket::data)];
-
-    if (gMode != kModeBox) {
-        setMode(kModeBox);
-    }
-
-    for (uint8_t index = 0; index < sizeof(chunk); ++index) {
-        chunk[index] = index;
-    }
-
-    Serial.println(F("[ota] test image: Begin, two Data, End"));
-    Serial.print(F("[ota] begin "));
-    const bool beginSent = sendOtaBegin(2 * sizeof(chunk), 0x12345678UL);
-    Serial.println(beginSent ? F("ACK") : F("no ACK"));
-
-    if (!beginSent) {
-        return;
-    }
-
-    /* The Begin makes the car erase its staging sector for about two seconds.
-     * Its RF FIFO only holds three packets and nobody drains it while the app
-     * is busy, so sending the rest now would have the End dropped without an
-     * acknowledgement. Wait for the application answer first, like the real
-     * relay does */
-    uint8_t error = 0;
-    const OtaWait begin = waitOtaResponse(kOtaBeginAck, kOtaBeginAckMs, error);
-    Serial.println(begin == OtaWait::Ok ? F("[ota] begin accepted") :
-                                          F("[ota] begin refused or silent"));
-
-    if (begin != OtaWait::Ok) {
-        return;
-    }
-
-    for (uint16_t seq = 0; seq < 2; ++seq) {
-        chunk[0] = static_cast<uint8_t>(seq);
-        Serial.print(F("[ota] data "));
-        Serial.print(seq);
-        Serial.print(' ');
-        Serial.println(sendOtaPacket(OtaKind::Data, seq, chunk, sizeof(chunk)) ? F("ACK") :
-                                                                                 F("no ACK"));
-        /* Leave the car time to read the packet and program its 28 bytes */
-        delay(10);
-    }
-
-    Serial.print(F("[ota] end "));
-    Serial.println(sendOtaPacket(OtaKind::End, 2, nullptr, 0) ? F("ACK") : F("no ACK"));
-}
-
 void handleKey(char ch)
 {
     if (consumeResetWord(ch)) {
         return;
     }
+
+    /* A key means the operator is driving again: the mode they pick, or the
+     * one they leave in place, wins over a pending post-OTA restore */
+    gPendingMode = 0;
 
     switch (ch) {
     case '1':
@@ -863,6 +667,9 @@ void handleKey(char ch)
         break;
     case '2':
         setMode(kModeBox);
+        break;
+    case '3':
+        setMode(kModeQuiet);
         break;
     case 'f':
         /* A device command, not a motor one: it works from any mode and
@@ -877,6 +684,39 @@ void handleKey(char ch)
         break;
     case 'v':
         sendVersionRequest();
+        break;
+    case 'p':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoProgramDone = !gNoProgramDone;
+        Serial.println(gNoProgramDone ? F("[fault] ProgramDone OFF") : F("[fault] ProgramDone ON"));
+        break;
+    case 'l':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoPingAnswer = !gNoPingAnswer;
+        Serial.println(gNoPingAnswer ?
+                               F("[fault] ping answers OFF, the box should call the link lost") :
+                               F("[fault] ping answers ON"));
+        break;
+    case 'n':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoAck = !gNoAck;
+        radio.setAutoAck(!gNoAck);
+        Serial.println(gNoAck ? F("[fault] ACK OFF, the box's sends will fail") :
+                                F("[fault] ACK ON"));
+        break;
+    case 't':
+        if (gMode != kModeCar) {
+            break;
+        }
+        gNoChatter = !gNoChatter;
+        Serial.println(gNoChatter ? F("[fault] telemetry and logs OFF") :
+                                    F("[fault] telemetry and logs ON"));
         break;
     case '?':
     case 'h':
@@ -939,13 +779,24 @@ void handleKey(char ch)
 void loop()
 {
     drainRadio();
+    /* Queued log fragments: one per pass, after the received traffic */
+    Log::service();
 
-    if (gMode == kModeCar && (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
+    /* The post-OTA log window is over: give the operator's mode back */
+    otaService();
+
+    if (gMode == kModeCar) {
+        serviceCarProgram();
+    }
+
+    if (gMode == kModeCar && gProgramActive && !gNoChatter &&
+        (millis() - gLastTelemetryMs) >= kTelemetryPeriodMs) {
         gLastTelemetryMs = millis();
         sendTelemetry();
     }
 
-    if (gMode == kModeCar && (millis() - gLastLogMs) >= kLogPeriodMs) {
+    if (gMode == kModeCar && gProgramActive && !gNoChatter &&
+        (millis() - gLastLogMs) >= kLogPeriodMs) {
         gLastLogMs = millis();
         sendCarLog();
     }
@@ -970,13 +821,19 @@ void printHelp()
 {
     Serial.println(F("\n=== NrfLink - Gaspetto radio link tool ==="));
     Serial.println(F("Modes:"));
-    Serial.println(F("  1: car emulation (default) - reads the program the Box sends"));
-    Serial.println(F("     on _car_ and answers with telemetry and logs on _box_"));
+    Serial.println(F("  1: car emulation (default) - plays the program the Box sends"));
+    Serial.println(F("     on _car_, answers its ping, then reports the end on _box_"));
     Serial.println(F("  2: box/sender - sends commands on _car_, reads telemetry on _box_"));
+    Serial.println(F("  3: quiet - radio idle, nothing sent or received, console only"));
     Serial.println(F("  ?: this help"));
     Serial.println(F("  f: ask the car to enter its DFU bootloader (works in any mode)"));
     Serial.println(F("  i: ask the car what its IRQ pin saw on A4 (works in any mode)"));
     Serial.println(F("  v: ping the other device: its build and the round-trip time"));
+    Serial.println(F("\nCar mode faults (mode 1 only):"));
+    Serial.println(F("  p: stop sending ProgramDone"));
+    Serial.println(F("  l: stop answering the box ping"));
+    Serial.println(F("  n: stop acknowledging the box sends"));
+    Serial.println(F("  t: stop telemetry and logs"));
     Serial.println(F("  o: send a dummy OTA image (framing check)"));
     Serial.println(F("  reset: type the five letters in a row to reboot the MCU"));
     Serial.println(F("\nMode 2 keys:"));

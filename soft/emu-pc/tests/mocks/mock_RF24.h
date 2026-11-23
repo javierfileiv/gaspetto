@@ -14,6 +14,9 @@ public:
     MOCK_METHOD(bool, _available, (uint8_t *pipe_num));
     MOCK_METHOD(bool, _write, (const void *buf, uint8_t len));
     MOCK_METHOD(bool, _write, (const void *buf, uint8_t len, bool multicast));
+    MOCK_METHOD(bool, _startWrite, (const void *buf, uint8_t len, bool multicast));
+    MOCK_METHOD(bool, _txStandBy, (uint32_t timeout, bool startTx));
+    MOCK_METHOD(void, _setRetries, (uint8_t delay, uint8_t count));
     MOCK_METHOD(void, _read, (void *buf, uint8_t len));
     MOCK_METHOD(void, _openWritingPipe, (const uint8_t *address));
     MOCK_METHOD(void, _openReadingPipe, (uint8_t number, const uint8_t *address));
@@ -31,6 +34,9 @@ public:
     bool available(uint8_t *pipe_num) override;
     void read(void *buf, uint8_t len) override;
     bool write(const void *buf, uint8_t len) override;
+    bool startWrite(const void *buf, uint8_t len, const bool multicast) override;
+    bool txStandBy(uint32_t timeout, bool startTx = 0) override;
+    void setRetries(uint8_t delay, uint8_t count) override;
     void openWritingPipe(const uint8_t *address) override;
     void openReadingPipe(uint8_t number, const uint8_t *address) override;
     void setPALevel(uint8_t level, bool lnaEnable = true) override;

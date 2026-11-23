@@ -125,10 +125,6 @@ void scan_run_piece_calibration();
  * INVALID. Used by the "p" send test to read the board it transmits */
 bool scan_zone(uint8_t firstSlot, uint8_t endSlot, BoxBoardPieces &board, bool &sawLoopCall);
 
-/* The one piece decode: a raw reading against this slot's compiled row.
- * Every consumer (monitors, scan, radio send) goes through it */
-BoxPieceId scan_piece_for_raw(uint8_t slotIndex, int16_t raw);
-
 /* Mode state, defined by main.cpp and read by nearly every module */
 extern TestMode test_mode;
 extern bool calibration_rails_on;
@@ -214,8 +210,8 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 /* ========================================== */
 /* leds.cpp - APA106 status LEDs and animations */
 /* ========================================== */
-/* The chain is driven by the FastLED library (dedicated APA106
- * controller, RGB wire order measured on this batch) */
+/* The chain is driven by the shared led_strip module, which wraps FastLED
+ * with the APA106 controller and the RGB wire order measured on this batch */
 
 /* Pixels on the chain: each APA106 regenerates the signal for the next
  * one, so a pixel soldered later lights as soon as it is wired after the
@@ -224,13 +220,6 @@ bool ads_read_single_ended_mean(const AdsTestEntry *entry, uint8_t channel, int1
 #define APA_LED_COUNT 3
 #endif
 constexpr uint16_t APA_PIXEL_COUNT = APA_LED_COUNT;
-
-/* Global output level handed to FastLED (255 = full); override with
- * -D APA_LED_INTENSITY=n when full scale is too harsh on the bench */
-#ifndef APA_LED_INTENSITY
-#define APA_LED_INTENSITY 80
-#endif
-constexpr uint8_t APA_INTENSITY = APA_LED_INTENSITY;
 
 /* Prepare the data pin and send one dark frame; call it AFTER the 5V
  * rail is up and settled (the APA106 ignores frames while unpowered) */

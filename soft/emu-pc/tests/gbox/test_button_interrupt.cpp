@@ -50,6 +50,10 @@ struct BoxTestRig {
             , ctx{ &eventQueue, &timeredEventQueue, &radioController, &idleState, &processingState }
             , box(ctx)
     {
+        /* work() reads the radio on every pass, so a silent receiver is the
+         * default here. A test that wants a packet declares its own
+         * expectation, and gmock gives it precedence over this one */
+        EXPECT_CALL(mockRf24, _available(_)).WillRepeatedly(Return(false));
         box.setLowPowerModeCallback([]() {});
         box.init(StateId::IDLE);
     }
@@ -81,7 +85,9 @@ TEST(GBoxButtonInterruptTest, ButtonPressedDuringProcessingSendsClearQueueComman
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -102,8 +108,8 @@ TEST(GBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
 
     InSequence seq;
     EXPECT_CALL(rig.mockRf24, _stopListening());
-    EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket)))
-            .WillOnce([](const void *data, uint8_t len) {
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+            .WillOnce([](const void *data, uint8_t len, bool) {
                 EXPECT_EQ(len, sizeof(CommandPacket));
                 const CommandPacket *pkt = static_cast<const CommandPacket *>(data);
                 EXPECT_EQ(pkt->count, 2);
@@ -111,6 +117,7 @@ TEST(GBoxButtonInterruptTest, SendClearQueueCommandCreatesCorrectPacket)
                 EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
                 return true;
             });
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rig.mockRf24, _startListening());
 
     bool result = rig.box.sendClearQueueCommand();
@@ -170,7 +177,8 @@ TEST(GBoxButtonInterruptTest, ProcessingStateButtonPressInterruptsScanAndClearsQ
 
     InSequence seq;
     EXPECT_CALL(rig.mockRf24, _stopListening());
-    EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false)).WillOnce(Return(true));
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rig.mockRf24, _startListening());
 
     Event evt = makeButtonPressedEvent();
@@ -185,7 +193,8 @@ TEST(GBoxButtonInterruptTest, ProcessingStateIgnoresNonButtonInterruptEvent)
     BoxTestRig rig;
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     Event evt{ EventId::ACTION, CommandId::MOTOR_FORWARD };
@@ -208,7 +217,9 @@ TEST(GBoxButtonInterruptTest, ButtonPressInIdleTransitionsToProcessing)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -232,7 +243,9 @@ TEST(GBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -247,7 +260,9 @@ TEST(GBoxButtonInterruptTest, MultipleButtonPressesWorkCorrectly)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -269,7 +284,8 @@ TEST(GBoxButtonInterruptTest, EmptyBoardWithButtonPressDoesNotSend)
     gbox_test::injectEmptyBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -292,7 +308,9 @@ TEST(GBoxButtonInterruptTest, RadioFailureDuringNormalOperation)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(false));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(false));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -311,13 +329,14 @@ TEST(GBoxButtonInterruptTest, ClearQueueCommandOrderIsCorrect)
 
     InSequence seq;
     EXPECT_CALL(rig.mockRf24, _stopListening());
-    EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket)))
-            .WillOnce([](const void *data, uint8_t len) {
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+            .WillOnce([](const void *data, uint8_t len, bool) {
                 const CommandPacket *pkt = static_cast<const CommandPacket *>(data);
                 EXPECT_EQ(pkt->commands[0], static_cast<uint8_t>(CommandId::MOTOR_STOP));
                 EXPECT_EQ(pkt->commands[1], static_cast<uint8_t>(CommandId::QUEUE_CLEAR));
                 return true;
             });
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rig.mockRf24, _startListening());
 
     bool result = rig.box.sendClearQueueCommand();
@@ -339,7 +358,9 @@ TEST(GBoxButtonInterruptTest, InterruptedScanTransitionsToIdle)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 
@@ -361,7 +382,8 @@ TEST(GBoxButtonInterruptTest, OverflowBoardWithButtonPressFails)
     gbox_test::injectOverflowBoard(rig.box);
 
     EXPECT_CALL(rig.mockRf24, _stopListening()).Times(0);
-    EXPECT_CALL(rig.mockRf24, _write(_, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, _, _)).Times(0);
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).Times(0);
     EXPECT_CALL(rig.mockRf24, _startListening()).Times(0);
 
     ASSERT_EQ(rig.box.postEvent(makeButtonPressedEvent()), 0);
@@ -383,13 +405,14 @@ TEST(GBoxButtonInterruptTest, ClearQueueCommandIncludesBothCommands)
 
     InSequence seq;
     EXPECT_CALL(rig.mockRf24, _stopListening());
-    EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket)))
-            .WillOnce([&](const void *data, uint8_t len) {
+    EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+            .WillOnce([&](const void *data, uint8_t len, bool) {
                 const CommandPacket *pkt = static_cast<const CommandPacket *>(data);
                 capturedCmd0 = pkt->commands[0];
                 capturedCmd1 = pkt->commands[1];
                 return true;
             });
+    EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rig.mockRf24, _startListening());
 
     capturedResult = rig.box.sendClearQueueCommand();
@@ -412,7 +435,9 @@ TEST(GBoxButtonInterruptTest, ProcessingStateHandlesButtonPressEvent)
     {
         InSequence seq;
         EXPECT_CALL(rig.mockRf24, _stopListening());
-        EXPECT_CALL(rig.mockRf24, _write(_, sizeof(CommandPacket))).WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _startWrite(_, sizeof(CommandPacket), false))
+                .WillOnce(Return(true));
+        EXPECT_CALL(rig.mockRf24, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rig.mockRf24, _startListening());
     }
 

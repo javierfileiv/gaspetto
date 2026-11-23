@@ -4,6 +4,7 @@
 #include "RadioController.h"
 #include "RadioProtocol.h"
 #include "config_radio.h"
+#include "mock_Arduino.h"
 #include "mock_RF24.h"
 
 #include <array>
@@ -16,6 +17,7 @@ using ::testing::_;
 using ::testing::DoAll;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::StrictMock;
 
@@ -33,6 +35,9 @@ bool same5(const uint8_t *lhs, const uint8_t *rhs)
 class RadioControllerUnitTest : public ::testing::Test {
 protected:
     EventQueue appQueue;
+    /* The version answer stamps millis(): the emulated Arduino routes it
+     * through this singleton, which has to exist for the stamp to work */
+    NiceMock<MockArduino> arduino;
     StrictMock<MockRF24> rf{ 10000000 };
     RadioController controller{ rf, &appQueue, gbox_pipe_name, gcar_pipe_name };
 
@@ -67,8 +72,8 @@ TEST_F(RadioControllerUnitTest, ProcessRadioTransmitsQueuedEvent)
 
     EXPECT_CALL(rf, _available(_)).WillOnce(Return(false));
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(_, Event::packetSize()))
-            .WillOnce(DoAll(Invoke([&evt](const void *buf, uint8_t len) {
+    EXPECT_CALL(rf, _startWrite(_, Event::packetSize(), false))
+            .WillOnce(DoAll(Invoke([&evt](const void *buf, uint8_t len, bool) {
                                 ASSERT_EQ(len, Event::packetSize());
                                 EventPacket expected{};
                                 evt.toPacket(expected);
@@ -76,6 +81,7 @@ TEST_F(RadioControllerUnitTest, ProcessRadioTransmitsQueuedEvent)
                                 EXPECT_EQ(std::memcmp(buf, &expected, len), 0);
                             }),
                             Return(true)));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rf, _startListening());
 
     controller.processRadio();
@@ -167,8 +173,8 @@ TEST_F(RadioControllerUnitTest, ProcessRadioAnswersAVersionRequest)
             }));
 
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(_, sizeof(VersionPacket)))
-            .WillOnce(Invoke([](const void *buf, uint8_t len) {
+    EXPECT_CALL(rf, _startWrite(_, sizeof(VersionPacket), false))
+            .WillOnce(Invoke([](const void *buf, uint8_t len, bool) {
                 VersionPacket answer = {};
                 std::memcpy(&answer, buf, sizeof(answer));
                 EXPECT_EQ(static_cast<uint8_t>(PacketTag::Version), answer.tag);
@@ -177,6 +183,7 @@ TEST_F(RadioControllerUnitTest, ProcessRadioAnswersAVersionRequest)
                 EXPECT_STREQ(FW_BUILD, answer.version);
                 return true;
             }));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
     EXPECT_CALL(rf, _startListening());
 
     controller.processRadio();
@@ -201,7 +208,27 @@ TEST_F(RadioControllerUnitTest, ProcessRadioReportsAVersionAnswer)
     controller.processRadio();
     const std::string out = testing::internal::GetCapturedStdout();
 
-    EXPECT_NE(out.find("Version build=42"), std::string::npos);
+    const std::string expected = std::string("version build 42 (abc1234), wire protocol v") +
+                                 std::to_string(static_cast<int>(answer.wire));
+
+    EXPECT_NE(out.find(expected), std::string::npos);
+}
+
+TEST_F(RadioControllerUnitTest, QuietLeavesTheRadioSilent)
+{
+    uint8_t payload[sizeof(CommandPacket)] = {};
+
+    EXPECT_CALL(rf, _stopListening());
+    controller.setQuiet(true);
+    ASSERT_TRUE(controller.isQuiet());
+
+    /* No SPI traffic at all: nothing is read, nothing is loaded for TX */
+    controller.processRadio();
+    EXPECT_FALSE(controller.sendBuffer(payload, sizeof(payload)));
+
+    EXPECT_CALL(rf, _startListening());
+    controller.setQuiet(false);
+    EXPECT_FALSE(controller.isQuiet());
 }
 
 TEST_F(RadioControllerUnitTest, ProcessRadioReassemblesLogFragments)
@@ -295,7 +322,8 @@ TEST_F(RadioControllerUnitTest, SendBufferReturnsFalseOnWriteFailure)
     uint8_t payload[4] = { 1, 2, 3, 4 };
 
     EXPECT_CALL(rf, _stopListening());
-    EXPECT_CALL(rf, _write(payload, sizeof(payload))).WillOnce(Return(false));
+    EXPECT_CALL(rf, _startWrite(payload, sizeof(payload), false)).WillOnce(Return(true));
+    EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(false));
     EXPECT_CALL(rf, _startListening());
 
     EXPECT_FALSE(controller.sendBuffer(payload, sizeof(payload)));
@@ -313,8 +341,8 @@ TEST_F(RadioControllerUnitTest, SendTelemetryStaysOnCommandPipeAndStampsTag)
     {
         InSequence seq;
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket)))
-                .WillOnce(Invoke([&stamped](const void *buf, uint8_t len) {
+        EXPECT_CALL(rf, _startWrite(_, sizeof(TelemetryPacket), false))
+                .WillOnce(Invoke([&stamped](const void *buf, uint8_t len, bool) {
                     TelemetryPacket sent{};
                     /* A wrong length leaves stamped false, which fails the
                      * assertion below just as loudly */
@@ -324,6 +352,7 @@ TEST_F(RadioControllerUnitTest, SendTelemetryStaysOnCommandPipeAndStampsTag)
                     }
                     return true;
                 }));
+        EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(true));
         EXPECT_CALL(rf, _startListening());
     }
 
@@ -342,7 +371,8 @@ TEST_F(RadioControllerUnitTest, SendTelemetryFailurePropagatesWithoutPipeSwitch)
     {
         InSequence seq;
         EXPECT_CALL(rf, _stopListening());
-        EXPECT_CALL(rf, _write(_, sizeof(TelemetryPacket))).WillOnce(Return(false));
+        EXPECT_CALL(rf, _startWrite(_, sizeof(TelemetryPacket), false)).WillOnce(Return(true));
+        EXPECT_CALL(rf, _txStandBy(_, _)).WillOnce(Return(false));
         EXPECT_CALL(rf, _startListening());
     }
 
@@ -355,6 +385,7 @@ TEST_F(RadioControllerUnitTest, InitReturnsEarlyWhenRadioBeginFails)
 
     EXPECT_CALL(rf, _setPALevel(_, _)).Times(0);
     EXPECT_CALL(rf, _setDataRate(_)).Times(0);
+    EXPECT_CALL(rf, _setRetries(_, _)).Times(0);
     EXPECT_CALL(rf, _setAddressWidth(_)).Times(0);
     EXPECT_CALL(rf, _setPayloadSize(_)).Times(0);
     EXPECT_CALL(rf, _openWritingPipe(_)).Times(0);
@@ -393,4 +424,22 @@ TEST_F(RadioControllerUnitTest, InvalidCommandPacketCountIsIgnored)
 
     controller.processRadio();
     EXPECT_TRUE(appQueue.IsEmpty());
+}
+
+TEST_F(RadioControllerUnitTest, SettersAndQuietModeAreCovered)
+{
+    controller.setOtaHandler(nullptr);
+    controller.setProgramDoneHandler(nullptr);
+    controller.setLogPeerPrefix("[peer] ");
+
+    EXPECT_CALL(rf, _stopListening());
+    controller.setQuiet(true);
+    EXPECT_TRUE(controller.isQuiet());
+
+    EXPECT_CALL(rf, _startListening());
+    controller.setQuiet(false);
+    EXPECT_FALSE(controller.isQuiet());
+
+    /* Already listening: the second false must not touch the radio */
+    controller.setQuiet(false);
 }
